@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policymap [
+<!ELEMENT policymap (policy)*>
+<!ATTLIST policymap xmlns CDATA #FIXED ''>
+<!ELEMENT policy EMPTY>
+<!ATTLIST policy xmlns CDATA #FIXED '' domain NMTOKEN #REQUIRED
+  name NMTOKEN #IMPLIED pattern CDATA #IMPLIED rights NMTOKEN #IMPLIED
+  stealth NMTOKEN #IMPLIED value CDATA #IMPLIED>
+]>
+<!--
+  Defence in depth for App\Services\ImageOptimiser.
+
+  The uploader is the site owner and nobody else — uploading sits behind
+  `auth` and there is one account — so this is not guarding against a hostile
+  user. It guards against one specific accident: ImageMagick decides a file's
+  format by reading its *contents*, while MediaLibrary::resolveMime() can fall
+  back to the filename when sniffing is inconclusive. A file that arrives named
+  `.png` therefore still reaches readImage(), which will happily recognise it
+  as something else entirely.
+
+  The coders below are the ones that turn "decode an image" into "follow
+  instructions in a file": MSL and MVG are scripting languages, URL/HTTPS/FTP
+  fetch over the network (an SSRF primitive), TEXT/LABEL read arbitrary paths,
+  and EPHEMERAL deletes. None of them is a format this site accepts, so losing
+  them costs nothing.
+
+  Also note SVG: it is never passed to ImageMagick at all — the optimiser
+  returns early on image/svg+xml before opening the file — but the coder is
+  disabled here too so that a future caller cannot reintroduce the delegate
+  path by accident.
+-->
+<policymap>
+  <policy domain="delegate" rights="none" pattern="*"/>
+
+  <policy domain="coder" rights="none" pattern="MSL"/>
+  <policy domain="coder" rights="none" pattern="MVG"/>
+  <policy domain="coder" rights="none" pattern="SVG"/>
+  <policy domain="coder" rights="none" pattern="URL"/>
+  <policy domain="coder" rights="none" pattern="HTTPS"/>
+  <policy domain="coder" rights="none" pattern="HTTP"/>
+  <policy domain="coder" rights="none" pattern="FTP"/>
+  <policy domain="coder" rights="none" pattern="EPHEMERAL"/>
+  <policy domain="coder" rights="none" pattern="TEXT"/>
+  <policy domain="coder" rights="none" pattern="LABEL"/>
+  <policy domain="coder" rights="none" pattern="SHOW"/>
+  <policy domain="coder" rights="none" pattern="WIN"/>
+  <policy domain="coder" rights="none" pattern="PLT"/>
+
+  <!-- Indirect reads: `@file` syntax that makes ImageMagick open a path of
+       the file's choosing rather than the one it was given. -->
+  <policy domain="path" rights="none" pattern="@*"/>
+</policymap>

@@ -1,0 +1,141 @@
+import {
+    mergeAttributes,
+    Node,
+    NodeViewWrapper,
+    ReactNodeViewRenderer,
+} from '@tiptap/react';
+import type { ReactNodeViewProps } from '@tiptap/react';
+import { Trash2 } from 'lucide-react';
+import {
+    EMPTY_MEDIA_LIBRARY,
+    findLibraryImage,
+    libraryFromOptions,
+} from '@/components/editor/media-library';
+import type {
+    EditorLibraryImage,
+    MediaEmbedOptions,
+} from '@/components/editor/media-library';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+/*
+ * One or more images, referenced by ULID.
+ *
+ * The attribute set matches App\Support\PageContent exactly: a `ulids` list,
+ * every entry of which must be a real ULID or the whole node is refused on
+ * save. Alt text is not stored here — it belongs to the image and is looked
+ * up, so editing it in the media library fixes every page at once.
+ *
+ * parseHTML/renderHTML are only Tiptap's clipboard plumbing — page bodies are
+ * stored and loaded as JSON.
+ */
+
+function toUlidList(value: unknown): string[] {
+    return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === 'string')
+        : [];
+}
+
+function ImageGalleryView(props: ReactNodeViewProps) {
+    const library = libraryFromOptions(props.extension.options);
+    const ulids = toUlidList(props.node.attrs.ulids);
+
+    const images = ulids
+        .map((ulid) => findLibraryImage(library, ulid))
+        .filter((image): image is EditorLibraryImage => image !== null);
+
+    return (
+        <NodeViewWrapper className="my-4">
+            <div
+                className={cn(
+                    'rounded-lg border border-border bg-card p-3',
+                    props.selected && 'ring-2 ring-ring',
+                )}
+            >
+                {images.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                        Deze afbeeldingen bestaan niet meer. Verwijder dit blok.
+                    </p>
+                ) : (
+                    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {images.map((image) => (
+                            <li
+                                key={image.ulid}
+                                className="flex aspect-video items-center justify-center overflow-hidden rounded-md bg-muted"
+                            >
+                                <img
+                                    src={image.url}
+                                    alt={image.alt_text}
+                                    loading="lazy"
+                                    className="max-h-full max-w-full object-contain"
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">
+                        {images.length === 1
+                            ? '1 afbeelding'
+                            : `${images.length} afbeeldingen`}
+                    </p>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => props.deleteNode()}
+                    >
+                        <Trash2 aria-hidden="true" />
+                        Verwijderen
+                    </Button>
+                </div>
+            </div>
+        </NodeViewWrapper>
+    );
+}
+
+export const ImageGallery = Node.create<MediaEmbedOptions>({
+    name: 'imageGallery',
+    group: 'block',
+    atom: true,
+    selectable: true,
+
+    addOptions() {
+        return {
+            library: EMPTY_MEDIA_LIBRARY,
+        };
+    },
+
+    addAttributes() {
+        return {
+            ulids: {
+                default: [],
+                parseHTML: (element) =>
+                    toUlidList(
+                        (element.getAttribute('data-ulids') ?? '')
+                            .split(',')
+                            .filter((entry) => entry !== ''),
+                    ),
+                renderHTML: (attributes) => ({
+                    'data-ulids': toUlidList(attributes.ulids).join(','),
+                }),
+            },
+        };
+    },
+
+    parseHTML() {
+        return [{ tag: 'div[data-type="imageGallery"]' }];
+    },
+
+    renderHTML({ HTMLAttributes }) {
+        return [
+            'div',
+            mergeAttributes(HTMLAttributes, { 'data-type': 'imageGallery' }),
+        ];
+    },
+
+    addNodeView() {
+        return ReactNodeViewRenderer(ImageGalleryView);
+    },
+});

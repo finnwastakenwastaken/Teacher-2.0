@@ -1,0 +1,119 @@
+import { Form, Head, usePage } from '@inertiajs/react';
+import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
+import Heading from '@/components/heading';
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { edit } from '@/routes/profile';
+import type { Auth } from '@/types';
+
+/*
+ * No "delete account" section here, and no e-mail verification notice.
+ *
+ * The account cannot be deleted — it is the only one, and losing it would lock
+ * the owner out of the site permanently. E-mail verification is disabled
+ * because the deployment has no outbound mail. See the technical reference.
+ */
+
+type PageProps = {
+    auth: Auth;
+};
+
+export default function Profile() {
+    const { auth } = usePage<PageProps>().props;
+
+    return (
+        <>
+            <Head title="Profielinstellingen" />
+
+            <h1 className="sr-only">Profielinstellingen</h1>
+
+            <div className="space-y-6">
+                <Heading
+                    variant="small"
+                    title="Profiel"
+                    description="Pas je naam en e-mailadres aan"
+                />
+
+                <Form
+                    {...ProfileController.update.form()}
+                    options={{ preserveScroll: true }}
+                    className="space-y-6"
+                >
+                    {({ processing, errors, recentlySuccessful }) => (
+                        <>
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">Naam</Label>
+
+                                <Input
+                                    id="name"
+                                    className="mt-1 block w-full"
+                                    defaultValue={auth.user.name}
+                                    name="name"
+                                    required
+                                    autoComplete="name"
+                                    placeholder="Volledige naam"
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.name}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="email">E-mailadres</Label>
+
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    className="mt-1 block w-full"
+                                    defaultValue={auth.user.email}
+                                    name="email"
+                                    required
+                                    autoComplete="username"
+                                    placeholder="E-mailadres"
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.email}
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <Button
+                                    disabled={processing}
+                                    data-test="update-profile-button"
+                                >
+                                    {processing && <Spinner />}
+                                    Opslaan
+                                </Button>
+
+                                {recentlySuccessful && (
+                                    <p
+                                        className="rounded-md bg-success px-2 py-1 text-sm text-success-foreground"
+                                        role="status"
+                                    >
+                                        Opgeslagen
+                                    </p>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </Form>
+            </div>
+        </>
+    );
+}
+
+Profile.layout = {
+    breadcrumbs: [
+        {
+            title: 'Profielinstellingen',
+            href: edit(),
+        },
+    ],
+};

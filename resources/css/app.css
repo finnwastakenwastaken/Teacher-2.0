@@ -1,0 +1,310 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+/* =========================================================================
+   TO REBRAND THIS SITE, EDIT ONLY THE "RAW PALETTE" BLOCK BELOW.
+   Everything else refers to those variables. No component hard-codes a colour.
+   ========================================================================= */
+
+@theme {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary-hover: var(--primary-hover);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    /* Project-specific semantic roles beyond the shadcn defaults. */
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-link: var(--link);
+    --color-error: var(--error);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+    /* ---------------------------------------------------------------------
+       RAW PALETTE — the project's full approved colour set.
+       These are the only literal colours in the codebase.
+       --------------------------------------------------------------------- */
+    --p-blue: #00a8ff;
+    --p-blue-deep: #0097e6;
+    --p-purple: #9c88ff;
+    --p-purple-deep: #8c7ae6;
+    --p-yellow: #fbc531;
+    --p-yellow-deep: #e1b12c;
+    --p-green: #4cd137;
+    --p-green-deep: #44bd32;
+    --p-steel: #487eb0;
+    --p-steel-deep: #40739e;
+    --p-red: #e84118;
+    --p-red-deep: #c23616;
+    --p-grey-50: #f5f6fa;
+    --p-grey-100: #dcdde1;
+    --p-grey-400: #7f8fa6;
+    --p-grey-500: #718093;
+    --p-navy: #273c75;
+    --p-navy-deep: #192a56;
+    --p-slate: #353b48;
+    --p-slate-deep: #2f3640;
+
+    /* White is not in the approved palette. It is used only for light-theme
+       card surfaces, where #f5f6fa is needed as the page background behind
+       them and a lifted surface must read as lifted. Permitted by the brief's
+       accessibility/contrast exception. */
+    --p-white: #ffffff;
+
+    --radius: 0.625rem;
+}
+
+/* =========================================================================
+   LIGHT THEME
+   Contrast notes (WCAG 2.1 AA, measured in the browser against the real
+   rendered stack, not estimated by eye):
+   - --p-slate-deep on --p-grey-50 .......... 11.3:1  body text
+   - --p-navy on white ...................... 10.6:1  links
+   - --p-navy-deep on --p-blue ............... 5.3:1  primary button label
+   - --muted-foreground on --p-grey-50 ....... 6.0:1  muted text
+   - --muted-foreground on --p-grey-100 ...... 4.8:1  muted text on a fill
+
+   IMPORTANT: white text on --p-blue is only 3.2:1 and FAILS AA for normal
+   text. That is why primary buttons carry dark navy labels, not white ones.
+
+   The general trap, and the reason several roles below are color-mix()
+   rather than a raw palette entry: a mid-luminance colour cannot serve both
+   as a fill carrying text AND as text on the page. The two requirements pull
+   in opposite directions. Raw --p-purple-deep, --p-steel and --p-red all sit
+   in that dead band (3.2-4.0:1 either way round). So fills are pushed toward
+   the surface and text roles are pushed away from it. This is already noted
+   for green and yellow; it applies more widely than the first pass assumed.
+   ========================================================================= */
+:root {
+    --background: var(--p-grey-50);
+    --foreground: var(--p-slate-deep);
+
+    --card: var(--p-white);
+    --card-foreground: var(--p-slate-deep);
+
+    --popover: var(--p-white);
+    --popover-foreground: var(--p-slate-deep);
+
+    --primary: var(--p-blue);
+    --primary-foreground: var(--p-navy-deep);
+    --primary-hover: var(--p-blue-deep);
+
+    --secondary: var(--p-steel-deep);
+    --secondary-foreground: var(--p-grey-50);
+
+    --muted: var(--p-grey-100);
+    /* Raw --p-grey-500 is 3.7:1 here — under AA. Darkened toward the
+       foreground until it passes on both the page and the muted fill, while
+       staying visibly quieter than body text (6.0:1 against 13.6:1). */
+    --muted-foreground: color-mix(
+        in srgb,
+        var(--p-grey-500) 55%,
+        var(--p-slate-deep)
+    );
+
+    /* `accent` is a hover/selected *surface* in this stack — menu items,
+       select options, ghost buttons, icon-picker tiles — never a brand fill.
+       A saturated purple there is both loud and unreadable (3.2:1 with any
+       label colour), so it is a pale tint of the brand purple instead. */
+    --accent: color-mix(in srgb, var(--p-purple-deep) 16%, var(--p-white));
+    --accent-foreground: var(--p-slate-deep);
+
+    --destructive: var(--p-red-deep);
+    --destructive-foreground: var(--p-grey-50);
+    /* Destructive as *text* (error messages, ghost delete buttons) rather
+       than as a fill. Separate role because the fill and the text want
+       opposite luminances — see the note above. */
+    --error: var(--p-red-deep);
+
+    --success: var(--p-green-deep);
+    --success-foreground: var(--p-slate-deep);
+
+    --warning: var(--p-yellow-deep);
+    --warning-foreground: var(--p-slate-deep);
+
+    --info: var(--p-steel-deep);
+    --info-foreground: var(--p-grey-50);
+
+    --link: var(--p-navy);
+
+    --border: var(--p-grey-100);
+    --input: var(--p-grey-100);
+    --ring: var(--p-blue);
+
+    --chart-1: var(--p-blue);
+    --chart-2: var(--p-purple);
+    --chart-3: var(--p-green-deep);
+    --chart-4: var(--p-yellow-deep);
+    --chart-5: var(--p-steel);
+
+    --sidebar: var(--p-navy);
+    --sidebar-foreground: var(--p-grey-50);
+    --sidebar-primary: var(--p-blue);
+    --sidebar-primary-foreground: var(--p-navy-deep);
+    --sidebar-accent: var(--p-navy-deep);
+    --sidebar-accent-foreground: var(--p-grey-50);
+    --sidebar-border: var(--p-navy-deep);
+    --sidebar-ring: var(--p-blue);
+}
+
+/* =========================================================================
+   DARK THEME — the default for this site.
+   Not an inversion: surfaces step up (#2f3640 page, #353b48 card) rather
+   than down, borders lighten rather than darken, and the brighter palette
+   variants are used because the deep ones lose separation on dark ground.
+   Contrast notes (measured, worst case of page background vs card, since
+   --card is lighter here and is therefore the harder of the two):
+   - --p-grey-50 on --p-slate ............... 10.4:1  body text
+   - --link on --p-slate ..................... 4.9:1  links
+   - --muted-foreground on --p-slate ......... 5.0:1  muted text
+   - --p-navy-deep on --p-blue ............... 5.3:1  primary button label
+   - --p-grey-50 on --destructive ............ 5.1:1  delete button label
+
+   Raw --p-blue is 4.3:1 on --card and raw --p-grey-400 is 3.4:1 — both fail
+   there, which the first pass missed by only checking the page background.
+   Anything used as text must clear AA on the *card*, not just the page.
+   ========================================================================= */
+.dark {
+    --background: var(--p-slate-deep);
+    --foreground: var(--p-grey-50);
+
+    --card: var(--p-slate);
+    --card-foreground: var(--p-grey-50);
+
+    --popover: var(--p-slate);
+    --popover-foreground: var(--p-grey-50);
+
+    --primary: var(--p-blue);
+    --primary-foreground: var(--p-navy-deep);
+    --primary-hover: var(--p-blue-deep);
+
+    /* Raw --p-steel carries a navy label at only 3.2:1. Lifted until the
+       label passes; the fill also separates further from the page. */
+    --secondary: color-mix(in srgb, var(--p-steel) 55%, var(--p-grey-50));
+    --secondary-foreground: var(--p-navy-deep);
+
+    --muted: var(--p-slate);
+    --muted-foreground: color-mix(
+        in srgb,
+        var(--p-grey-400) 70%,
+        var(--p-grey-50)
+    );
+
+    /* See the light theme's note: `accent` is a hover surface, not a brand
+       fill. Here it is the card colour with a purple cast. */
+    --accent: color-mix(in srgb, var(--p-purple) 22%, var(--p-slate));
+    --accent-foreground: var(--p-grey-50);
+
+    /* The deep red, not the bright one, and a light label: no label colour
+       clears AA on --p-red (the best available is 3.5:1). Identical to the
+       light theme, so the destructive role reads the same in both. */
+    --destructive: var(--p-red-deep);
+    --destructive-foreground: var(--p-grey-50);
+    --error: color-mix(in srgb, var(--p-red) 58%, var(--p-grey-50));
+
+    --success: var(--p-green);
+    --success-foreground: var(--p-slate-deep);
+
+    --warning: var(--p-yellow);
+    --warning-foreground: var(--p-slate-deep);
+
+    --info: color-mix(in srgb, var(--p-steel) 55%, var(--p-grey-50));
+    --info-foreground: var(--p-navy-deep);
+
+    /* Softened toward the foreground so links clear AA on --card too, not
+       only on the page background. */
+    --link: color-mix(in srgb, var(--p-blue) 82%, var(--p-grey-50));
+
+    --border: color-mix(in srgb, var(--p-grey-400) 22%, transparent);
+    --input: color-mix(in srgb, var(--p-grey-400) 28%, transparent);
+    --ring: var(--p-blue);
+
+    --chart-1: var(--p-blue);
+    --chart-2: var(--p-purple);
+    --chart-3: var(--p-green);
+    --chart-4: var(--p-yellow);
+    --chart-5: var(--p-steel);
+
+    --sidebar: var(--p-navy-deep);
+    --sidebar-foreground: var(--p-grey-50);
+    --sidebar-primary: var(--p-blue);
+    --sidebar-primary-foreground: var(--p-navy-deep);
+    --sidebar-accent: var(--p-navy);
+    --sidebar-accent-foreground: var(--p-grey-50);
+    --sidebar-border: color-mix(in srgb, var(--p-grey-400) 22%, transparent);
+    --sidebar-ring: var(--p-blue);
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+
+    /* Visible focus is a hard requirement, not a default. Never remove this
+       without providing an equally visible replacement. */
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-ring;
+    }
+}

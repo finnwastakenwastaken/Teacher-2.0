@@ -1,0 +1,7 @@
+# Drop-box for `php artisan media:import`.
+#
+# Bind-mounted into the app container at storage/app/import (see compose.yaml)
+# so a large file copied onto the host with scp can be registered without
+# going through the browser at all. Contents are never committed.
+*
+!.gitignore

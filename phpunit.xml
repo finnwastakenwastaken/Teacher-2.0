@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <!--
+            force="true" is REQUIRED on every entry here, not optional.
+
+            The application runs in Docker, where APP_ENV, DB_DATABASE and the
+            rest are set as real environment variables by compose. PHPUnit's
+            <env> only applies when a variable is NOT already present in the
+            real environment unless forced, so without force="true":
+
+              * APP_ENV stays "local", so Laravel's runningUnitTests() is
+                false, CSRF validation stays on, and every POST test fails
+                with 419;
+              * DB_DATABASE stays "teacher", so RefreshDatabase truncates the
+                DEVELOPMENT database instead of teacher_testing.
+
+            The second one silently destroys real content. Do not remove.
+        -->
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <!--
+            Tests run against real PostgreSQL, not SQLite in-memory.
+
+            This application depends on PostgreSQL-specific behaviour that
+            SQLite cannot emulate: tsvector columns and GIN indexes for Dutch
+            full-text search, CHECK constraints on the topic tree depth, and
+            partial/composite unique indexes on slugs. Under SQLite the
+            migrations themselves would fail, and the search feature could not
+            be tested at all — which is precisely the feature most likely to
+            break silently.
+
+            The teacher_testing database is created by
+            docker/postgres/init-test-db.sh when the database volume is first
+            initialised.
+        -->
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_HOST" value="database" force="true"/>
+        <env name="DB_PORT" value="5432" force="true"/>
+        <env name="DB_DATABASE" value="teacher_testing" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+    </php>
+</phpunit>

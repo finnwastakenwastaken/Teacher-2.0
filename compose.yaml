@@ -1,0 +1,108 @@
+# Production stack. `docker compose up -d` brings up the real site.
+#
+# For local development use:
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d
+#
+# The Cloudflare Tunnel is behind a profile, so it only starts when asked for:
+#   docker compose --profile tunnel up -d
+
+name: teacher
+
+services:
+  app:
+    build:
+      context: .
+      target: production
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      # Uploaded media. Shared read-only with nginx so it can stream gated
+      # files via X-Accel-Redirect. This volume holds all user content —
+      # it is one of the two things that must be backed up.
+      - media:/var/www/html/storage/app/private
+      # Backup archives, deliberately on their own volume rather than inside
+      # the media one: an archive contains the media, so nesting them would
+      # make every backup contain all the previous ones. See config/backup.php.
+      - backups:/var/www/html/storage/app/backups
+      - logs:/var/www/html/storage/logs
+      # Drop-box for `php artisan media:import`, the escape hatch for files
+      # too large to upload through the browser. A bind mount rather than a
+      # named volume precisely so the operator can scp a file straight into
+      # ./storage-import on the host and have it appear here — with a named
+      # volume they would need docker cp, which defeats the point.
+      #
+      # Directories created by Docker are root-owned while PHP runs as
+      # www-data, so media:import copies and leaves the original in place by
+      # default. Pass --prune once ownership allows it.
+      - ./storage-import:/var/www/html/storage/app/import
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      # Bound to loopback only. Nothing should reach this from the network —
+      # the tunnel connects to it from inside the compose network, and the
+      # installer configures ufw to deny inbound 80/443 regardless.
+      - '127.0.0.1:8080:80'
+    volumes:
+      - media:/var/www/html/storage/app/private:ro
+      # Read-only, so nginx can stream a backup download from the internal
+      # /__backup/ location. Only an authenticated request ever produces the
+      # header that reaches it.
+      - backups:/var/www/html/storage/app/backups:ro
+
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # Dutch full-text search relies only on the built-in `dutch`
+      # configuration, so no locale beyond UTF-8 is required here.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8'
+    volumes:
+      - database:/var/lib/postgresql/data
+      # Runs once on first initialisation, creating the database the test
+      # suite uses. See phpunit.xml for why tests need real PostgreSQL.
+      - ./docker/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/10-init-test-db.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ['tunnel']
+    # The token is passed as an environment variable, never as a command
+    # argument — arguments are visible to any user who can run `ps`.
+    #
+    # Deliberately `:-` and not `:?`. Compose interpolates variables for every
+    # service in the file, including ones behind an inactive profile, so a
+    # required-variable guard here would break plain `docker compose build` for
+    # anyone not using the tunnel. install.sh validates the token instead.
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      - web
+
+volumes:
+  database:
+  media:
+  backups:
+  logs:
