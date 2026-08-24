@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-label="Teacher 2.0 admin dashboard placeholder">
+  <rect width="1200" height="700" fill="#f8fafc" />
+  <rect x="0" y="0" width="260" height="700" fill="#1e293b" />
+  <rect x="300" y="48" width="860" height="64" rx="12" fill="#e2e8f0" />
+  <rect x="300" y="150" width="260" height="180" rx="12" fill="#dbeafe" />
+  <rect x="590" y="150" width="260" height="180" rx="12" fill="#dcfce7" />
+  <rect x="880" y="150" width="260" height="180" rx="12" fill="#fee2e2" />
+  <rect x="300" y="360" width="860" height="280" rx="12" fill="#e2e8f0" />
+  <text x="730" y="515" text-anchor="middle" font-size="32" font-family="Arial, sans-serif" fill="#334155">
+    Add real admin screenshot at docs/demo/assets/admin-dashboard.png
+  </text>
+</svg>

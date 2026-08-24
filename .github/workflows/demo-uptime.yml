@@ -1,0 +1,53 @@
+name: demo-uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      demo_url:
+        description: 'Override demo URL for this run'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  uptime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target URL
+        id: target
+        env:
+          INPUT_URL: ${{ inputs.demo_url }}
+          CONFIG_URL: ${{ vars.DEMO_URL }}
+        run: |
+          URL="${INPUT_URL:-$CONFIG_URL}"
+          if [ -z "$URL" ]; then
+            echo "Set repository variable DEMO_URL or provide workflow_dispatch input demo_url."
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Check demo health
+        env:
+          DEMO_URL: ${{ steps.target.outputs.url }}
+        run: |
+          HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$DEMO_URL")"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 400 ]; then
+            echo "Demo check failed for $DEMO_URL (HTTP $HTTP_CODE)."
+            exit 1
+          fi
+
+      - name: Write step summary
+        if: always()
+        env:
+          DEMO_URL: ${{ steps.target.outputs.url }}
+        run: |
+          {
+            echo "## Demo uptime check"
+            echo ""
+            echo "- URL: \`$DEMO_URL\`"
+            echo "- Result: \`${{ job.status }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

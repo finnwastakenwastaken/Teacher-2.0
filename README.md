@@ -27,10 +27,12 @@ English.
 |---|---|---|
 | [Deployment](docs/deployment.md) | Getting it onto a server, start to finish | English |
 | [Maintenance](docs/maintenance.md) | Backups, updates, recovery, troubleshooting | English |
+| [Live demo runbook](docs/live-demo.md) | Operating a public demo with GitHub Pages + a real host | English |
 | [Administration](docs/administration.md) | The teacher who publishes the material | English |
 | [Beheerdersgids](docs/beheerdersgids.md) | Same as *Administration* | Dutch |
 | [Installatiegids](docs/installatiegids.md) | Same as *Deployment* | Dutch |
 | [Onderhoud en beveiliging](docs/onderhoud-en-beveiliging.md) | Same as *Maintenance* | Dutch |
+| [Live demo draaiboek](docs/live-demo-nl.md) | Same as *Live demo runbook* | Dutch |
 | [Technical reference](docs/technical-reference.md) | Developers | English |
 
 > The Dutch and English guides are translations of each other. A change to

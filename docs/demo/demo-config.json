@@ -1,0 +1,31 @@
+{
+  "siteName": "Teacher 2.0 Demo",
+  "repoUrl": "https://github.com/finnwastakenwastaken/Teacher-2.0",
+  "liveDemoUrl": "https://demo.example.com",
+  "statusPageUrl": "https://status.example.com",
+  "publicNotes": [
+    "The live application runs on Docker with Laravel + PostgreSQL.",
+    "GitHub Pages only hosts this static portal."
+  ],
+  "credentials": {
+    "enabled": false,
+    "label": "Demo account",
+    "username": "",
+    "passwordHint": "Ask the repository owner for temporary credentials."
+  },
+  "highlights": [
+    "No student accounts or tracking",
+    "Content grouped by education level",
+    "Private media with access control"
+  ],
+  "screenshots": [
+    {
+      "title": "Homepage",
+      "path": "assets/homepage.svg"
+    },
+    {
+      "title": "Admin dashboard",
+      "path": "assets/admin-dashboard.svg"
+    }
+  ]
+}
