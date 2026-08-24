@@ -560,9 +560,11 @@ summary() {
     fi
 
     printf '\n'
-    printf '  Verder lezen:\n'
-    printf '    docs/beheerdersgids.md            voor de docent\n'
-    printf '    docs/onderhoud-en-beveiliging.md  back-ups, updates, herstel\n'
+    printf '  Verder lezen, in de wiki:\n'
+    printf '    github.com/finnwastakenwastaken/Teacher-2.0/wiki\n'
+    printf '      Getting-Started        voor de docent\n'
+    printf '      Backups-and-Restore    back-ups en herstel\n'
+    printf '      Troubleshooting        als er iets misgaat\n'
     printf '\n'
     printf '  Bijwerken doe je later met:  sudo ./update.sh\n\n'
 }

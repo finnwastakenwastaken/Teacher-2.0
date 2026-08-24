@@ -466,9 +466,9 @@ return [
         'restore_body_1' => 'Dat gebeurt op de server zelf, niet hier — het wist alles wat er nu staat, en dat is geen knop die per ongeluk ingedrukt moet kunnen worden. De stappen staan in ',
         'restore_body_2' => '. Kort: zet het bestand op de server en voer ',
         'restore_body_3' => ' uit.',
-        // The two server guides are one guide in two languages, so the
-        // citation follows the interface rather than staying Dutch.
-        'restore_doc' => 'docs/onderhoud-en-beveiliging.md',
+        // The documentation is one English wiki, so this citation is the same
+        // in both locales — see the allow-list in LocalisationTest.
+        'restore_doc' => 'github.com/finnwastakenwastaken/Teacher-2.0/wiki/Backups-and-Restore',
         'restore_command' => './restore.sh <bestand>',
         'confirm_delete' => 'Back-up van :moment verwijderen? Dit kan niet ongedaan worden gemaakt.',
         'keep' => 'Op deze server worden standaard de :count nieuwste back-ups bewaard als er automatisch wordt opgeruimd.',

@@ -50,7 +50,6 @@ auth.json
 storage-import
 
 # Read on the host, never inside a container.
-docs
 install.sh
 update.sh
 

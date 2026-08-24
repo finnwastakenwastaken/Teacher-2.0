@@ -9,32 +9,29 @@ anywhere in the application.
 
 Nothing in it is tied to a subject or a school. The topics, the education
 levels, the site's name and logo are all defined by whoever owns the
-installation; the examples in the guides are only examples.
+installation; the examples in the documentation are only examples.
 
 The feature that justifies building this rather than adopting Moodle or
 WordPress: **downloads tagged by education level**. One page carries one
 worksheet in several track-specific variants, grouped per level, so each student
 picks the version matching their track.
 
-The interface is **Dutch**. Code, comments and the technical reference are
-English.
+The interface is **Dutch or English**, and the visitor chooses. Only the
+interface switches — the teacher's own words stay in whichever language they
+were written in. Code, comments and the documentation are English.
 
 ---
 
 ## Documentation
 
-| Guide | For | Language |
-|---|---|---|
-| [Deployment](docs/deployment.md) | Getting it onto a server, start to finish | English |
-| [Maintenance](docs/maintenance.md) | Backups, updates, recovery, troubleshooting | English |
-| [Administration](docs/administration.md) | The teacher who publishes the material | English |
-| [Beheerdersgids](docs/beheerdersgids.md) | Same as *Administration* | Dutch |
-| [Installatiegids](docs/installatiegids.md) | Same as *Deployment* | Dutch |
-| [Onderhoud en beveiliging](docs/onderhoud-en-beveiliging.md) | Same as *Maintenance* | Dutch |
-| [Technical reference](docs/technical-reference.md) | Developers | English |
+Everything is in the [wiki](https://github.com/finnwastakenwastaken/Teacher-2.0/wiki),
+in three tracks:
 
-> The Dutch and English guides are translations of each other. A change to
-> one belongs in the other.
+| Track | Start at | For |
+|---|---|---|
+| Publishing material | [Getting started](https://github.com/finnwastakenwastaken/Teacher-2.0/wiki/Getting-Started) | The teacher who owns the site |
+| Running the server | [Installation](https://github.com/finnwastakenwastaken/Teacher-2.0/wiki/Installation) | Whoever deploys and maintains it |
+| Working on the code | [Technical reference](https://github.com/finnwastakenwastaken/Teacher-2.0/wiki/Technical-Reference) | Developers |
 
 ---
 
@@ -47,7 +44,8 @@ English.
   with seeking, and YouTube embeds.
 - A downloads section grouped by education level, plus a "my level" preference
   that reorders the groups. It never hides anything.
-- Full-text search in Dutch, including word forms.
+- Full-text search, including word forms, in the language the material is
+  written in.
 - Class passwords on a page or a whole branch, remembered for 30 days.
 
 **For the teacher** — one admin panel, everything editable in the browser.
@@ -111,8 +109,9 @@ Updating later:
 cd /opt/teacher && sudo ./update.sh
 ```
 
-Both scripts are safe to re-run. The [deployment guide](docs/deployment.md)
-walks through the whole thing, including the manual route.
+Both scripts are safe to re-run.
+[Installation](https://github.com/finnwastakenwastaken/Teacher-2.0/wiki/Installation)
+walks through the whole thing, and there is a manual route beside it.
 
 ---
 
@@ -174,7 +173,6 @@ resources/js/
   components/content/      The public renderer
   components/editor/       TipTap and its custom blocks
 docker/                    nginx config, PHP image, entrypoint
-docs/                      The guides above
 install.sh · update.sh     Server setup and updates
 compose.yaml               Production;  compose.dev.yaml overlays development
 ```
@@ -191,7 +189,7 @@ structured JSON and rendered through a whitelist, never as HTML, which removes
 stored XSS as a category. There is no registration, the single account cannot be
 deleted, and password recovery is a command on the server rather than an email.
 The details, and the reasoning, are in the [technical
-reference](docs/technical-reference.md).
+reference](https://github.com/finnwastakenwastaken/Teacher-2.0/wiki/Technical-Reference).
 
 ---
 

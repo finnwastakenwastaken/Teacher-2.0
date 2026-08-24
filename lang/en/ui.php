@@ -466,9 +466,9 @@ return [
         'restore_body_1' => 'That happens on the server itself, not here — it erases everything currently there, and that is not a button anybody should be able to press by accident. The steps are in ',
         'restore_body_2' => '. In short: put the file on the server and run ',
         'restore_body_3' => '.',
-        // The two server guides are one guide in two languages, so the
-        // citation follows the interface rather than staying Dutch.
-        'restore_doc' => 'docs/maintenance.md',
+        // The documentation is one English wiki, so this citation is the same
+        // in both locales — see the allow-list in LocalisationTest.
+        'restore_doc' => 'github.com/finnwastakenwastaken/Teacher-2.0/wiki/Backups-and-Restore',
         'restore_command' => './restore.sh <file>',
         'confirm_delete' => 'Delete the backup from :moment? This cannot be undone.',
         'keep' => 'By default this server keeps the :count most recent backups when it prunes automatically.',

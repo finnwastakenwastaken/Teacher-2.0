@@ -137,6 +137,11 @@ class LocalisationTest extends TestCase
             // Format strings: a URL and a bare count.
             'ui.editor.youtube_dialog.placeholder',
             'ui.levels.download_count',
+
+            // The documentation is one English wiki rather than a Dutch guide
+            // and an English one, so the address it cites is the same address
+            // whichever language the interface is in.
+            'ui.backups.restore_doc',
         ];
 
         $dutch = $this->messages('nl');
