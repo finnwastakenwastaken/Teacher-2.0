@@ -85,6 +85,36 @@ class TopicManagementTest extends TestCase
         $response->assertSessionHasErrors('parent_id');
     }
 
+    /**
+     * Moving a topic under its own child used to be refused only by accident:
+     * the depth cascade pushed the subtree past the cap and the database
+     * trigger raised a message about depth — for something that is not a
+     * depth problem. The owner read "maximaal 3 niveaus diep" about a move
+     * between two levels, which explains nothing.
+     */
+    public function test_a_topic_cannot_be_moved_under_its_own_descendant()
+    {
+        $admin = User::factory()->create();
+        $root = Topic::query()->create(['title' => 'L0', 'slug' => 'l0']);
+        $child = Topic::query()->create(['title' => 'L1', 'slug' => 'l1', 'parent_id' => $root->id]);
+
+        $response = $this->actingAs($admin)->put(route('admin.topics.update', $root), [
+            'title' => 'L0',
+            'slug' => 'l0',
+            'parent_id' => $child->id,
+        ]);
+
+        $response->assertSessionHasErrors('parent_id');
+        // Asserted through the key rather than against a Dutch literal: the
+        // interface has two languages, and the test client advertises
+        // English, so a hard-coded string here would pin the wrong one.
+        $this->assertSame(
+            __('admin.topics.own_descendant'),
+            session('errors')->first('parent_id')
+        );
+        $this->assertNull($root->fresh()->parent_id);
+    }
+
     public function test_the_admin_can_rename_a_topic()
     {
         $admin = User::factory()->create();
@@ -148,7 +178,7 @@ class TopicManagementTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('admin.topics.index'));
 
-        $response->assertInertia(fn ($page) => $page->where('status', 'Onderwerp aangemaakt.'));
+        $response->assertInertia(fn ($page) => $page->where('status', __('admin.topics.created')));
     }
 
     public function test_the_admin_can_give_a_topic_an_introduction()

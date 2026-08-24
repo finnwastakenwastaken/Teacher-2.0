@@ -37,11 +37,12 @@ class MediaStream
         // straight onto the private disk root, so anything that ever managed
         // to put a different value in that column — a chunk directory, a
         // traversal sequence — would otherwise be served verbatim.
-        abort_unless(static::isServablePath($path), Response::HTTP_NOT_FOUND);
+        abort_unless(self::isServablePath($path), Response::HTTP_NOT_FOUND);
 
-        return static::emit(
+        return self::emit(
             config('media.disk'),
             config('media.x_accel_prefix'),
+            (bool) config('media.x_accel'),
             $path,
             $mime,
             $filename,
@@ -66,9 +67,14 @@ class MediaStream
      */
     public static function sendArchive(string $name): Response
     {
-        return static::emit(
+        return self::emit(
             config('backup.disk'),
             config('backup.x_accel_prefix'),
+            // Its own flag, not media's. emit() used to read
+            // config('media.x_accel') for both, which made how a backup is
+            // transported a setting on the media library — unrelated things
+            // sharing a switch is how one of them gets changed by accident.
+            (bool) config('backup.x_accel'),
             $name,
             'application/gzip',
             $name,
@@ -82,6 +88,7 @@ class MediaStream
     private static function emit(
         string $diskName,
         string $prefix,
+        bool $useXAccel,
         string $path,
         string $mime,
         string $filename,
@@ -94,7 +101,7 @@ class MediaStream
 
         $headers = [
             'Content-Type' => $mime,
-            'Content-Disposition' => static::disposition($filename, $inline),
+            'Content-Disposition' => self::disposition($filename, $inline),
             'X-Content-Type-Options' => 'nosniff',
             // `private` keeps this out of any shared cache. Media access
             // depends on who is asking — and, once passwords land, on a
@@ -104,8 +111,8 @@ class MediaStream
             ...$extraHeaders,
         ];
 
-        if (! config('media.x_accel')) {
-            return static::sendWithPhp($disk->path($path), $headers);
+        if (! $useXAccel) {
+            return self::sendWithPhp($disk->path($path), $headers);
         }
 
         // Empty body: nginx discards it and streams the file itself. The

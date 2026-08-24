@@ -20,6 +20,7 @@ import { index as levelsIndex } from '@/routes/admin/levels';
 import { index as mediaIndex } from '@/routes/admin/media';
 import { index as passwordsIndex } from '@/routes/admin/passwords';
 import { index as topicsIndex } from '@/routes/admin/topics';
+import { t } from '@/lib/i18n';
 
 /*
  * The teacher's landing page. It answers "what is on my site, and what should
@@ -127,10 +128,11 @@ function NextSteps({ steps }: { steps: Step[] }) {
     return (
         <Card>
             <CardHeader>
-                <h2 className="text-base font-medium">Aan de slag</h2>
+                <h2 className="text-base font-medium">
+                    {t('ui.dashboard.next_steps')}
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                    Nog {remaining} {remaining === 1 ? 'stap' : 'stappen'} te
-                    gaan. Je kunt ze in elke volgorde doen.
+                    {t('ui.dashboard.remaining', { count: remaining })}
                 </p>
             </CardHeader>
             <CardContent>
@@ -193,12 +195,14 @@ function RecentPages({ pages }: { pages: RecentPage[] }) {
     return (
         <Card className="h-full">
             <CardHeader>
-                <h2 className="text-base font-medium">Onlangs bewerkt</h2>
+                <h2 className="text-base font-medium">
+                    {t('ui.dashboard.recent')}
+                </h2>
             </CardHeader>
             <CardContent>
                 {pages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        Er zijn nog geen pagina&apos;s.
+                        {t('ui.dashboard.no_pages')}
                     </p>
                 ) : (
                     <ul className="divide-y divide-border">
@@ -218,12 +222,12 @@ function RecentPages({ pages }: { pages: RecentPage[] }) {
                                                     className="size-3"
                                                     aria-hidden="true"
                                                 />
-                                                Verborgen
+                                                {t('ui.dashboard.hidden')}
                                             </Badge>
                                         )}
                                         {page.isEmpty && (
                                             <Badge variant="outline">
-                                                Nog geen inhoud
+                                                {t('ui.dashboard.empty')}
                                             </Badge>
                                         )}
                                     </span>
@@ -247,15 +251,17 @@ function PopularDownloads({ downloads }: { downloads: PopularDownload[] }) {
     return (
         <Card className="h-full">
             <CardHeader>
-                <h2 className="text-base font-medium">Meest opgehaald</h2>
+                <h2 className="text-base font-medium">
+                    {t('ui.dashboard.popular')}
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                    Alleen aantallen. Er wordt niets over bezoekers vastgelegd.
+                    {t('ui.dashboard.counts_only')}
                 </p>
             </CardHeader>
             <CardContent>
                 {downloads.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        Nog niets opgehaald.
+                        {t('ui.dashboard.nothing_fetched')}
                     </p>
                 ) : (
                     <ul className="divide-y divide-border">
@@ -296,15 +302,15 @@ export default function Dashboard({
 
     return (
         <>
-            <Head title="Dashboard" />
+            <Head title={t('ui.dashboard.title')} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <div className="space-y-0.5">
                     <h1 className="text-xl font-semibold tracking-tight">
-                        Dashboard
+                        {t('ui.dashboard.title')}
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        Een overzicht van je site.
+                        {t('ui.dashboard.subtitle')}
                     </p>
                 </div>
 
@@ -313,42 +319,52 @@ export default function Dashboard({
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <StatTile
                         icon={FolderTree}
-                        label="Onderwerpen"
+                        label={t('ui.dashboard.topics')}
                         value={String(stats.topics)}
                         detail={
                             stats.hiddenTopics > 0
-                                ? `${stats.hiddenTopics} verborgen`
-                                : 'Allemaal zichtbaar'
+                                ? t('ui.dashboard.topics_hidden', {
+                                      count: stats.hiddenTopics,
+                                  })
+                                : t('ui.dashboard.topics_all_visible')
                         }
                         href={topicsIndex().url}
                     />
                     <StatTile
                         icon={FileText}
-                        label="Pagina's"
+                        label={t('ui.dashboard.pages')}
                         value={String(stats.pages)}
                         detail={
                             stats.emptyPages > 0
-                                ? `${stats.emptyPages} nog zonder inhoud`
-                                : `${stats.hiddenPages} verborgen`
+                                ? t('ui.dashboard.pages_empty', {
+                                      count: stats.emptyPages,
+                                  })
+                                : t('ui.dashboard.pages_hidden', {
+                                      count: stats.hiddenPages,
+                                  })
                         }
                         href={topicsIndex().url}
                     />
                     <StatTile
                         icon={Images}
-                        label="Media"
+                        label={t('ui.dashboard.media')}
                         value={String(mediaCount)}
                         detail={
                             mediaCount > 0
-                                ? `${formatBytes(stats.mediaBytes)} in gebruik`
-                                : 'Nog niets geüpload'
+                                ? t('ui.dashboard.media_in_use', {
+                                      size: formatBytes(stats.mediaBytes),
+                                  })
+                                : t('ui.dashboard.media_none')
                         }
                         href={mediaIndex().url}
                     />
                     <StatTile
                         icon={Download}
-                        label="Downloads"
+                        label={t('ui.dashboard.downloads')}
                         value={String(stats.downloads)}
-                        detail={`${stats.downloadsServed}× opgehaald`}
+                        detail={t('ui.dashboard.downloads_served', {
+                            count: stats.downloadsServed,
+                        })}
                         href={topicsIndex().url}
                     />
                 </div>
@@ -364,16 +380,16 @@ export default function Dashboard({
                         className="flex items-center gap-2 hover:text-foreground"
                     >
                         <GraduationCap className="size-4" aria-hidden="true" />
-                        {stats.levels}{' '}
-                        {stats.levels === 1 ? 'niveau' : 'niveaus'}
+                        {t('ui.dashboard.levels', { count: stats.levels })}
                     </Link>
                     <Link
                         href={passwordsIndex().url}
                         className="flex items-center gap-2 hover:text-foreground"
                     >
                         <KeyRound className="size-4" aria-hidden="true" />
-                        {stats.passwords}{' '}
-                        {stats.passwords === 1 ? 'wachtwoord' : 'wachtwoorden'}
+                        {t('ui.dashboard.passwords', {
+                            count: stats.passwords,
+                        })}
                     </Link>
                 </div>
             </div>
@@ -384,7 +400,7 @@ export default function Dashboard({
 Dashboard.layout = {
     breadcrumbs: [
         {
-            title: 'Dashboard',
+            title: t('ui.dashboard.title'),
             href: dashboard(),
         },
     ],

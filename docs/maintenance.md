@@ -86,7 +86,7 @@ against an existing volume, so keep it.
 ### Making it automatic
 
 ```bash
-printf '#!/bin/sh\ncd /opt/teacher && docker compose exec -T app php artisan backup:run --prune\n' > /usr/local/bin/teacher-backup.sh
+printf '#!/bin/sh\ncd /opt/teacher || exit 1\ndocker compose exec -T app php artisan backup:run --prune\ndocker compose exec -T app php artisan media:prune-uploads\n' > /usr/local/bin/teacher-backup.sh
 ```
 
 ```bash
@@ -98,6 +98,12 @@ Run it every night at half past two:
 ```bash
 echo '30 2 * * * root /usr/local/bin/teacher-backup.sh' > /etc/cron.d/teacher-backup
 ```
+
+The second line clears the leftovers of uploads that were started and never
+finished. That also happens every time the container boots, which is enough on
+a machine that gets restarted — but a server that runs untouched for months
+never boots, and an abandoned two-gigabyte upload sits in the backed-up media
+volume until something clears it.
 
 `--prune` keeps the newest few archives and deletes the rest, so the volume does
 not grow forever. How many it keeps is `BACKUP_KEEP` in `.env`, seven by
@@ -218,6 +224,14 @@ apt update && apt upgrade -y
 Security updates install themselves if the installer set up
 `unattended-upgrades`, which it does. Reboot after a kernel update; the site
 comes back on its own.
+
+**That command patches the machine, not the site.** Nothing the site actually
+runs — nginx, PHP, PostgreSQL, ImageMagick, OpenSSL, the tunnel — comes from
+this machine's apt; each lives inside a container built from its own base
+image. `update.sh` is what patches those: it re-pulls every base image and
+rebuilds against it on each run. So running it occasionally matters even when
+there is nothing new to pull, and a server left alone for a year is a year
+behind on all of them however green `apt upgrade` looks.
 
 ---
 
@@ -353,6 +367,18 @@ opens for anyone with the link. Use a password for real protection.
 **Rate limits** apply to logging in, to claiming the account, and to entering a
 page password.
 
+**HSTS is set at Cloudflare, not here.** The site's own webserver only ever sees
+plain HTTP — Cloudflare terminates the encryption and the tunnel carries the
+request in from there — so it is in no position to promise a browser that this
+domain is always HTTPS. Cloudflare is: turn on **SSL/TLS → Edge Certificates →
+HTTP Strict Transport Security** in its dashboard once the site is live and
+working. Do it *after*, not before: HSTS is remembered by every browser that
+sees it, so switching it on while something is still broken over HTTPS is
+awkward to undo.
+
+Everything else — `X-Frame-Options`, `Referrer-Policy`, the content security
+policy — is sent by the site itself and needs nothing from you.
+
 ---
 
 ## 9. Things never to do
@@ -428,11 +454,37 @@ A full disk shows up as slowness long before it shows up as errors.
 
 ### An update failed partway
 
-The application container stops with an error in the log, and the site keeps
-running on the previous version until a build succeeds. Restore the database
-from the dump `update.sh` took just before it started, and report the error —
-this should not happen, and it is a fault in the software rather than in your
-server.
+`update.sh` builds, migrates and only then recreates the containers, in that
+order and for this reason: each of those steps stops the update while the old
+version is still serving. So a failed build or a failed migration leaves your
+site up, running exactly what it was running before, and the script says so.
+
+Report the error either way — this should not happen, and it is a fault in the
+software rather than in your server.
+
+If a migration did fail, the database may be part-way between two versions:
+PostgreSQL wraps each migration on its own, but not the run as a whole. Put it
+back from the dump `update.sh` wrote before it started. **That dump is a plain
+SQL stream, not a backup archive, so `restore.sh` does not take it** — it is
+read like this, with the newest file from `/var/backups`:
+
+```bash
+docker compose stop app
+```
+
+```bash
+gunzip -c /var/backups/teacher-db-pre-update-2026-08-24-1130.sql.gz | docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+```bash
+docker compose start app
+```
+
+`update.sh` prints these three lines itself whenever it stops badly, so you do
+not have to find this page first.
+
+The seven most recent dumps are kept and older ones are removed on each run;
+`TEACHER_KEEP_DUMPS` changes that number.
 
 ### Where the logs are
 

@@ -6,6 +6,7 @@ import type { IconData } from '@/components/icon';
 import type { ContentSummary } from '@/components/content-summary-card';
 import { PublicBreadcrumbs } from '@/components/public-breadcrumbs';
 import PublicLayout from '@/layouts/public-layout';
+import { t } from '@/lib/i18n';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import type { TipTapDoc } from '@/types/tiptap';
 
@@ -57,7 +58,7 @@ export default function ContentTopic({
 
             {!hasContent && !topic.content && (
                 <p className="text-muted-foreground">
-                    Dit onderdeel heeft nog geen inhoud.
+                    {t('ui.public.topic.empty')}
                 </p>
             )}
 

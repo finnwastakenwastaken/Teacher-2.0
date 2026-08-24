@@ -6,6 +6,7 @@ import type { IconData } from '@/components/icon';
 import type { PossibleParent } from '@/components/admin/topic-form';
 import { index as topicsIndex } from '@/routes/admin/topics';
 import type { TipTapDoc } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 type Topic = {
     id: number;
@@ -35,11 +36,11 @@ export default function TopicsEdit({
 }: Props) {
     return (
         <>
-            <Head title={`"${topic.title}" bewerken`} />
+            <Head title={t('ui.content.edit_title', { title: topic.title })} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <h1 className="text-xl font-semibold tracking-tight">
-                    &quot;{topic.title}&quot; bewerken
+                    {t('ui.content.edit_title', { title: topic.title })}
                 </h1>
 
                 <TopicForm
@@ -58,7 +59,7 @@ export default function TopicsEdit({
 // never as a link — see components/breadcrumbs.tsx — so its href is unused.
 TopicsEdit.layout = {
     breadcrumbs: [
-        { title: 'Inhoud', href: topicsIndex.url() },
-        { title: 'Onderwerp bewerken', href: '#' },
+        { title: t('ui.content.title'), href: topicsIndex.url() },
+        { title: t('ui.content.topic.edit'), href: '#' },
     ],
 };

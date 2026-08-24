@@ -34,12 +34,20 @@ class DashboardTest extends TestCase
 
     private function page(Topic $topic, string $title, string $slug, ?array $content = null): Page
     {
-        return Page::query()->create([
+        $page = Page::query()->create([
             'title' => $title,
             'slug' => $slug,
             'topic_id' => $topic->id,
-            'content' => $content,
         ]);
+
+        // writeContent(), not a fillable attribute: `content` is not mass
+        // assignable and should not be, since this is the only writer that
+        // whitelists the document and derives content_text from it.
+        if ($content !== null) {
+            $page->writeContent($content);
+        }
+
+        return $page;
     }
 
     private function download(Page $page, int $count = 0): PageDownload

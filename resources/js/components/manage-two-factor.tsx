@@ -7,6 +7,7 @@ import TwoFactorSetupModal from '@/components/two-factor-setup-modal';
 import { Button } from '@/components/ui/button';
 import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
 import { disable, enable } from '@/routes/two-factor';
+import { t } from '@/lib/i18n';
 
 export type Props = {
     canManageTwoFactor?: boolean;
@@ -48,15 +49,13 @@ export default function ManageTwoFactor(props: Props) {
         <div className="space-y-6">
             <Heading
                 variant="small"
-                title="Tweestapsverificatie"
-                description="Een extra code bij het inloggen, uit een authenticator-app op je telefoon."
+                title={t('ui.settings.two_factor.title')}
+                description={t('ui.settings.two_factor.description')}
             />
             {twoFactorEnabled ? (
                 <div className="flex flex-col items-start justify-start space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Bij het inloggen wordt om een code gevraagd die je
-                        aflezt in de authenticator-app op je telefoon. De code
-                        verandert elke dertig seconden.
+                        {t('ui.settings.two_factor.enabled_explanation')}
                     </p>
 
                     <div className="relative inline">
@@ -67,7 +66,7 @@ export default function ManageTwoFactor(props: Props) {
                                     type="submit"
                                     disabled={processing}
                                 >
-                                    Tweestapsverificatie uitzetten
+                                    {t('ui.settings.two_factor.disable')}
                                 </Button>
                             )}
                         </Form>
@@ -82,17 +81,14 @@ export default function ManageTwoFactor(props: Props) {
             ) : (
                 <div className="flex flex-col items-start justify-start space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Zet je dit aan, dan vraagt de site bij het inloggen om
-                        een code uit een authenticator-app op je telefoon, naast
-                        je wachtwoord. Bewaar de herstelcodes die je daarna
-                        krijgt op een veilige plek.
+                        {t('ui.settings.two_factor.disabled_explanation')}
                     </p>
 
                     <div>
                         {hasSetupData ? (
                             <Button onClick={() => setShowSetupModal(true)}>
                                 <ShieldCheck />
-                                Instellen afmaken
+                                {t('ui.settings.two_factor.finish_setup')}
                             </Button>
                         ) : (
                             <Form
@@ -101,7 +97,7 @@ export default function ManageTwoFactor(props: Props) {
                             >
                                 {({ processing }) => (
                                     <Button type="submit" disabled={processing}>
-                                        Tweestapsverificatie aanzetten
+                                        {t('ui.settings.two_factor.enable')}
                                     </Button>
                                 )}
                             </Form>

@@ -151,6 +151,40 @@ class ContentRoutingTest extends TestCase
         $response->assertRedirect('/physica/sterrenkunde/de-planeten');
     }
 
+    /**
+     * A 301 is cached by browsers until the profile is cleared, so a slug
+     * typo corrected an hour later would otherwise stay broken for everyone
+     * who visited in between — and the owner has no way to reach into their
+     * browsers. The status stays 301 for crawlers; the max-age bounds how
+     * long a person is stuck with it.
+     */
+    public function test_a_slug_redirect_is_permanent_but_not_cached_forever()
+    {
+        $topic = Topic::query()->create(['title' => 'Natuurkunde', 'slug' => 'natuurkunde']);
+        $topic->update(['slug' => 'natuurkunde-nieuw']);
+
+        $this->get('/natuurkunde')
+            ->assertStatus(301)
+            ->assertHeader('Cache-Control', 'max-age=86400, public');
+    }
+
+    /**
+     * A vacated path can be claimed again. firstOrCreate kept the first
+     * claimant's row forever, so the second rename recorded nothing and the
+     * old address went on pointing at a page that had not lived there for a
+     * year.
+     */
+    public function test_a_reused_path_redirects_to_whoever_had_it_last()
+    {
+        $first = Topic::query()->create(['title' => 'Natuurkunde', 'slug' => 'natuurkunde']);
+        $first->update(['slug' => 'physica']);
+
+        $second = Topic::query()->create(['title' => 'Natuurkunde 2', 'slug' => 'natuurkunde']);
+        $second->update(['slug' => 'natuurwetenschappen']);
+
+        $this->get('/natuurkunde')->assertRedirect('/natuurwetenschappen');
+    }
+
     public function test_a_redirect_to_a_since_deleted_target_404s()
     {
         $topic = Topic::query()->create(['title' => 'Natuurkunde', 'slug' => 'natuurkunde']);

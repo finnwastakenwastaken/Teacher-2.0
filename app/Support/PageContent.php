@@ -42,10 +42,31 @@ class PageContent
         'tableRow' => [],
         'tableHeader' => ['colspan', 'rowspan', 'colwidth'],
         'tableCell' => ['colspan', 'rowspan', 'colwidth'],
-        // The three embed blocks.
+        // The embed blocks.
         'fileEmbed' => ['ulid'],
         'youtubeEmbed' => ['videoId'],
         'imageGallery' => ['ulids'],
+        // One image the running text flows around. `side` and `size` are
+        // enumerations the renderer turns into fixed classes, never numbers
+        // and never a style string.
+        'imageAside' => ['ulid', 'side', 'size'],
+    ];
+
+    /**
+     * The node types that put a media file on a page.
+     *
+     * Named once because two things read the list and they must not drift:
+     * this is what sanitiseWithoutEmbeds() strips, and it is the same set
+     * whose ULIDs collectReferences() turns into the rows that publish a file
+     * to anonymous visitors. A block added to one and not the other either
+     * leaks a picker into the topic editor or renders an image the owner can
+     * see and every student gets a 403 for.
+     */
+    private const EMBED_NODES = [
+        'fileEmbed',
+        'youtubeEmbed',
+        'imageGallery',
+        'imageAside',
     ];
 
     private const MARKS = [
@@ -63,6 +84,18 @@ class PageContent
 
     private const TEXT_ALIGNMENTS = ['left', 'center', 'right', 'justify'];
 
+    /** Which side of the running text an imageAside sits on. */
+    private const ASIDE_SIDES = ['left', 'right'];
+
+    /**
+     * How much of the column an imageAside takes.
+     *
+     * A named bucket rather than a number: the renderer maps it to one of
+     * three compiled classes, so there is no arithmetic and nothing that can
+     * become a style string.
+     */
+    private const ASIDE_SIZES = ['small', 'medium', 'large'];
+
     /**
      * Attributes whose absence is a real value, not a malformed one.
      *
@@ -70,6 +103,14 @@ class PageContent
      * table column nobody resized. Everywhere else in sanitiseAttrs() a null
      * means "this attribute is broken, drop the node"; for these two it means
      * "there is no value", so the key is dropped and the node survives.
+     *
+     * imageAside's `side` and `size` are deliberately *not* here. TipTap only
+     * writes a null for an attribute whose declared default is null, and both
+     * of those declare a real one ('right', 'medium'), so there is no "nobody
+     * chose" state for them to represent. Their arms below fall back to that
+     * same default instead of rejecting, which is the colspan treatment rather
+     * than the colwidth one: an image on the wrong side is cosmetic, an image
+     * dropped out of a lesson is a hole in it.
      */
     private const NULLABLE_ATTRS = ['textAlign', 'colwidth'];
 
@@ -83,6 +124,9 @@ class PageContent
     /**
      * Return a copy of $document containing only whitelisted nodes, marks and
      * attributes. Structure is preserved; anything unrecognised is dropped.
+     *
+     * @param  array<string, mixed>|null  $document
+     * @return array<string, mixed>|null
      */
     public static function sanitise(?array $document): ?array
     {
@@ -99,7 +143,7 @@ class PageContent
     }
 
     /**
-     * The same whitelist, minus the three embed blocks.
+     * The same whitelist, minus every embed block (see EMBED_NODES).
      *
      * Used for the homepage introduction. Embeds are what publish a file to
      * anonymous visitors, and that decision is made by walking from a file
@@ -108,6 +152,9 @@ class PageContent
      * and 403 for everyone else — a trap rather than a feature. Text, links
      * and lists cover what an introduction needs; a banner image is a
      * separate setting with its own explicit rule in MediaAccess.
+     *
+     * @param  array<string, mixed>|null  $document
+     * @return array<string, mixed>|null
      */
     public static function sanitiseWithoutEmbeds(?array $document): ?array
     {
@@ -132,7 +179,7 @@ class PageContent
                 $node['content'],
                 fn (mixed $child) => is_array($child) && ! in_array(
                     $child['type'] ?? null,
-                    ['fileEmbed', 'youtubeEmbed', 'imageGallery'],
+                    self::EMBED_NODES,
                     true,
                 ),
             ),
@@ -145,6 +192,8 @@ class PageContent
      * Flatten a document to plain text for the search vector (task 8) and for
      * excerpts. Derived server-side and never accepted from the client — it
      * has to describe what is actually stored.
+     *
+     * @param  array<string, mixed>|null  $document
      */
     public static function toPlainText(?array $document): string
     {
@@ -166,6 +215,7 @@ class PageContent
      * App\Support\MediaAccess), and it is what makes "this file is still in
      * use" answerable when the owner tries to delete it.
      *
+     * @param  array<string, mixed>|null  $document
      * @return array{images: list<string>, files: list<string>}
      */
     public static function references(?array $document): array
@@ -181,6 +231,9 @@ class PageContent
         ];
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private static function sanitiseNode(mixed $node): ?array
     {
         if (! is_array($node) || ! isset($node['type']) || ! is_string($node['type'])) {
@@ -267,12 +320,25 @@ class PageContent
                 'textAlign' => in_array($value, self::TEXT_ALIGNMENTS, true) ? $value : 'left',
                 'colspan', 'rowspan' => self::cellSpan($value),
                 'colwidth' => self::sanitiseColumnWidths($value),
+                // See NULLABLE_ATTRS: a bad value falls back rather than
+                // taking the image with it.
+                'side' => in_array($value, self::ASIDE_SIDES, true) ? $value : 'right',
+                'size' => in_array($value, self::ASIDE_SIZES, true) ? $value : 'medium',
                 // A ULID that is not a ULID cannot resolve to anything, and
                 // is the sort of value that ends up interpolated somewhere
                 // later. Reject the whole node rather than keep it.
                 'ulid' => self::isUlid($value) ? $value : null,
                 'ulids' => self::sanitiseUlidList($value),
+                // The default arm below is deliberately unreachable, which
+                // makes this the last arm that can match.
+                // @phpstan-ignore match.alwaysTrue
                 'videoId' => self::isYouTubeId($value) ? $value : null,
+                // Unreachable today: every name that can reach this method is
+                // in one of the allow-lists above and has an arm. Kept anyway,
+                // because the arms and the allow-lists are edited separately
+                // and this is what makes the omission fail closed — an
+                // attribute added to a list without a rule here drops its node
+                // rather than passing through unchecked.
                 default => null,
             };
 
@@ -348,7 +414,12 @@ class PageContent
         $trimmed = trim($href);
 
         // Relative links stay inside the site and cannot carry a scheme.
-        if (str_starts_with($trimmed, '/') && ! str_starts_with($trimmed, '//')) {
+        //
+        // The second slash is checked as either slash: browsers normalise a
+        // backslash in this position to a forward one, so `/\evil.example`
+        // is the protocol-relative URL `//evil.example` by the time it is
+        // navigated. Only the plain form was rejected before.
+        if (str_starts_with($trimmed, '/') && ! preg_match('#^/[/\\\\]#', $trimmed)) {
             return $trimmed;
         }
 
@@ -399,6 +470,9 @@ class PageContent
         return $widths;
     }
 
+    /**
+     * @return list<string>|null
+     */
     private static function sanitiseUlidList(mixed $value): ?array
     {
         if (! is_array($value)) {
@@ -447,8 +521,8 @@ class PageContent
     }
 
     /**
-     * @param  list<string>  $images
-     * @param  list<string>  $files
+     * @param  array<int, string>  $images
+     * @param  array<int, string>  $files
      */
     private static function collectReferences(mixed $node, array &$images, array &$files): void
     {
@@ -458,13 +532,27 @@ class PageContent
 
         $type = $node['type'] ?? null;
 
-        if ($type === 'fileEmbed' && isset($node['attrs']['ulid'])) {
+        // The is_string checks are not ceremony: this walks documents that
+        // are already in the database, including ones written before a given
+        // attribute rule existed. A non-string here would be carried into a
+        // whereIn() against the ulid column.
+        if ($type === 'fileEmbed' && is_string($node['attrs']['ulid'] ?? null)) {
             $files[] = $node['attrs']['ulid'];
+        }
+
+        // An imageAside shows exactly one image, and that reference is what
+        // publishes it. Forgetting this line renders the picture for the
+        // logged-in owner and 403s it for every student — a failure that is
+        // invisible from the admin panel.
+        if ($type === 'imageAside' && is_string($node['attrs']['ulid'] ?? null)) {
+            $images[] = $node['attrs']['ulid'];
         }
 
         if ($type === 'imageGallery' && is_array($node['attrs']['ulids'] ?? null)) {
             foreach ($node['attrs']['ulids'] as $ulid) {
-                $images[] = $ulid;
+                if (is_string($ulid)) {
+                    $images[] = $ulid;
+                }
             }
         }
 

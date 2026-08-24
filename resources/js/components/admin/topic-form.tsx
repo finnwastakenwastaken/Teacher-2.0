@@ -21,6 +21,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { slugify } from '@/lib/slug';
 import type { TipTapDoc } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 export type PossibleParent = {
     id: number;
@@ -91,7 +92,7 @@ export function TopicForm({
                 return (
                     <>
                         <div className="grid gap-2">
-                            <Label htmlFor="title">Titel</Label>
+                            <Label htmlFor="title">{t('ui.forms.title')}</Label>
                             <Input
                                 id="title"
                                 name="title"
@@ -103,13 +104,15 @@ export function TopicForm({
                                         setSlug(slugify(e.target.value));
                                     }
                                 }}
-                                placeholder="Bijv. Sterrenkunde"
+                                placeholder={t(
+                                    'ui.forms.topic_title_placeholder',
+                                )}
                             />
                             <InputError message={fieldErrors.title} />
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="slug">Slug</Label>
+                            <Label htmlFor="slug">{t('ui.forms.slug')}</Label>
                             <Input
                                 id="slug"
                                 name="slug"
@@ -119,14 +122,16 @@ export function TopicForm({
                                     setSlug(e.target.value);
                                     setSlugTouched(true);
                                 }}
-                                placeholder="bijv-sterrenkunde"
+                                placeholder={t(
+                                    'ui.forms.topic_slug_placeholder',
+                                )}
                             />
                             <InputError message={fieldErrors.slug} />
                         </div>
 
                         <div className="grid gap-2">
                             <Label htmlFor="parent_id">
-                                Bovenliggend onderwerp
+                                {t('ui.forms.parent')}
                             </Label>
                             <Select
                                 value={
@@ -150,7 +155,7 @@ export function TopicForm({
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={NO_PARENT}>
-                                        Geen (hoofdonderwerp)
+                                        {t('ui.forms.no_parent')}
                                     </SelectItem>
                                     {possibleParents.map((parent) => (
                                         <SelectItem
@@ -177,17 +182,21 @@ export function TopicForm({
                             value={icon}
                             valueIcon={iconData}
                             onChange={setIcon}
-                            label="Icoon"
+                            label={t('ui.forms.icon')}
                         />
                         <input type="hidden" name="icon" value={icon ?? ''} />
 
                         <div className="grid gap-2">
-                            <Label htmlFor="description">Omschrijving</Label>
+                            <Label htmlFor="description">
+                                {t('ui.forms.description')}
+                            </Label>
                             <Textarea
                                 id="description"
                                 name="description"
                                 defaultValue={topic?.description ?? ''}
-                                placeholder="Optionele korte omschrijving"
+                                placeholder={t(
+                                    'ui.forms.description_placeholder',
+                                )}
                             />
                             <InputError message={fieldErrors.description} />
                         </div>
@@ -197,7 +206,7 @@ export function TopicForm({
                                 id="topic-content-label"
                                 className="text-sm leading-none font-medium"
                             >
-                                Tekst
+                                {t('ui.forms.text')}
                             </span>
                             <SimpleTextEditor
                                 content={content}
@@ -205,9 +214,7 @@ export function TopicForm({
                                 labelledBy="topic-content-label"
                             />
                             <p className="text-xs text-muted-foreground">
-                                Optioneel. Verschijnt boven de lijst met
-                                subonderwerpen en pagina&apos;s. Bestanden en
-                                video&apos;s horen op een pagina, niet hier.
+                                {t('ui.forms.topic_text_hint')}
                             </p>
                             <InputError message={fieldErrors.content} />
                         </div>
@@ -222,7 +229,7 @@ export function TopicForm({
                         <AccessPasswordField
                             passwords={passwords}
                             defaultValue={topic?.access_password_id ?? null}
-                            hint="Beveiligt dit onderwerp en alles wat eronder valt. Een pagina of subonderwerp met een eigen wachtwoord gaat voor."
+                            hint={t('ui.forms.topic_password_hint')}
                             error={fieldErrors.access_password_id}
                         />
 
@@ -240,9 +247,7 @@ export function TopicForm({
                                 }
                             />
                             <Label htmlFor="is_hidden" className="font-normal">
-                                Verborgen — verschijnt niet in het menu of op de
-                                homepage, maar blijft bereikbaar via een directe
-                                link
+                                {t('ui.forms.hidden')}
                             </Label>
                         </div>
 
@@ -252,7 +257,7 @@ export function TopicForm({
                             disabled={processing}
                         >
                             {processing && <Spinner />}
-                            Opslaan
+                            {t('ui.actions.save')}
                         </Button>
                     </>
                 );

@@ -9,11 +9,14 @@ import type {
     PageMedia,
     PageMediaFile,
     PageMediaImage,
+    TipTapAsideSide,
+    TipTapAsideSize,
     TipTapDoc,
     TipTapMark,
     TipTapNode,
     TipTapTextAlign,
 } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 /*
  * The public renderer for a stored page body.
@@ -46,10 +49,31 @@ export function RichText({ doc, media }: RichTextProps) {
     }
 
     return (
-        <div className="max-w-none">
+        <div
+            className={cn(
+                'max-w-none',
+                // A float has to be contained or it runs past the end of the
+                // body and over whatever follows — on a page, the downloads.
+                // `flow-root` is the containment, but it also stops the first
+                // and last child's margins collapsing out of here, so it is
+                // applied only to a document that actually floats something.
+                // Every page written before this feature existed therefore
+                // renders byte-for-byte as it did.
+                containsAside(doc) && 'flow-root',
+            )}
+        >
             <NodeList nodes={doc.content} media={media} />
         </div>
     );
+}
+
+/** Does this document float anything? See the note in RichText. */
+function containsAside(node: TipTapDoc | TipTapNode): boolean {
+    if (node.type === 'imageAside') {
+        return true;
+    }
+
+    return 'content' in node ? (node.content ?? []).some(containsAside) : false;
 }
 
 function NodeList({
@@ -123,7 +147,7 @@ function RichTextNode({ node, media }: { node: TipTapNode; media: PageMedia }) {
 
         case 'blockquote':
             return (
-                <blockquote className="my-6 border-l-4 border-border pl-4 text-muted-foreground italic">
+                <blockquote className="clear-both my-6 border-l-4 border-border pl-4 text-muted-foreground italic">
                     <NodeList nodes={node.content} media={media} />
                 </blockquote>
             );
@@ -132,7 +156,7 @@ function RichTextNode({ node, media }: { node: TipTapNode; media: PageMedia }) {
             return (
                 // The wrapper scrolls, not the page: a wide table on a phone
                 // must not push the whole layout sideways.
-                <div className="my-6 overflow-x-auto">
+                <div className="clear-both my-6 overflow-x-auto">
                     <table className="w-full border-collapse text-sm">
                         <tbody>
                             <NodeList nodes={node.content} media={media} />
@@ -179,6 +203,16 @@ function RichTextNode({ node, media }: { node: TipTapNode; media: PageMedia }) {
         case 'imageGallery':
             return <ImageGalleryNode ulids={node.attrs.ulids} media={media} />;
 
+        case 'imageAside':
+            return (
+                <ImageAsideNode
+                    ulid={node.attrs.ulid}
+                    side={node.attrs.side}
+                    size={node.attrs.size}
+                    media={media}
+                />
+            );
+
         default:
             // Unknown node type: render nothing. Never guess.
             return null;
@@ -213,7 +247,9 @@ function HeadingNode({
     media: PageMedia;
 }) {
     const children = <NodeList nodes={node.content} media={media} />;
-    const align = alignmentClass(node.attrs?.textAlign);
+    // A heading starts a new section, so it must never sit in the gutter
+    // beside a floated image left over from the previous one. See ASIDE_BASE.
+    const align = cn('clear-both', alignmentClass(node.attrs?.textAlign));
 
     // The page title is the only h1, so a stored level outside 2–4 falls back
     // to 2 — the same clamp the server applies.
@@ -308,14 +344,14 @@ function FileEmbedNode({ ulid, media }: { ulid: string; media: PageMedia }) {
 
     if (item.kind === 'video') {
         return (
-            <figure className="my-6">
+            <figure className="clear-both my-6">
                 <video
                     controls
                     preload="metadata"
                     src={item.url}
                     className="max-h-[70vh] w-full rounded-lg bg-muted"
                 >
-                    Je browser kan deze video niet afspelen.
+                    {t('ui.public.video_unsupported')}
                 </video>
             </figure>
         );
@@ -326,7 +362,7 @@ function FileEmbedNode({ ulid, media }: { ulid: string; media: PageMedia }) {
 
 function DownloadCard({ file }: { file: PageMediaFile }) {
     return (
-        <div className="my-6 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="clear-both my-6 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
             <FileTypeIcon
                 mime={file.mime}
                 kind={file.kind}
@@ -348,7 +384,7 @@ function DownloadCard({ file }: { file: PageMediaFile }) {
                 className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
             >
                 <Download className="size-4" aria-hidden="true" />
-                Downloaden
+                {t('ui.actions.download')}
             </a>
         </div>
     );
@@ -356,12 +392,12 @@ function DownloadCard({ file }: { file: PageMediaFile }) {
 
 function YouTubeEmbedNode({ videoId }: { videoId: string }) {
     return (
-        <figure className="my-6 aspect-video w-full overflow-hidden rounded-lg bg-muted">
+        <figure className="clear-both my-6 aspect-video w-full overflow-hidden rounded-lg bg-muted">
             {/* The URL is built from the stored id alone — a pasted URL never
                 reaches this attribute. */}
             <iframe
                 src={youTubeEmbedUrl(videoId)}
-                title="YouTube-video"
+                title={t('ui.public.youtube_title')}
                 loading="lazy"
                 allowFullScreen
                 // Without this the player answers with error 153 instead of
@@ -369,6 +405,94 @@ function YouTubeEmbedNode({ videoId }: { videoId: string }) {
                 referrerPolicy={YOUTUBE_REFERRER_POLICY}
                 allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 className="size-full border-0"
+            />
+        </figure>
+    );
+}
+
+/*
+ * One image with the running text beside it.
+ *
+ * WHAT "BESIDE" MEANS BELOW 640 px: nothing. It stacks.
+ *
+ * The float only exists from the `sm` breakpoint up. At 375 px the content
+ * column is about 343 px wide; a third of that is 114 px, which is too small
+ * to read a diagram, and it leaves the text a measure of roughly twenty-five
+ * characters, which is too narrow to read a sentence. Both halves would be
+ * worse than either one alone, so the image becomes a full-width block and
+ * the text follows underneath it.
+ *
+ * It stacks *above* the text, never below, and that is not arbitrary: a float
+ * changes where a box paints and never where it sits in the document, so a
+ * screen reader has always been announcing the image before the paragraph it
+ * belongs to. Keeping the phone's visual order equal to the document order
+ * means the two agree at every width.
+ *
+ * `sm` is the same breakpoint the gallery and the download grid already
+ * change at, so a page reflows once rather than at three different widths.
+ *
+ * Everything below is a fixed class map. `float-${side}` would defeat
+ * Tailwind's static extraction and emit a class that was never compiled —
+ * the same trap text alignment hit.
+ */
+export const ASIDE_BASE = 'my-6 w-full sm:my-4';
+
+/**
+ * `clear-both` is what keeps a float from becoming a bug.
+ *
+ * A picture taller than the paragraph next to it goes on wrapping whatever
+ * comes after — the next heading, a table, a download card — which reads as
+ * broken rather than as a layout. So paragraphs and lists wrap, because that
+ * is the feature, and every other block clears: headings, blockquotes,
+ * tables, the embeds, and an aside itself, so two of them stack instead of
+ * fighting over one line.
+ */
+export const ASIDE_SIDE_CLASSES: Record<TipTapAsideSide, string> = {
+    left: 'clear-both sm:float-left sm:mr-6',
+    right: 'clear-both sm:float-right sm:ml-6',
+};
+
+export const ASIDE_SIZE_CLASSES: Record<TipTapAsideSize, string> = {
+    small: 'sm:w-1/4',
+    medium: 'sm:w-1/3',
+    large: 'sm:w-1/2',
+};
+
+function ImageAsideNode({
+    ulid,
+    side,
+    size,
+    media,
+}: {
+    ulid: string;
+    side: TipTapAsideSide | undefined;
+    size: TipTapAsideSize | undefined;
+    media: PageMedia;
+}) {
+    const image = media[ulid];
+
+    // Deleted, or never published: nothing is drawn, and the text simply runs
+    // full width. The same rule as the gallery — an absence beats a broken
+    // picture.
+    if (image === undefined || image.type !== 'image') {
+        return null;
+    }
+
+    return (
+        <figure
+            className={cn(
+                ASIDE_BASE,
+                ASIDE_SIDE_CLASSES[side ?? 'right'],
+                ASIDE_SIZE_CLASSES[size ?? 'medium'],
+            )}
+        >
+            <img
+                src={image.url}
+                alt={image.alt}
+                width={image.width ?? undefined}
+                height={image.height ?? undefined}
+                loading="lazy"
+                className="h-auto w-full rounded-lg border border-border bg-muted object-contain"
             />
         </figure>
     );
@@ -398,8 +522,8 @@ function ImageGalleryNode({
         <figure
             className={
                 images.length === 1
-                    ? 'my-6'
-                    : 'my-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3'
+                    ? 'clear-both my-6'
+                    : 'clear-both my-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3'
             }
         >
             {images.map((image, index) => (

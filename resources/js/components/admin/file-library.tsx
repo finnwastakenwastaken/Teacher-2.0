@@ -13,10 +13,13 @@ import { FileTypeIcon } from '@/components/file-type-icon';
 import { formatBytes } from '@/lib/format';
 import { destroy as destroyFile } from '@/routes/admin/media/files';
 import type { MediaFile } from '@/types';
+import { t } from '@/lib/i18n';
 
-const KIND_LABELS: Record<MediaFile['kind'], string> = {
-    document: 'Document',
-    video: 'Video',
+// Read through t() at render, not frozen into a module constant: the
+// dictionary is a Blade global set per document.
+const KIND_KEYS: Record<MediaFile['kind'], string> = {
+    document: 'ui.library.kind_document',
+    video: 'ui.library.kind_video',
 };
 
 const ICON_CLASS = 'size-5 shrink-0 text-muted-foreground';
@@ -31,7 +34,9 @@ function FileRow({
     const remove = () => {
         if (
             !confirm(
-                `Weet je zeker dat je "${file.original_filename}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+                t('ui.library.confirm_delete', {
+                    name: file.original_filename,
+                }),
             )
         ) {
             return;
@@ -60,7 +65,7 @@ function FileRow({
                 </p>
             </div>
 
-            <Badge variant="secondary">{KIND_LABELS[file.kind]}</Badge>
+            <Badge variant="secondary">{t(KIND_KEYS[file.kind])}</Badge>
 
             <div className="flex flex-wrap gap-2">
                 {file.kind === 'video' && (
@@ -69,7 +74,7 @@ function FileRow({
                         size="sm"
                         onClick={() => onPreview(file)}
                     >
-                        Voorbeeld
+                        {t('ui.library.preview')}
                     </Button>
                 )}
                 <Button variant="outline" size="sm" asChild>
@@ -77,11 +82,13 @@ function FileRow({
                         so the same link reads as "download" or "open"
                         depending on the kind. */}
                     <a href={file.url} target="_blank" rel="noreferrer">
-                        {file.kind === 'video' ? 'Openen' : 'Downloaden'}
+                        {file.kind === 'video'
+                            ? t('ui.library.open')
+                            : t('ui.actions.download')}
                     </a>
                 </Button>
                 <Button variant="destructive" size="sm" onClick={remove}>
-                    Verwijderen
+                    {t('ui.actions.delete')}
                 </Button>
             </div>
         </li>
@@ -94,7 +101,7 @@ export function FileLibrary({ files }: { files: MediaFile[] }) {
     if (files.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
-                Er zijn nog geen documenten of video&apos;s geüpload.
+                {t('ui.library.no_files')}
             </p>
         );
     }
@@ -125,8 +132,7 @@ export function FileLibrary({ files }: { files: MediaFile[] }) {
                             {preview?.original_filename}
                         </DialogTitle>
                         <DialogDescription>
-                            De video wordt gestreamd met ondersteuning voor
-                            doorspoelen.
+                            {t('ui.library.video_preview_description')}
                         </DialogDescription>
                     </DialogHeader>
 

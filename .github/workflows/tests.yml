@@ -5,13 +5,36 @@ on:
     branches:
       - main
   pull_request:
+  schedule:
+    # Weekly, for the dependency audit below — a newly disclosed CVE is not
+    # something a push will tell you about.
+    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
 
+# Runs the checks inside the project's own Docker stack rather than on a
+# hand-assembled runner.
+#
+# The previous version installed PHP 8.3 and ran `composer setup` directly, and
+# had never once got past that step: the lockfile pins symfony/* v8.1, which
+# requires PHP >= 8.4.1, so every run since the workflow was written failed at
+# dependency installation. Nothing downstream — pint, phpstan, the test suite —
+# had ever executed, which is how 166 PHPStan errors accumulated behind a green
+# tick that was never green.
+#
+# It would also never have worked even with the right PHP version. The suite
+# needs real PostgreSQL (tsvector, GIN, CHECK constraints), a `teacher_testing`
+# database created by docker/postgres/init-test-db.sh, and phpunit.xml forces
+# DB_HOST=database — a name that only resolves inside the compose network.
+#
+# So CI uses the stack the project actually documents. It is slower to start
+# and it tests the thing that ships: the same Dockerfile, the same PHP version,
+# the same extensions, the same Postgres.
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -19,20 +42,138 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      # The stack refuses to boot without these two, deliberately — see the
+      # APP_KEY guard in docker/php/entrypoint.sh. They are throwaway values
+      # for a container that lives for one job.
+      - name: Write a disposable .env
+        run: |
+          cp .env.example .env
+          printf 'APP_KEY=base64:%s\n' "$(head -c 32 /dev/urandom | base64)" >> .env
+          printf 'DB_PASSWORD=%s\n' "$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')" >> .env
+
+      - name: Build and start the stack
+        run: docker compose -f compose.yaml -f compose.dev.yaml up -d --build app database
+
+      # The app entrypoint runs composer install on first boot (vendor lives in
+      # a named volume that starts empty) and then migrates, so "healthy" is
+      # the real signal that the application is usable.
+      - name: Wait for the application
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose -f compose.yaml -f compose.dev.yaml exec -T app php artisan --version >/dev/null 2>&1; then
+              echo "Application is up."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "The application never came up. Logs:"
+          docker compose -f compose.yaml -f compose.dev.yaml logs app database
+          exit 1
+
+      # node_modules is a named volume too, and nothing installs into it on
+      # boot — the vite service does that in development, and it is not started
+      # here because no browser needs serving.
+      - name: Install JS dependencies
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T app npm ci
+
+      # resources/js/{actions,routes,wayfinder} are generated and gitignored;
+      # in development the Vite plugin writes them on start, and that service
+      # is not running here. They are not optional for the checks: tsc cannot
+      # resolve `@/actions/...` without them, and — less obviously — eslint's
+      # import/order rule classifies an import differently depending on whether
+      # the file it points at exists, so `lint:check` failed on 31 files that
+      # are perfectly ordered on a developer's machine.
+      #
+      # --with-form is what `formVariants: true` in vite.config.ts passes.
+      # Without it every `SomeController.store.form` in the front end is a
+      # missing property, which is fifteen tsc errors in files nobody touched.
+      - name: Generate the typed routes
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T app php artisan wayfinder:generate --with-form
+
+      # public/build is gitignored, and the suite needs it: app.blade.php asks
+      # the Vite helper for the manifest on every rendered page, and without
+      # one that is an exception rather than a missing stylesheet — 61 feature
+      # tests failed on it. Running the real production build here also means
+      # a change that breaks bundling is caught by CI rather than by a deploy.
+      - name: Build the front end
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T app npm run build
+
+      # The checkout is owned by the runner's user and the container runs as
+      # another, so git refuses to read the repository and composer prints a
+      # "dubious ownership" block before every script. Harmless, and it looks
+      # exactly like a real failure in the log.
+      - name: Let git read the checkout from inside the container
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T app git config --global --add safe.directory /var/www/html
+
+      - name: Run CI checks
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T app composer ci:check
+
+      # The browser tests need nginx, which the steps above deliberately do
+      # not start: the PHP suite talks to the framework, not to a web server.
+      # But the things these tests exist to catch — a drag landing on the
+      # wrong list, an iframe attribute, a header add_header quietly dropped —
+      # are either browser-only or nginx-only, so this is where `web` earns
+      # its place in CI.
+      - name: Start nginx
+        run: docker compose -f compose.yaml -f compose.dev.yaml up -d web
+
+      # Deliberately its own command rather than part of DatabaseSeeder, which
+      # the entrypoint runs on every boot including on the teacher's own
+      # install. It refuses to run in production for the same reason.
+      - name: Seed the browser test fixtures
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T app php artisan e2e:seed
+
+      - name: Run the browser tests
+        run: docker compose -f compose.yaml -f compose.dev.yaml --profile e2e run --rm e2e
+
+      # A failed browser test is close to unreadable from a log alone. The
+      # trace is a step-by-step recording with the DOM at each step, which is
+      # the difference between "something was not visible" and knowing what
+      # the page actually looked like.
+      - name: Upload the Playwright trace on failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          php-version: '8.3'
-          tools: composer:v2
-          coverage: none
+          name: playwright-trace
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose -f compose.yaml -f compose.dev.yaml logs --tail=100 app database web
+
+  # Separate from the checks above, and deliberately non-blocking. A CVE
+  # disclosed against a pinned dependency is news about the world, not a
+  # regression in this commit — failing the build for it would mean an
+  # unrelated pull request cannot merge until someone has time to upgrade.
+  # What matters is that it becomes visible on the day it is published rather
+  # than the next time somebody thinks to look.
+  #
+  # It runs on a schedule for the same reason: no push happens on a quiet
+  # week, and that is exactly when this is worth knowing.
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
+          persist-credentials: false
 
-      - name: Setup Application
-        run: composer setup
+      # Both read only the lockfiles, so neither needs the application stack,
+      # a database or a built vendor directory.
+      #
+      # --ignore-unreachable because the advisory API timing out is not a
+      # finding. Without it a ten-second blip at packagist reports as though a
+      # vulnerability had been found, which is the one thing this job must not
+      # cry wolf about.
+      - name: Audit PHP dependencies
+        run: docker run --rm -v "$PWD":/app -w /app composer:2 composer audit --locked --no-interaction --ignore-unreachable
 
-      - name: Run CI Checks
-        run: composer ci:check
+      - name: Audit JS dependencies
+        run: docker run --rm -v "$PWD":/app -w /app node:22-alpine npm audit --audit-level=high

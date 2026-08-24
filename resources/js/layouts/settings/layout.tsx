@@ -7,21 +7,22 @@ import { cn, toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
+import { t } from '@/lib/i18n';
 import type { NavItem } from '@/types';
 
 const sidebarNavItems: NavItem[] = [
     {
-        title: 'Profiel',
+        title: t('ui.nav.profile'),
         href: edit(),
         icon: null,
     },
     {
-        title: 'Beveiliging',
+        title: t('ui.nav.security'),
         href: editSecurity(),
         icon: null,
     },
     {
-        title: 'Weergave',
+        title: t('ui.nav.appearance'),
         href: editAppearance(),
         icon: null,
     },
@@ -39,7 +40,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 <aside className="w-full max-w-xl lg:w-48">
                     <nav
                         className="flex flex-col space-y-1 space-x-0"
-                        aria-label="Instellingen"
+                        aria-label={t('ui.nav.settings')}
                     >
                         {sidebarNavItems.map((item, index) => (
                             <Button

@@ -36,7 +36,18 @@ class SyncIconCatalogue extends Command
             return self::FAILURE;
         }
 
+        // false on a read failure. Stored as-is that becomes an empty string,
+        // which can never equal the checksum of a real file — so `icons:sync`
+        // would reload all fifteen thousand rows on every container boot and
+        // nothing would say why. It runs from the entrypoint, so that is a
+        // slower start for the life of the deployment.
         $checksum = hash_file('xxh128', $path);
+
+        if ($checksum === false) {
+            $this->components->error(sprintf('Could not read the icon catalogue at %s.', $path));
+
+            return self::FAILURE;
+        }
 
         if (! $this->option('force') && $this->storedChecksum() === $checksum) {
             $this->components->info('Icon catalogue already up to date.');

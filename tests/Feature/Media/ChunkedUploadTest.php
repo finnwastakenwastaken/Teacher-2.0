@@ -153,6 +153,31 @@ class ChunkedUploadTest extends TestCase
         $this->assertStringEndsWith('.pdf', $file->path);
         // The owner's filename survives as the download name.
         $this->assertSame('Rapport eindexamen 2026.pdf', $file->original_filename);
+        $this->assertStringContainsString($file->ulid, $file->path);
+    }
+
+    /**
+     * The row's ULID and the one in its path used to differ for images and
+     * only for images — the path was built from one and createImage() minted
+     * another. Nothing broke, which is why it survived; it just meant that a
+     * file on disk could not be traced back to its row without a LIKE query,
+     * at exactly the moment someone is trying to work out what went wrong.
+     */
+    public function test_an_image_row_and_its_file_carry_the_same_ulid()
+    {
+        $admin = User::factory()->create();
+        $contents = base64_decode(self::PNG);
+
+        $session = $this->begin($admin, 'foto.png', $contents);
+        $this->sendChunks($admin, $session['ulid'], $contents, 8);
+        $this->actingAs($admin)->postJson(
+            route('admin.uploads.complete', ['upload' => $session['ulid']]),
+            ['alt_text' => 'Een foto'],
+        )->assertCreated();
+
+        $image = Image::query()->sole();
+
+        $this->assertStringContainsString($image->ulid, $image->path);
     }
 
     public function test_an_image_requires_alt_text()

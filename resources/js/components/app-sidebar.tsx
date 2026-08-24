@@ -10,6 +10,8 @@ import {
     LayoutGrid,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
+import LocaleSwitcher from '@/components/locale-switcher';
+import { t } from '@/lib/i18n';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -33,37 +35,37 @@ import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: t('ui.nav.dashboard'),
         href: dashboard(),
         icon: LayoutGrid,
     },
     {
-        title: 'Inhoud',
+        title: t('ui.nav.content'),
         href: topicsIndex(),
         icon: FolderTree,
     },
     {
-        title: 'Media',
+        title: t('ui.nav.media'),
         href: mediaIndex(),
         icon: Images,
     },
     {
-        title: 'Niveaus',
+        title: t('ui.nav.levels'),
         href: levelsIndex(),
         icon: GraduationCap,
     },
     {
-        title: 'Wachtwoorden',
+        title: t('ui.nav.passwords'),
         href: passwordsIndex(),
         icon: KeyRound,
     },
     {
-        title: 'Back-ups',
+        title: t('ui.nav.backups'),
         href: backupsIndex(),
         icon: DatabaseBackup,
     },
     {
-        title: 'Instellingen',
+        title: t('ui.nav.settings'),
         href: siteSettingsEdit(),
         icon: Settings,
     },
@@ -75,7 +77,7 @@ const mainNavItems: NavItem[] = [
 // admin screen is the public site itself.
 const footerNavItems: NavItem[] = [
     {
-        title: 'Bekijk de website',
+        title: t('ui.nav.view_site'),
         href: '/',
         icon: Globe,
     },
@@ -102,6 +104,9 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
+                {/* Hidden when the sidebar is collapsed to icons: a select is
+                    not something that survives a 3rem-wide rail. */}
+                <LocaleSwitcher className="px-2 group-data-[collapsible=icon]:hidden" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

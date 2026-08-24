@@ -10,6 +10,7 @@ use App\Models\Page;
 use App\Models\PageDownload;
 use App\Models\Topic;
 use App\Support\SiteSettings;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -46,25 +47,83 @@ class DashboardController extends Controller
      */
     private function counts(): array
     {
-        return [
-            'topics' => Topic::query()->count(),
-            'hiddenTopics' => Topic::query()->where('is_hidden', true)->count(),
-            'pages' => Page::query()->count(),
-            'hiddenPages' => Page::query()->where('is_hidden', true)->count(),
-            'emptyPages' => Page::query()->whereNull('content')->count(),
-            'images' => Image::query()->count(),
-            'documents' => MediaFile::query()->documents()->count(),
-            'videos' => MediaFile::query()->videos()->count(),
-            'mediaBytes' => (int) Image::query()->sum('size_bytes')
-                + (int) MediaFile::query()->sum('size_bytes'),
-            'downloads' => PageDownload::query()->count(),
+        /*
+         * One query per table rather than one per number. This used to run
+         * fifteen round trips to build a card of counters — every one of them
+         * a full scan of the same table the previous one had just scanned.
+         *
+         * `count(*) filter (where …)` is standard SQL and Postgres computes
+         * every column in a single pass. The two tables that carry no
+         * variants keep their plain count().
+         */
+        $topics = $this->aggregate(Topic::query()->toBase(), [
+            'topics' => 'count(*)',
+            'hiddenTopics' => 'count(*) filter (where is_hidden)',
+        ]);
+
+        $pages = $this->aggregate(Page::query()->toBase(), [
+            'pages' => 'count(*)',
+            'hiddenPages' => 'count(*) filter (where is_hidden)',
+            'emptyPages' => 'count(*) filter (where content is null)',
+        ]);
+
+        $images = $this->aggregate(Image::query()->toBase(), [
+            'images' => 'count(*)',
+            'imageBytes' => 'coalesce(sum(size_bytes), 0)',
+        ]);
+
+        $files = $this->aggregate(MediaFile::query()->toBase(), [
+            'documents' => "count(*) filter (where kind = '".MediaFile::KIND_DOCUMENT."')",
+            'videos' => "count(*) filter (where kind = '".MediaFile::KIND_VIDEO."')",
+            'fileBytes' => 'coalesce(sum(size_bytes), 0)',
+        ]);
+
+        $downloads = $this->aggregate(PageDownload::query()->toBase(), [
+            'downloads' => 'count(*)',
             // The site's only counter, and an aggregate with no visitor data
             // attached to it — see the technical reference. Authenticated requests are not
             // counted, so this is what students actually took.
-            'downloadsServed' => (int) PageDownload::query()->sum('downloads_count'),
+            'downloadsServed' => 'coalesce(sum(downloads_count), 0)',
+        ]);
+
+        return [
+            ...$topics,
+            ...$pages,
+            'images' => $images['images'],
+            'documents' => $files['documents'],
+            'videos' => $files['videos'],
+            'mediaBytes' => $images['imageBytes'] + $files['fileBytes'],
+            ...$downloads,
             'levels' => EducationLevel::query()->count(),
             'passwords' => AccessPassword::query()->count(),
         ];
+    }
+
+    /**
+     * Run several aggregates over one table in one query.
+     *
+     * The expressions are literals written above, never anything that came
+     * from a request — the only interpolated values are two class constants —
+     * so selectRaw is safe here and there is no bindable form of a `filter`
+     * clause anyway.
+     *
+     * @param  array<string, string>  $expressions
+     * @return array<string, int>
+     */
+    private function aggregate(QueryBuilder $query, array $expressions): array
+    {
+        $select = [];
+
+        foreach ($expressions as $alias => $expression) {
+            $select[] = $expression.' as "'.$alias.'"';
+        }
+
+        // Assembled from the literals above, never from input — see the doc
+        // block. PHPStan wants a literal-string and cannot see that.
+        // @phpstan-ignore argument.type
+        $row = (array) $query->selectRaw(implode(', ', $select))->first();
+
+        return array_map(intval(...), $row);
     }
 
     /**
@@ -75,61 +134,58 @@ class DashboardController extends Controller
      * block is hidden by the page once every step is done.
      *
      * @param  array<string, int|bool>  $counts
-     * @return list<array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     private function nextSteps(array $counts): array
     {
         // A title the owner has never touched still resolves to APP_NAME.
         $named = SiteSettings::get('site_title') !== config('app.name');
 
-        return [
-            [
-                'key' => 'branding',
-                'title' => 'Geef de site een naam',
-                'description' => 'Stel de naam, het logo en de favicon in.',
+        $steps = [
+            'branding' => [
                 'href' => route('admin.site-settings.edit'),
                 'done' => $named,
             ],
-            [
-                'key' => 'topic',
-                'title' => 'Maak je eerste onderwerp',
-                'description' => 'Onderwerpen vormen het menu en de indeling van de site.',
+            'topic' => [
                 'href' => route('admin.topics.create'),
                 'done' => $counts['topics'] > 0,
             ],
-            [
-                'key' => 'page',
-                'title' => 'Maak je eerste pagina',
-                'description' => 'Een pagina hangt onder een onderwerp en draagt de inhoud.',
+            'page' => [
                 'href' => route('admin.pages.create'),
                 'done' => $counts['pages'] > 0,
             ],
-            [
-                'key' => 'content',
-                'title' => 'Schrijf de inhoud van een pagina',
-                'description' => 'Tekst, afbeeldingen, video en YouTube-fragmenten.',
+            'content' => [
                 'href' => route('admin.topics.index'),
                 'done' => $counts['pages'] > 0 && $counts['emptyPages'] < $counts['pages'],
             ],
-            [
-                'key' => 'media',
-                'title' => 'Upload lesmateriaal',
-                'description' => 'Afbeeldingen, documenten en video in de mediabibliotheek.',
+            'media' => [
                 'href' => route('admin.media.index'),
                 'done' => $counts['images'] + $counts['documents'] + $counts['videos'] > 0,
             ],
-            [
-                'key' => 'download',
-                'title' => 'Bied een download aan per niveau',
-                'description' => 'Hetzelfde werkblad in een versie per leerweg.',
+            'download' => [
                 'href' => route('admin.topics.index'),
                 'done' => $counts['downloads'] > 0,
             ],
         ];
+
+        // The copy lives in lang/, keyed by the same name, so the two locales
+        // stay in step and LocalisationTest can see both halves. What stays
+        // here is the part that is not copy: where each step goes and how it
+        // knows it is done.
+        return array_map(
+            fn (array $step, string $key) => [
+                'key' => $key,
+                'title' => (string) __("admin.dashboard.steps.{$key}.title"),
+                'description' => (string) __("admin.dashboard.steps.{$key}.description"),
+                ...$step,
+            ],
+            $steps,
+            array_keys($steps),
+        );
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     private function recentPages(): array
     {
@@ -150,7 +206,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     private function popularDownloads(): array
     {
@@ -163,7 +219,7 @@ class DashboardController extends Controller
             ->map(fn (PageDownload $download) => [
                 'id' => $download->id,
                 'label' => $download->displayLabel(),
-                'page' => $download->page?->title,
+                'page' => $download->page->title,
                 'count' => $download->downloads_count,
             ])
             ->all();

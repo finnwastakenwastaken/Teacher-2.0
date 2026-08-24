@@ -24,6 +24,7 @@ import {
     destroy as abortRoute,
     store as beginRoute,
 } from '@/routes/admin/uploads';
+import { t } from '@/lib/i18n';
 
 /*
  * Chunked upload, by hand.
@@ -93,12 +94,15 @@ type PendingSelection = {
     altText: string;
 };
 
-const STATUS_LABELS: Record<UploadStatus, string> = {
-    waiting: 'Wachten',
-    uploading: 'Bezig',
-    done: 'Klaar',
-    failed: 'Mislukt',
-    cancelled: 'Geannuleerd',
+// Read through t() at render rather than at module scope: the
+// dictionary is a Blade global, and a module-level constant would freeze
+// whichever language happened to load first.
+const STATUS_KEYS: Record<UploadStatus, string> = {
+    waiting: 'ui.uploader.status.waiting',
+    uploading: 'ui.uploader.status.uploading',
+    done: 'ui.uploader.status.done',
+    failed: 'ui.uploader.status.failed',
+    cancelled: 'ui.uploader.status.cancelled',
 };
 
 const STATUS_CLASSES: Record<UploadStatus, string> = {
@@ -142,7 +146,7 @@ function isImageFile(file: File): boolean {
     return IMAGE_EXTENSIONS.includes(extension);
 }
 
-/** Reads the Dutch `message` a 4xx JSON response carries, or a fallback. */
+/** Reads the `message` a 4xx JSON response carries, or a fallback. */
 async function readErrorMessage(response: Response): Promise<string> {
     try {
         const body = (await response.json()) as { message?: string };
@@ -154,7 +158,7 @@ async function readErrorMessage(response: Response): Promise<string> {
         // Not JSON — nginx or PHP failed before Laravel could answer.
     }
 
-    return `De server antwoordde met een fout (${response.status}).`;
+    return t('ui.uploader.server_error', { status: response.status });
 }
 
 class UploadCancelled extends Error {}
@@ -355,10 +359,10 @@ export function MediaUploader({
                 patchItem(item.id, {
                     status: cancelled ? 'cancelled' : 'failed',
                     message: cancelled
-                        ? 'Upload geannuleerd.'
+                        ? t('ui.uploader.cancelled')
                         : error instanceof Error
                           ? error.message
-                          : 'Er ging iets mis tijdens het uploaden.',
+                          : t('ui.uploader.failed'),
                 });
 
                 return null;
@@ -393,7 +397,7 @@ export function MediaUploader({
                             message:
                                 error instanceof Error
                                     ? error.message
-                                    : 'Het bestand is geüpload, maar kon niet aan deze pagina worden gekoppeld.',
+                                    : t('ui.downloads.attach_failed'),
                         });
 
                         continue;
@@ -406,11 +410,7 @@ export function MediaUploader({
             setIsRunning(false);
 
             if (succeeded > 0) {
-                toast.success(
-                    succeeded === 1
-                        ? '1 bestand geüpload.'
-                        : `${succeeded} bestanden geüpload.`,
-                );
+                toast.success(t('ui.uploader.uploaded', { count: succeeded }));
 
                 if (!onUploaded) {
                     // A full reload, not `only: ['images', 'files']`: a
@@ -455,14 +455,18 @@ export function MediaUploader({
             for (const file of Array.from(fileList)) {
                 if (file.size > maxBytes) {
                     toast.error(
-                        `"${file.name}" is te groot (${formatBytes(file.size)}). Het maximum is ${formatBytes(maxBytes)}.`,
+                        t('ui.uploader.too_large', {
+                            name: file.name,
+                            size: formatBytes(file.size),
+                            max: formatBytes(maxBytes),
+                        }),
                     );
                     continue;
                 }
 
                 if (file.size === 0) {
                     toast.error(
-                        `"${file.name}" is leeg en wordt overgeslagen.`,
+                        t('ui.uploader.empty_file', { name: file.name }),
                     );
                     continue;
                 }
@@ -502,8 +506,7 @@ export function MediaUploader({
                 isImageFile(selection.file) &&
                 selection.altText.trim() === ''
             ) {
-                errors[selection.id] =
-                    'Alt-tekst is verplicht bij elke afbeelding.';
+                errors[selection.id] = t('ui.uploader.alt_required');
             }
         }
 
@@ -535,7 +538,7 @@ export function MediaUploader({
 
             patchItem(item.id, {
                 status: 'cancelled',
-                message: 'Upload geannuleerd.',
+                message: t('ui.uploader.cancelled'),
             });
         },
         [patchItem],
@@ -584,11 +587,13 @@ export function MediaUploader({
                 />
                 <div className={cn('grid gap-1', compact && 'min-w-0 flex-1')}>
                     <p className="font-medium">
-                        {title ?? 'Sleep bestanden hierheen'}
+                        {title ?? t('ui.uploader.drop_here')}
                     </p>
                     <p className="text-sm text-muted-foreground">
                         {description ??
-                            `Of kies ze zelf. Maximaal ${formatBytes(maxBytes)} per bestand. Grote bestanden worden in delen geüpload.`}
+                            t('ui.uploader.drop_hint', {
+                                size: formatBytes(maxBytes),
+                            })}
                     </p>
                 </div>
 
@@ -617,21 +622,23 @@ export function MediaUploader({
                     disabled={isRunning}
                 >
                     <FileUp aria-hidden="true" />
-                    Bestanden kiezen
+                    {t('ui.uploader.choose_files')}
                 </Button>
             </div>
 
             {items.length > 0 && (
                 <div className="grid gap-2 rounded-lg border border-border bg-card p-4">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold">Uploads</h3>
+                        <h3 className="text-sm font-semibold">
+                            {t('ui.uploader.queue_heading')}
+                        </h3>
                         {hasFinished && !isRunning && (
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={clearFinished}
                             >
-                                Lijst wissen
+                                {t('ui.uploader.clear_list')}
                             </Button>
                         )}
                     </div>
@@ -663,22 +670,26 @@ export function MediaUploader({
                                                 STATUS_CLASSES[item.status],
                                             )}
                                         >
-                                            {STATUS_LABELS[item.status]}
+                                            {t(STATUS_KEYS[item.status])}
                                         </span>
 
                                         <div className="ml-auto flex items-center gap-2">
                                             {item.totalChunks > 1 && (
                                                 <span className="text-xs text-muted-foreground">
-                                                    deel{' '}
-                                                    {Math.min(
-                                                        item.chunksSent +
-                                                            (item.status ===
-                                                            'uploading'
-                                                                ? 1
-                                                                : 0),
-                                                        item.totalChunks,
-                                                    )}{' '}
-                                                    van {item.totalChunks}
+                                                    {t(
+                                                        'ui.uploader.chunk_progress',
+                                                        {
+                                                            index: Math.min(
+                                                                item.chunksSent +
+                                                                    (item.status ===
+                                                                    'uploading'
+                                                                        ? 1
+                                                                        : 0),
+                                                                item.totalChunks,
+                                                            ),
+                                                            total: item.totalChunks,
+                                                        },
+                                                    )}
                                                 </span>
                                             )}
                                             {(item.status === 'waiting' ||
@@ -687,7 +698,13 @@ export function MediaUploader({
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={`Upload van ${item.file.name} annuleren`}
+                                                    aria-label={t(
+                                                        'ui.uploader.cancel_item',
+                                                        {
+                                                            name: item.file
+                                                                .name,
+                                                        },
+                                                    )}
                                                     onClick={() =>
                                                         cancelItem(item)
                                                     }
@@ -729,11 +746,11 @@ export function MediaUploader({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Alt-tekst voor afbeeldingen</DialogTitle>
+                        <DialogTitle>
+                            {t('ui.uploader.alt_dialog_title')}
+                        </DialogTitle>
                         <DialogDescription>
-                            Elke afbeelding heeft een korte beschrijving nodig
-                            voor schermlezers en voor als de afbeelding niet
-                            laadt. Zonder alt-tekst weigert de server de upload.
+                            {t('ui.uploader.alt_dialog_description')}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -779,18 +796,17 @@ export function MediaUploader({
                             (selection) => !isImageFile(selection.file),
                         ) && (
                             <p className="text-sm text-muted-foreground">
-                                De overige gekozen bestanden hebben geen
-                                alt-tekst nodig en worden gewoon meegeüpload.
+                                {t('ui.uploader.alt_others')}
                             </p>
                         )}
                     </div>
 
                     <DialogFooter>
                         <Button variant="outline" onClick={cancelPending}>
-                            Annuleren
+                            {t('ui.actions.cancel')}
                         </Button>
                         <Button onClick={confirmAltText}>
-                            Uploaden starten
+                            {t('ui.uploader.start')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

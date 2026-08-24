@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { formatBytes } from '@/lib/format';
+import { intlLocale, t } from '@/lib/i18n';
 
 /*
  * Back-ups: one archive holding the database and every uploaded file.
@@ -27,7 +28,7 @@ type Props = {
 };
 
 function formatMoment(iso: string): string {
-    return new Date(iso).toLocaleString('nl-NL', {
+    return new Date(iso).toLocaleString(intlLocale, {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
@@ -57,7 +58,9 @@ export default function BackupsIndex({ backups, keep }: Props) {
     function remove(backup: Backup) {
         if (
             !confirm(
-                `Back-up van ${formatMoment(backup.created_at)} verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+                t('ui.backups.confirm_delete', {
+                    moment: formatMoment(backup.created_at),
+                }),
             )
         ) {
             return;
@@ -70,18 +73,15 @@ export default function BackupsIndex({ backups, keep }: Props) {
 
     return (
         <>
-            <Head title="Back-ups" />
+            <Head title={t('ui.backups.title')} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">
-                        Back-ups
+                        {t('ui.backups.title')}
                     </h1>
                     <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                        Een back-up bevat álles: de teksten, de indeling, de
-                        instellingen en elk bestand dat je hebt geüpload. Met
-                        één zo&apos;n bestand zet je de site opnieuw op een
-                        andere server.
+                        {t('ui.backups.description')}
                     </p>
                 </div>
 
@@ -92,29 +92,27 @@ export default function BackupsIndex({ backups, keep }: Props) {
                         ) : (
                             <HardDriveDownload aria-hidden="true" />
                         )}
-                        Nu een back-up maken
+                        {t('ui.backups.create')}
                     </Button>
                     <p className="text-sm text-muted-foreground">
                         {creating
-                            ? 'Bezig… bij veel bestanden duurt dit een paar minuten. Laat dit scherm open staan.'
-                            : 'Bij veel bestanden duurt dit een paar minuten.'}
+                            ? t('ui.backups.creating')
+                            : t('ui.backups.may_take_a_while')}
                     </p>
                 </div>
 
                 <div className="max-w-2xl rounded-lg border border-warning/40 bg-card p-4 text-sm">
                     <p className="font-medium">
-                        Zet een back-up ergens anders neer.
+                        {t('ui.backups.offsite_title')}
                     </p>
                     <p className="mt-1 text-muted-foreground">
-                        Zolang het bestand alleen op deze server staat, ben je
-                        het samen met de server kwijt. Download hem en bewaar
-                        hem op je laptop of een externe schijf.
+                        {t('ui.backups.offsite_body')}
                     </p>
                 </div>
 
                 {backups.length === 0 ? (
                     <p className="text-muted-foreground">
-                        Er zijn nog geen back-ups gemaakt.
+                        {t('ui.backups.empty')}
                     </p>
                 ) : (
                     <ul className="max-w-3xl divide-y divide-border rounded-lg border border-border">
@@ -145,7 +143,7 @@ export default function BackupsIndex({ backups, keep }: Props) {
                                             }
                                         >
                                             <Download aria-hidden="true" />
-                                            Downloaden
+                                            {t('ui.actions.download')}
                                         </a>
                                     </Button>
                                     <Button
@@ -155,7 +153,7 @@ export default function BackupsIndex({ backups, keep }: Props) {
                                         onClick={() => remove(backup)}
                                     >
                                         <Trash2 aria-hidden="true" />
-                                        Verwijderen
+                                        {t('ui.actions.delete')}
                                     </Button>
                                 </div>
                             </li>
@@ -165,19 +163,17 @@ export default function BackupsIndex({ backups, keep }: Props) {
 
                 <div className="max-w-2xl text-sm text-muted-foreground">
                     <h2 className="font-medium text-foreground">
-                        Een back-up terugzetten
+                        {t('ui.backups.restore_title')}
                     </h2>
                     <p className="mt-1">
-                        Dat gebeurt op de server zelf, niet hier — het wist
-                        alles wat er nu staat, en dat is geen knop die per
-                        ongeluk ingedrukt moet kunnen worden. De stappen staan
-                        in <code>docs/onderhoud-en-beveiliging.md</code>. Kort:
-                        zet het bestand op de server en voer{' '}
-                        <code>./restore.sh &lt;bestand&gt;</code> uit.
+                        {t('ui.backups.restore_body_1')}
+                        <code>{t('ui.backups.restore_doc')}</code>
+                        {t('ui.backups.restore_body_2')}
+                        <code>{t('ui.backups.restore_command')}</code>
+                        {t('ui.backups.restore_body_3')}
                     </p>
                     <p className="mt-2">
-                        Op deze server worden standaard de {keep} nieuwste
-                        back-ups bewaard als er automatisch wordt opgeruimd.
+                        {t('ui.backups.keep', { count: keep })}
                     </p>
                 </div>
             </div>
@@ -188,7 +184,7 @@ export default function BackupsIndex({ backups, keep }: Props) {
 BackupsIndex.layout = {
     breadcrumbs: [
         {
-            title: 'Back-ups',
+            title: t('ui.backups.title'),
             href: BackupController.index.url(),
         },
     ],

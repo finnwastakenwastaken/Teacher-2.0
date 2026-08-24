@@ -28,6 +28,7 @@ import {
     Superscript as SuperscriptIcon,
     Table as TableIcon,
     Trash2,
+    WrapText,
     Youtube,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -35,6 +36,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import type { UploadedRecord } from '@/components/admin/media-uploader';
 import { FileEmbed } from '@/components/editor/extensions/file-embed';
+import { ImageAside } from '@/components/editor/extensions/image-aside';
 import { ImageGallery } from '@/components/editor/extensions/image-gallery';
 import { YouTubeEmbed } from '@/components/editor/extensions/youtube-embed';
 import { FilePickerDialog } from '@/components/editor/file-picker-dialog';
@@ -50,6 +52,7 @@ import { update as updateContent } from '@/routes/admin/pages/content';
 import { GrowingEditorLibrary } from '@/components/editor/media-library';
 import type { EditorMediaLibrary } from '@/components/editor/media-library';
 import type { TipTapDoc } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 /*
  * The page body editor.
@@ -94,6 +97,13 @@ const PROSE_CLASSES = [
     '[&_.column-resize-handle]:absolute [&_.column-resize-handle]:top-0 [&_.column-resize-handle]:bottom-0 [&_.column-resize-handle]:-right-0.5 [&_.column-resize-handle]:w-1 [&_.column-resize-handle]:bg-primary',
     '[&_.tableWrapper]:overflow-x-auto',
     '[&.resize-cursor]:cursor-col-resize',
+    // Everything that must not sit in the gutter beside a floated image (see
+    // the imageAside notes in components/content/rich-text.tsx). Paragraphs
+    // and lists are deliberately absent: wrapping is the feature. A `clear`
+    // does nothing at all when nothing is floating, so this changes no page
+    // that has no imageAside on it.
+    '[&_h2]:clear-both [&_h3]:clear-both [&_h4]:clear-both',
+    '[&_blockquote]:clear-both [&_table]:clear-both [&_.tableWrapper]:clear-both',
 ].join(' ');
 
 type PageEditorProps = {
@@ -112,47 +122,54 @@ export function PageEditor({
     const [isDirty, setIsDirty] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
     const [dialog, setDialog] = React.useState<
-        'file' | 'image' | 'youtube' | 'link' | null
+        'file' | 'image' | 'imageAside' | 'youtube' | 'link' | null
     >(null);
 
     /*
-     * The library, in two forms, because it now changes while the editor is
-     * open: the pickers upload into it.
+     * The library the node views resolve an embed's geometry from.
      *
      * `useEditor` builds the extension list once, and rebuilding it to hand
      * the node views a new object would tear the editor down and take the
      * caret and the undo history with it. So the extensions get this one
-     * object for the editor's whole life (GrowingEditorLibrary) and uploads
-     * change what is inside it. The second copy is plain React state, because
-     * the picker dialogs are ordinary components and need a re-render.
+     * object for the editor's whole life (GrowingEditorLibrary), and it is
+     * mutated in place — never replaced — by uploads and by picking an
+     * existing file or image out of the picker dialogs' own search results.
+     *
+     * It starts holding only what the page's body already shows (see
+     * App\Http\Controllers\Admin\PageController::embeddedMedia): the picker
+     * dialogs ask the server for anything else themselves, a page of matches
+     * at a time, rather than this screen shipping the whole media library up
+     * front. Nothing here needs a React re-render to take
+     * effect — inserting a node is itself a transaction, and by the time it
+     * happens the holder already has whatever that node is about to embed.
      */
     const [holder] = React.useState(
         () => new GrowingEditorLibrary(mediaLibrary),
-    );
-    const [library, setLibrary] = React.useState<EditorMediaLibrary>(() =>
-        holder.snapshot(),
     );
     const [uploadedCount, setUploadedCount] = React.useState(0);
 
     const addToLibrary = React.useCallback(
         (record: UploadedRecord) => {
-            setLibrary(
-                record.type === 'image'
-                    ? holder.addImage({
-                          ulid: record.ulid,
-                          alt_text: record.alt_text,
-                          original_filename: record.original_filename,
-                          url: record.url,
-                      })
-                    : holder.addFile({
-                          ulid: record.ulid,
-                          kind: record.kind,
-                          mime: record.mime,
-                          size_bytes: record.size_bytes,
-                          original_filename: record.original_filename,
-                          url: record.url,
-                      }),
-            );
+            if (record.type === 'image') {
+                holder.addImage({
+                    ulid: record.ulid,
+                    alt_text: record.alt_text,
+                    original_filename: record.original_filename,
+                    url: record.url,
+                });
+
+                return;
+            }
+
+            holder.addFile({
+                id: record.id,
+                ulid: record.ulid,
+                kind: record.kind,
+                mime: record.mime,
+                size_bytes: record.size_bytes,
+                original_filename: record.original_filename,
+                url: record.url,
+            });
         },
         [holder],
     );
@@ -198,6 +215,7 @@ export function PageEditor({
             }),
             FileEmbed.configure({ library: holder }),
             ImageGallery.configure({ library: holder }),
+            ImageAside.configure({ library: holder }),
             YouTubeEmbed,
         ],
         // An empty stored document has no blocks, which ProseMirror's schema
@@ -205,12 +223,19 @@ export function PageEditor({
         content: (content?.content?.length ?? 0) > 0 ? content : '',
         editorProps: {
             attributes: {
-                class: cn('min-h-64 p-4 focus:outline-none', PROSE_CLASSES),
+                // `flow-root` contains a floated imageAside inside the
+                // document rather than letting it run out over the toolbar
+                // below. The editable already has padding, so establishing a
+                // block formatting context here costs nothing.
+                class: cn(
+                    'flow-root min-h-64 p-4 focus:outline-none',
+                    PROSE_CLASSES,
+                ),
                 // A contenteditable is not a form control, so nothing else
                 // gives this a name in the accessibility tree.
                 role: 'textbox',
                 'aria-multiline': 'true',
-                'aria-label': 'Pagina-inhoud',
+                'aria-label': t('ui.editor.aria_label'),
             },
         },
         onUpdate: () => setIsDirty(true),
@@ -268,7 +293,7 @@ export function PageEditor({
                 <div className="flex flex-wrap items-center gap-1 border-b border-border bg-card p-2">
                     <ToolbarButton
                         icon={Bold}
-                        label="Vet"
+                        label={t('ui.editor.bold')}
                         active={state.bold}
                         onClick={() =>
                             editor.chain().focus().toggleBold().run()
@@ -276,7 +301,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={Italic}
-                        label="Cursief"
+                        label={t('ui.editor.italic')}
                         active={state.italic}
                         onClick={() =>
                             editor.chain().focus().toggleItalic().run()
@@ -284,7 +309,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={SubscriptIcon}
-                        label="Subscript (H₂O)"
+                        label={t('ui.editor.subscript')}
                         active={state.subscript}
                         onClick={() =>
                             editor.chain().focus().toggleSubscript().run()
@@ -292,7 +317,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={SuperscriptIcon}
-                        label="Superscript (m/s²)"
+                        label={t('ui.editor.superscript')}
                         active={state.superscript}
                         onClick={() =>
                             editor.chain().focus().toggleSuperscript().run()
@@ -303,7 +328,7 @@ export function PageEditor({
 
                     <ToolbarButton
                         icon={Heading2}
-                        label="Kop 2"
+                        label={t('ui.editor.heading_2')}
                         active={state.heading2}
                         onClick={() =>
                             editor
@@ -315,7 +340,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={Heading3}
-                        label="Kop 3"
+                        label={t('ui.editor.heading_3')}
                         active={state.heading3}
                         onClick={() =>
                             editor
@@ -330,7 +355,7 @@ export function PageEditor({
 
                     <ToolbarButton
                         icon={AlignLeft}
-                        label="Links uitlijnen"
+                        label={t('ui.editor.align_left')}
                         active={state.alignLeft}
                         onClick={() =>
                             editor.chain().focus().setTextAlign('left').run()
@@ -338,7 +363,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={AlignCenter}
-                        label="Centreren"
+                        label={t('ui.editor.align_center')}
                         active={state.alignCenter}
                         onClick={() =>
                             editor.chain().focus().setTextAlign('center').run()
@@ -346,7 +371,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={AlignRight}
-                        label="Rechts uitlijnen"
+                        label={t('ui.editor.align_right')}
                         active={state.alignRight}
                         onClick={() =>
                             editor.chain().focus().setTextAlign('right').run()
@@ -354,7 +379,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={AlignJustify}
-                        label="Uitvullen"
+                        label={t('ui.editor.align_justify')}
                         active={state.alignJustify}
                         onClick={() =>
                             editor.chain().focus().setTextAlign('justify').run()
@@ -365,7 +390,7 @@ export function PageEditor({
 
                     <ToolbarButton
                         icon={List}
-                        label="Opsomming"
+                        label={t('ui.editor.bullet_list')}
                         active={state.bulletList}
                         onClick={() =>
                             editor.chain().focus().toggleBulletList().run()
@@ -373,7 +398,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={ListOrdered}
-                        label="Genummerde lijst"
+                        label={t('ui.editor.ordered_list')}
                         active={state.orderedList}
                         onClick={() =>
                             editor.chain().focus().toggleOrderedList().run()
@@ -381,7 +406,7 @@ export function PageEditor({
                     />
                     <ToolbarButton
                         icon={Quote}
-                        label="Citaat"
+                        label={t('ui.editor.blockquote')}
                         active={state.blockquote}
                         onClick={() =>
                             editor.chain().focus().toggleBlockquote().run()
@@ -392,7 +417,7 @@ export function PageEditor({
 
                     <ToolbarButton
                         icon={Link2}
-                        label="Link"
+                        label={t('ui.editor.link')}
                         active={state.link}
                         onClick={() => setDialog('link')}
                     />
@@ -401,22 +426,27 @@ export function PageEditor({
 
                     <ToolbarButton
                         icon={Paperclip}
-                        label="Bestand invoegen"
+                        label={t('ui.editor.insert_file')}
                         onClick={() => setDialog('file')}
                     />
                     <ToolbarButton
                         icon={Images}
-                        label="Afbeeldingen invoegen"
+                        label={t('ui.editor.insert_images')}
                         onClick={() => setDialog('image')}
                     />
                     <ToolbarButton
+                        icon={WrapText}
+                        label={t('ui.editor.insert_image_aside')}
+                        onClick={() => setDialog('imageAside')}
+                    />
+                    <ToolbarButton
                         icon={Youtube}
-                        label="YouTube-video invoegen"
+                        label={t('ui.editor.insert_youtube')}
                         onClick={() => setDialog('youtube')}
                     />
                     <ToolbarButton
                         icon={TableIcon}
-                        label="Tabel invoegen"
+                        label={t('ui.editor.insert_table')}
                         onClick={() =>
                             editor
                                 .chain()
@@ -441,19 +471,19 @@ export function PageEditor({
                             className="mx-1 size-4 text-muted-foreground"
                         />
                         <TableButton
-                            label="Rij erboven"
+                            label={t('ui.editor.row_above')}
                             onClick={() =>
                                 editor.chain().focus().addRowBefore().run()
                             }
                         />
                         <TableButton
-                            label="Rij eronder"
+                            label={t('ui.editor.row_below')}
                             onClick={() =>
                                 editor.chain().focus().addRowAfter().run()
                             }
                         />
                         <TableButton
-                            label="Rij wissen"
+                            label={t('ui.editor.delete_row')}
                             onClick={() =>
                                 editor.chain().focus().deleteRow().run()
                             }
@@ -466,19 +496,19 @@ export function PageEditor({
                             className="mx-1 size-4 text-muted-foreground"
                         />
                         <TableButton
-                            label="Kolom links"
+                            label={t('ui.editor.column_left')}
                             onClick={() =>
                                 editor.chain().focus().addColumnBefore().run()
                             }
                         />
                         <TableButton
-                            label="Kolom rechts"
+                            label={t('ui.editor.column_right')}
                             onClick={() =>
                                 editor.chain().focus().addColumnAfter().run()
                             }
                         />
                         <TableButton
-                            label="Kolom wissen"
+                            label={t('ui.editor.delete_column')}
                             onClick={() =>
                                 editor.chain().focus().deleteColumn().run()
                             }
@@ -487,7 +517,7 @@ export function PageEditor({
                         <ToolbarSeparator />
 
                         <TableButton
-                            label="Cellen samenvoegen"
+                            label={t('ui.editor.merge_cells')}
                             onClick={() =>
                                 editor.chain().focus().mergeOrSplit().run()
                             }
@@ -504,7 +534,7 @@ export function PageEditor({
                             }
                         >
                             <Trash2 aria-hidden="true" />
-                            Tabel wissen
+                            {t('ui.editor.delete_table')}
                         </Button>
                     </div>
                 )}
@@ -514,7 +544,7 @@ export function PageEditor({
 
                     {state.isEmpty && (
                         <p className="pointer-events-none absolute top-4 left-4 text-muted-foreground select-none">
-                            Schrijf hier de inhoud van deze pagina…
+                            {t('ui.editor.placeholder')}
                         </p>
                     )}
                 </div>
@@ -522,9 +552,7 @@ export function PageEditor({
 
             <div className="flex flex-wrap items-center justify-end gap-3">
                 <p className="text-sm text-muted-foreground">
-                    {isDirty
-                        ? 'Er zijn niet-opgeslagen wijzigingen.'
-                        : 'Alle wijzigingen zijn opgeslagen.'}
+                    {isDirty ? t('ui.editor.unsaved') : t('ui.editor.saved')}
                 </p>
                 <Button
                     type="button"
@@ -536,7 +564,7 @@ export function PageEditor({
                     ) : (
                         <Save aria-hidden="true" />
                     )}
-                    Inhoud opslaan
+                    {t('ui.editor.save')}
                 </Button>
             </div>
 
@@ -544,7 +572,6 @@ export function PageEditor({
                 starts from a clean slate — no effect to reset its state. */}
             {dialog === 'file' && (
                 <FilePickerDialog
-                    files={library.files}
                     maxBytes={maxBytes}
                     uploadedCount={uploadedCount}
                     onUploaded={(record) => {
@@ -556,7 +583,9 @@ export function PageEditor({
                         // and the image button will offer it.
                         if (record.type === 'image') {
                             toast.info(
-                                `"${record.original_filename}" is een afbeelding. Voeg hem in met de knop "Afbeeldingen invoegen".`,
+                                t('ui.editor.image_not_a_file', {
+                                    name: record.original_filename,
+                                }),
                             );
 
                             return;
@@ -582,6 +611,11 @@ export function PageEditor({
                         closeDialog();
                     }}
                     onSelect={(file) => {
+                        // Found by search rather than uploaded, so the holder
+                        // has never seen it — without this the node view
+                        // mounted just below would find nothing to draw.
+                        holder.addFile(file);
+
                         editor
                             .chain()
                             .focus()
@@ -598,9 +632,9 @@ export function PageEditor({
 
             {dialog === 'image' && (
                 <ImagePickerDialog
-                    images={library.images}
                     maxBytes={maxBytes}
                     onUploaded={addToLibrary}
+                    onPicked={(image) => holder.addImage(image)}
                     onClose={closeDialog}
                     onSelect={(ulids) => {
                         editor
@@ -611,6 +645,34 @@ export function PageEditor({
                                 attrs: { ulids },
                             })
                             .run();
+                        closeDialog();
+                    }}
+                />
+            )}
+
+            {dialog === 'imageAside' && (
+                <ImagePickerDialog
+                    maxBytes={maxBytes}
+                    multiple={false}
+                    onUploaded={addToLibrary}
+                    onPicked={(image) => holder.addImage(image)}
+                    onClose={closeDialog}
+                    onSelect={(ulids) => {
+                        // Side and size are left to the node's own defaults
+                        // and changed on the block afterwards, where the owner
+                        // can see the result. Asking for them in the dialog
+                        // would be asking about a layout they cannot see yet.
+                        if (ulids[0] !== undefined) {
+                            editor
+                                .chain()
+                                .focus()
+                                .insertContent({
+                                    type: 'imageAside',
+                                    attrs: { ulid: ulids[0] },
+                                })
+                                .run();
+                        }
+
                         closeDialog();
                     }}
                 />

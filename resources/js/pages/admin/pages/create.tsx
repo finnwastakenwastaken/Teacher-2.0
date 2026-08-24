@@ -5,11 +5,13 @@ import type { ImageOption } from '@/components/admin/image-field';
 import { PageForm } from '@/components/admin/page-form';
 import type { TopicOption } from '@/components/admin/page-form';
 import { index as topicsIndex } from '@/routes/admin/topics';
+import { t } from '@/lib/i18n';
 
 type Props = {
     topics: TopicOption[];
     passwords: AccessPasswordOption[];
-    images: ImageOption[];
+    /** The image the banner field currently points at, if any. */
+    heroImage: ImageOption | null;
 };
 
 function initialTopicIdFromQuery(): number | null {
@@ -23,21 +25,21 @@ function initialTopicIdFromQuery(): number | null {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-export default function PagesCreate({ topics, passwords, images }: Props) {
+export default function PagesCreate({ topics, passwords, heroImage }: Props) {
     return (
         <>
-            <Head title="Nieuwe pagina" />
+            <Head title={t('ui.content.page.new')} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <h1 className="text-xl font-semibold tracking-tight">
-                    Nieuwe pagina
+                    {t('ui.content.page.new')}
                 </h1>
 
                 <PageForm
                     formProps={PageController.store.form()}
                     topics={topics}
                     passwords={passwords}
-                    images={images}
+                    heroImage={heroImage}
                     initialTopicId={initialTopicIdFromQuery()}
                 />
             </div>
@@ -47,7 +49,7 @@ export default function PagesCreate({ topics, passwords, images }: Props) {
 
 PagesCreate.layout = {
     breadcrumbs: [
-        { title: 'Inhoud', href: topicsIndex.url() },
-        { title: 'Nieuwe pagina', href: PageController.create.url() },
+        { title: t('ui.content.title'), href: topicsIndex.url() },
+        { title: t('ui.content.page.new'), href: PageController.create.url() },
     ],
 };

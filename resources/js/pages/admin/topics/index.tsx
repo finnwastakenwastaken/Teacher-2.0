@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SortableList, SortableRow } from '@/components/admin/sortable-list';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
+import { t } from '@/lib/i18n';
 
 /*
  * CRUD listing of the whole content tree, with drag-to-reorder.
@@ -42,11 +43,7 @@ type Props = {
 };
 
 function deleteTopic(topic: TopicNode) {
-    if (
-        !confirm(
-            `Weet je zeker dat je "${topic.title}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`,
-        )
-    ) {
+    if (!confirm(t('ui.content.confirm_delete', { title: topic.title }))) {
         return;
     }
 
@@ -56,11 +53,7 @@ function deleteTopic(topic: TopicNode) {
 }
 
 function deletePage(page: PageSummary) {
-    if (
-        !confirm(
-            `Weet je zeker dat je "${page.title}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`,
-        )
-    ) {
+    if (!confirm(t('ui.content.confirm_delete', { title: page.title }))) {
         return;
     }
 
@@ -117,7 +110,7 @@ function TopicRow({
                 />
                 <span className="font-medium">{topic.title}</span>
                 {topic.is_hidden && (
-                    <Badge variant="secondary">Verborgen</Badge>
+                    <Badge variant="secondary">{t('ui.content.hidden')}</Badge>
                 )}
 
                 <div className="ml-auto flex flex-wrap gap-2">
@@ -128,7 +121,7 @@ function TopicRow({
                                     query: { parent_id: topic.id },
                                 })}
                             >
-                                + Subonderwerp
+                                {t('ui.content.topic.add_child')}
                             </Link>
                         </Button>
                     )}
@@ -138,12 +131,12 @@ function TopicRow({
                                 query: { topic_id: topic.id },
                             })}
                         >
-                            + Pagina
+                            {t('ui.content.page.add')}
                         </Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
                         <Link href={TopicController.edit(topic.id).url}>
-                            Bewerken
+                            {t('ui.actions.edit')}
                         </Link>
                     </Button>
                     <Button
@@ -151,7 +144,7 @@ function TopicRow({
                         size="sm"
                         onClick={() => deleteTopic(topic)}
                     >
-                        Verwijderen
+                        {t('ui.actions.delete')}
                     </Button>
                 </div>
             </div>
@@ -163,7 +156,9 @@ function TopicRow({
                         getId={(page) => page.id}
                         getTitle={(page) => page.title}
                         onReorder={reorderPages}
-                        label={`Pagina’s onder ${topic.title}`}
+                        label={t('ui.content.page.under_topic', {
+                            title: topic.title,
+                        })}
                     >
                         {(page) => (
                             <SortableRow
@@ -176,7 +171,7 @@ function TopicRow({
                                     <span>{page.title}</span>
                                     {page.is_hidden && (
                                         <Badge variant="secondary">
-                                            Verborgen
+                                            {t('ui.content.hidden')}
                                         </Badge>
                                     )}
 
@@ -192,7 +187,7 @@ function TopicRow({
                                                         .url
                                                 }
                                             >
-                                                Bewerken
+                                                {t('ui.actions.edit')}
                                             </Link>
                                         </Button>
                                         <Button
@@ -200,14 +195,14 @@ function TopicRow({
                                             size="sm"
                                             onClick={() => duplicatePage(page)}
                                         >
-                                            Dupliceren
+                                            {t('ui.content.duplicate')}
                                         </Button>
                                         <Button
                                             variant="destructive"
                                             size="sm"
                                             onClick={() => deletePage(page)}
                                         >
-                                            Verwijderen
+                                            {t('ui.actions.delete')}
                                         </Button>
                                     </div>
                                 </div>
@@ -224,7 +219,9 @@ function TopicRow({
                         getId={(child) => child.id}
                         getTitle={(child) => child.title}
                         onReorder={reorderTopics}
-                        label={`Subonderwerpen van ${topic.title}`}
+                        label={t('ui.content.topic.children_of', {
+                            title: topic.title,
+                        })}
                     >
                         {(child) => (
                             <SortableRow
@@ -247,23 +244,23 @@ export default function TopicsIndex({ tree, icons }: Props) {
 
     return (
         <>
-            <Head title="Inhoud" />
+            <Head title={t('ui.content.title')} />
 
             <div className="flex flex-1 flex-col gap-4 p-4">
                 <div className="flex items-center justify-between">
                     <h1 className="text-xl font-semibold tracking-tight">
-                        Inhoud
+                        {t('ui.content.title')}
                     </h1>
                     <Button asChild>
                         <Link href={TopicController.create.url()}>
-                            + Nieuw hoofdonderwerp
+                            {t('ui.content.topic.add_top_level')}
                         </Link>
                     </Button>
                 </div>
 
                 {tree.length === 0 ? (
                     <p className="text-muted-foreground">
-                        Er zijn nog geen onderwerpen aangemaakt.
+                        {t('ui.content.empty')}
                     </p>
                 ) : (
                     <div className="rounded-lg border border-border p-2">
@@ -272,7 +269,7 @@ export default function TopicsIndex({ tree, icons }: Props) {
                             getId={(topic) => topic.id}
                             getTitle={(topic) => topic.title}
                             onReorder={reorderTopics}
-                            label="Hoofdonderwerpen"
+                            label={t('ui.content.top_level')}
                         >
                             {(topic) => (
                                 <SortableRow
@@ -294,7 +291,7 @@ export default function TopicsIndex({ tree, icons }: Props) {
 TopicsIndex.layout = {
     breadcrumbs: [
         {
-            title: 'Inhoud',
+            title: t('ui.content.title'),
             href: TopicController.index.url(),
         },
     ],

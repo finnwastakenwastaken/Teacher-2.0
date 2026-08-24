@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import PublicLayout from '@/layouts/public-layout';
+import { t } from '@/lib/i18n';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 
 type Props = {
@@ -45,8 +46,8 @@ export default function ContentLocked({
 
                 <p className="mb-6 text-sm text-muted-foreground">
                     {passwordName
-                        ? `Deze pagina is beveiligd. Vul het wachtwoord voor ${passwordName} in.`
-                        : 'Deze pagina is beveiligd. Vul het wachtwoord in.'}
+                        ? t('ui.public.locked.named', { name: passwordName })
+                        : t('ui.public.locked.unnamed')}
                 </p>
 
                 <Form
@@ -59,7 +60,9 @@ export default function ContentLocked({
                             <input type="hidden" name="path" value={path} />
 
                             <div className="space-y-2">
-                                <Label htmlFor="password">Wachtwoord</Label>
+                                <Label htmlFor="password">
+                                    {t('ui.public.locked.password')}
+                                </Label>
                                 <Input
                                     id="password"
                                     name="password"
@@ -72,7 +75,7 @@ export default function ContentLocked({
                             </div>
 
                             <Button type="submit" disabled={processing}>
-                                Ontgrendelen
+                                {t('ui.public.locked.unlock')}
                             </Button>
                         </div>
                     )}

@@ -21,6 +21,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useClipboard } from '@/hooks/use-clipboard';
 import { OTP_MAX_LENGTH } from '@/hooks/use-two-factor-auth';
+import { t } from '@/lib/i18n';
 import { confirm } from '@/routes/two-factor';
 
 function GridScanIcon() {
@@ -213,7 +214,7 @@ function TwoFactorVerificationStep({
                                 onClick={onBack}
                                 disabled={processing}
                             >
-                                Annuleren
+                                {t('ui.actions.cancel')}
                             </Button>
                             <Button
                                 type="submit"
@@ -222,7 +223,7 @@ function TwoFactorVerificationStep({
                                     processing || code.length < OTP_MAX_LENGTH
                                 }
                             >
-                                Bevestigen
+                                {t('ui.settings.two_factor.continue')}
                             </Button>
                         </div>
                     </div>
@@ -265,27 +266,24 @@ export default function TwoFactorSetupModal({
     }>(() => {
         if (twoFactorEnabled) {
             return {
-                title: 'Tweestapsverificatie staat aan',
-                description:
-                    'Scan de QR-code met je authenticator-app, of vul de sleutel handmatig in.',
-                buttonText: 'Sluiten',
+                title: t('ui.settings.two_factor.enabled_heading'),
+                description: t('ui.settings.two_factor.scan_or_key'),
+                buttonText: t('ui.actions.close'),
             };
         }
 
         if (showVerificationStep) {
             return {
-                title: 'Code controleren',
-                description:
-                    'Vul de code van zes cijfers uit je authenticator-app in',
-                buttonText: 'Doorgaan',
+                title: t('ui.settings.two_factor.verify_heading'),
+                description: t('ui.settings.two_factor.verify_description'),
+                buttonText: t('ui.settings.two_factor.continue'),
             };
         }
 
         return {
-            title: 'Tweestapsverificatie aanzetten',
-            description:
-                'Scan de QR-code met je authenticator-app, of vul de sleutel handmatig in',
-            buttonText: 'Doorgaan',
+            title: t('ui.settings.two_factor.enable'),
+            description: t('ui.settings.two_factor.scan_or_key_short'),
+            buttonText: t('ui.settings.two_factor.continue'),
         };
     }, [twoFactorEnabled, showVerificationStep]);
 

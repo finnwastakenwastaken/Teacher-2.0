@@ -15,6 +15,13 @@ declare module '@inertiajs/core' {
             auth: Auth;
             sidebarOpen: boolean;
             branding: Branding;
+            /**
+             * Every validation message per field, where Inertia's own
+             * `errors` keeps only the first. See
+             * HandleInertiaRequests::allValidationErrors() for why both
+             * exist. Screens opt in; most only ever need `errors`.
+             */
+            errorList: Record<string, string[]>;
             [key: string]: unknown;
         };
     }

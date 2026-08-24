@@ -29,7 +29,7 @@ class ProfileController extends Controller
         $request->user()->fill($request->validated());
         $request->user()->save();
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Profiel bijgewerkt.')]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('admin.profile.updated')]);
 
         return to_route('profile.edit');
     }

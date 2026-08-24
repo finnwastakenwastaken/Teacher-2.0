@@ -4,6 +4,7 @@ namespace Tests\Feature\Settings;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
@@ -114,5 +115,44 @@ class SecurityTest extends TestCase
         $response
             ->assertSessionHasErrors('current_password')
             ->assertRedirect(route('security.edit'));
+    }
+
+    /**
+     * Changing the password has to end the sessions opened under the old one.
+     *
+     * The commonest reason to change a password is believing someone else has
+     * it. Before this, the new hash changed nothing for them — their cookie
+     * kept working until SESSION_LIFETIME expired it, and any activity
+     * renewed that.
+     */
+    public function test_changing_the_password_signs_out_other_sessions()
+    {
+        // The suite forces SESSION_DRIVER=array (phpunit.xml), and the
+        // controller deliberately does nothing on a driver whose sessions it
+        // cannot reach — so this test has to ask for the driver the
+        // application actually ships with, or it would assert on the branch
+        // that is skipped rather than the one that matters.
+        config(['session.driver' => 'database']);
+
+        $user = User::factory()->create(['password' => 'oud-wachtwoord']);
+
+        // A second session for the same account, as a row in the table the
+        // database session driver reads.
+        DB::table('sessions')->insert([
+            'id' => 'een-andere-sessie',
+            'user_id' => $user->id,
+            'ip_address' => '198.51.100.4',
+            'user_agent' => 'Vergeten laptop',
+            'payload' => base64_encode(serialize([])),
+            'last_activity' => time(),
+        ]);
+
+        $this->actingAs($user)->put(route('user-password.update'), [
+            'current_password' => 'oud-wachtwoord',
+            'password' => 'Nieuw-Wachtwoord-2026!',
+            'password_confirmation' => 'Nieuw-Wachtwoord-2026!',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('sessions', ['id' => 'een-andere-sessie']);
     }
 }

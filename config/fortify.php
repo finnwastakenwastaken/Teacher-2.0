@@ -145,7 +145,18 @@ return [
     'passkeys' => [
         'relying_party_id' => parse_url(config('app.url'), PHP_URL_HOST),
         'allowed_origins' => [config('app.url')],
-        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
+        // `?:` and not env()'s second argument: .env.example ships the key
+        // present but empty, and Dotenv reads that as the empty string rather
+        // than as absent — so the default would never apply and the secret
+        // would be "". Falling back to APP_KEY is the old behaviour and is
+        // survivable; falling back to nothing is not.
+        //
+        // The fallback exists for installations that predate the variable.
+        // Prefer a value of its own: rotating APP_KEY is a supported operation
+        // (APP_PREVIOUS_KEYS) that costs one round of logging back in, while
+        // changing this unenrols every passkey permanently. install.sh
+        // generates one and back-fills existing .env files.
+        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET') ?: config('app.key'),
         'timeout' => 60000,
     ],
 

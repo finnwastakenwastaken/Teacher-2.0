@@ -4,6 +4,7 @@ import type { AccessPasswordOption } from '@/components/admin/access-password-fi
 import { TopicForm } from '@/components/admin/topic-form';
 import type { PossibleParent } from '@/components/admin/topic-form';
 import { index as topicsIndex } from '@/routes/admin/topics';
+import { t } from '@/lib/i18n';
 
 type Props = {
     possibleParents: PossibleParent[];
@@ -24,11 +25,11 @@ function initialParentIdFromQuery(): number | null {
 export default function TopicsCreate({ possibleParents, passwords }: Props) {
     return (
         <>
-            <Head title="Nieuw onderwerp" />
+            <Head title={t('ui.content.topic.new')} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <h1 className="text-xl font-semibold tracking-tight">
-                    Nieuw onderwerp
+                    {t('ui.content.topic.new')}
                 </h1>
 
                 <TopicForm
@@ -44,7 +45,10 @@ export default function TopicsCreate({ possibleParents, passwords }: Props) {
 
 TopicsCreate.layout = {
     breadcrumbs: [
-        { title: 'Inhoud', href: topicsIndex.url() },
-        { title: 'Nieuw onderwerp', href: TopicController.create.url() },
+        { title: t('ui.content.title'), href: topicsIndex.url() },
+        {
+            title: t('ui.content.topic.new'),
+            href: TopicController.create.url(),
+        },
     ],
 };

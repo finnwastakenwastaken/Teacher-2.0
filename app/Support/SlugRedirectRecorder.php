@@ -35,7 +35,10 @@ class SlugRedirectRecorder
     public static function recordPageMove(Page $page): void
     {
         $oldSlug = $page->getOriginal('slug');
-        $oldTopic = Topic::find($page->getOriginal('topic_id'));
+        // Cast: getOriginal() is typed mixed, and Topic::find() given an
+        // array returns a Collection — which has no fullPath() and would be
+        // a fatal rather than the early return below.
+        $oldTopic = Topic::find((int) $page->getOriginal('topic_id'));
 
         if ($oldTopic === null) {
             return;
@@ -65,17 +68,25 @@ class SlugRedirectRecorder
      * observer chain), making old and "current" paths look identical even
      * though the move is genuinely happening. Callers only reach here after
      * already confirming a real slug/parent change, so recording
-     * unconditionally is correct; firstOrCreate keeps this idempotent if the
-     * same old path is renamed through again later.
+     * unconditionally is correct.
+     *
+     * updateOrCreate and not firstOrCreate: a path that has been vacated can
+     * be claimed by something else and then vacated again, and firstOrCreate
+     * would leave the first claimant's redirect in place — sending visitors
+     * to a page that has not lived at that address for a year. The newest
+     * occupant is the one the link was for.
      */
     private static function record(string $oldPath, Topic|Page $model): void
     {
-        SlugRedirect::query()->firstOrCreate(
+        SlugRedirect::query()->updateOrCreate(
             ['from_path' => $oldPath],
             ['redirectable_type' => $model::class, 'redirectable_id' => $model->id]
         );
     }
 
+    /**
+     * @return list<string>
+     */
     private static function ancestorSlugs(?int $topicId): array
     {
         if ($topicId === null) {
@@ -87,6 +98,9 @@ class SlugRedirectRecorder
         return $topic === null ? [] : explode('/', $topic->fullPath());
     }
 
+    /**
+     * @param  list<string>  $ancestorSlugs
+     */
     private static function joinPath(array $ancestorSlugs, string $slug): string
     {
         return implode('/', [...$ancestorSlugs, $slug]);

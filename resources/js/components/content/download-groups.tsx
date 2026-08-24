@@ -3,6 +3,7 @@ import * as React from 'react';
 import { FileTypeIcon } from '@/components/file-type-icon';
 import { Button } from '@/components/ui/button';
 import { formatBytes } from '@/lib/format';
+import { t } from '@/lib/i18n';
 import type { MediaFileKind } from '@/types';
 
 /*
@@ -80,11 +81,12 @@ export function DownloadGroups({ groups }: { groups: DownloadGroup[] }) {
     // Only offer the preference once there is a real choice to make.
     const selectable = groups.filter((group) => group.key !== 'all');
 
-    // The preference reorders; it never filters. "Voor iedereen" stays on
-    // top because it applies regardless of track, then the chosen level,
-    // then the rest in the owner's order. A student who picked HAVO can
-    // still scroll to the VWO material — sometimes that is exactly what
-    // they want, and hiding it would leave them unable to tell it exists.
+    // The preference reorders; it never filters. The untagged group
+    // stays on top because it applies regardless of track, then the
+    // chosen level, then the rest in the owner's order. A student who
+    // picked one track can still scroll to another's material — sometimes
+    // that is exactly what they want, and hiding it would leave them
+    // unable to tell it exists.
     const ordered = [
         ...groups.filter((group) => group.key === 'all'),
         ...selectable.filter((group) => group.key === preferred),
@@ -93,12 +95,14 @@ export function DownloadGroups({ groups }: { groups: DownloadGroup[] }) {
 
     return (
         <section className="mt-10 border-t border-border pt-8">
-            <h2 className="text-lg font-semibold tracking-tight">Downloads</h2>
+            <h2 className="text-lg font-semibold tracking-tight">
+                {t('ui.public.downloads.heading')}
+            </h2>
 
             {selectable.length > 1 && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="text-sm text-muted-foreground">
-                        Mijn niveau:
+                        {t('ui.public.downloads.my_level')}
                     </span>
                     {selectable.map((group) => (
                         <Button

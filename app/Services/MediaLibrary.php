@@ -6,6 +6,7 @@ use App\Exceptions\MediaUploadException;
 use App\Models\Image;
 use App\Models\MediaFile;
 use App\Models\MediaUpload;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -54,15 +55,14 @@ class MediaLibrary
         $maxBytes = (int) config('media.max_bytes');
 
         if ($totalBytes <= 0) {
-            throw new MediaUploadException('Het bestand lijkt leeg te zijn.');
+            throw new MediaUploadException(__('media.upload.empty'));
         }
 
         if ($totalBytes > $maxBytes) {
-            throw new MediaUploadException(sprintf(
-                'Dit bestand is te groot (%s). Het maximum is %s. Gebruik voor grotere bestanden "php artisan media:import".',
-                $this->formatBytes($totalBytes),
-                $this->formatBytes($maxBytes),
-            ));
+            throw new MediaUploadException(__('media.upload.too_large', [
+                'size' => $this->formatBytes($totalBytes),
+                'maximum' => $this->formatBytes($maxBytes),
+            ]));
         }
 
         // The server decides the chunk size, not the client. It has to stay
@@ -84,11 +84,11 @@ class MediaLibrary
     public function storeChunk(MediaUpload $upload, int $index, UploadedFile $chunk): void
     {
         if ($upload->isExpired()) {
-            throw new MediaUploadException('Deze upload is verlopen. Probeer het opnieuw.');
+            throw new MediaUploadException(__('media.upload.expired'));
         }
 
         if ($index < 0 || $index >= $upload->total_chunks) {
-            throw new MediaUploadException('Ongeldig chunknummer.');
+            throw new MediaUploadException(__('media.upload.bad_chunk_number'));
         }
 
         // Every chunk but the last is exactly one chunk long. Checking this
@@ -99,10 +99,11 @@ class MediaLibrary
             : $upload->chunk_bytes;
 
         if ($chunk->getSize() !== $expected) {
-            throw new MediaUploadException(sprintf(
-                'Chunk %d heeft een onverwachte grootte (%d bytes in plaats van %d).',
-                $index, $chunk->getSize(), $expected
-            ));
+            throw new MediaUploadException(__('media.upload.chunk_wrong_size', [
+                'index' => $index,
+                'actual' => (int) $chunk->getSize(),
+                'expected' => $expected,
+            ]));
         }
 
         $disk = $this->disk();
@@ -132,7 +133,7 @@ class MediaLibrary
     public function complete(MediaUpload $upload, ?string $altText = null): Image|MediaFile
     {
         if ($upload->isExpired()) {
-            throw new MediaUploadException('Deze upload is verlopen. Probeer het opnieuw.');
+            throw new MediaUploadException(__('media.upload.expired'));
         }
 
         $disk = $this->disk();
@@ -140,10 +141,10 @@ class MediaLibrary
 
         for ($i = 0; $i < $upload->total_chunks; $i++) {
             if (! $disk->exists($directory.'/'.$i)) {
-                throw new MediaUploadException(sprintf(
-                    'De upload is onvolledig: deel %d van %d ontbreekt.',
-                    $i + 1, $upload->total_chunks
-                ));
+                throw new MediaUploadException(__('media.upload.chunk_missing', [
+                    'index' => $i + 1,
+                    'total' => $upload->total_chunks,
+                ]));
             }
         }
 
@@ -154,7 +155,7 @@ class MediaLibrary
         $out = fopen($assembledPath, 'wb');
 
         if ($out === false) {
-            throw new MediaUploadException('Kon het bestand niet samenvoegen.');
+            throw new MediaUploadException(__('media.upload.merge_failed'));
         }
 
         try {
@@ -162,7 +163,7 @@ class MediaLibrary
                 $in = fopen($disk->path($directory.'/'.$i), 'rb');
 
                 if ($in === false) {
-                    throw new MediaUploadException('Kon een deel van de upload niet lezen.');
+                    throw new MediaUploadException(__('media.upload.chunk_unreadable'));
                 }
 
                 stream_copy_to_stream($in, $out);
@@ -175,7 +176,7 @@ class MediaLibrary
         if (filesize($assembledPath) !== $upload->total_bytes) {
             $this->abort($upload);
 
-            throw new MediaUploadException('De samengevoegde upload heeft niet de verwachte grootte.');
+            throw new MediaUploadException(__('media.upload.wrong_size'));
         }
 
         try {
@@ -205,13 +206,11 @@ class MediaLibrary
         $type = config('media.types')[$mime] ?? null;
 
         if ($type === null) {
-            throw new MediaUploadException(sprintf(
-                'Bestandstype "%s" wordt niet ondersteund.', $mime
-            ));
+            throw new MediaUploadException(__('media.upload.unsupported_type', ['mime' => $mime]));
         }
 
         if ($mime === 'image/svg+xml' && ! config('media.allow_svg')) {
-            throw new MediaUploadException('SVG-bestanden zijn uitgeschakeld.');
+            throw new MediaUploadException(__('media.upload.svg_disabled'));
         }
 
         /*
@@ -234,7 +233,20 @@ class MediaLibrary
             $originalFilename = $optimised->renamed($originalFilename);
         }
 
+        // filesize() returns false on a stat failure, and false written into
+        // an unsignedBigInteger column becomes 0 — the library would then
+        // report a perfectly good file as empty, with nothing to say why.
+        // Refusing here is cheap: nothing has been stored yet.
         $sizeBytes = filesize($source);
+
+        if ($sizeBytes === false) {
+            if ($optimised !== null) {
+                @unlink($optimised->path);
+            }
+
+            throw new MediaUploadException(__('media.upload.size_unknown'));
+        }
+
         $ulid = (string) Str::ulid();
 
         $directory = $type['kind'] === 'image'
@@ -274,7 +286,7 @@ class MediaLibrary
                 @unlink($optimised->path);
             }
 
-            throw new MediaUploadException('Kon het bestand niet opslaan.');
+            throw new MediaUploadException(__('media.upload.store_failed'));
         }
 
         // Only once the bytes are safely in place: a converted image was moved
@@ -285,7 +297,7 @@ class MediaLibrary
         }
 
         if ($type['kind'] === 'image') {
-            return $this->createImage($relativePath, $mime, $sizeBytes, $originalFilename, $destination, $altText);
+            return $this->createImage($ulid, $relativePath, $mime, $sizeBytes, $originalFilename, $destination, $altText);
         }
 
         return MediaFile::query()->create([
@@ -322,7 +334,15 @@ class MediaLibrary
         return $count;
     }
 
+    /**
+     * The ULID is passed in rather than minted here so that the row and the
+     * file on disk carry the same one. They used to differ — the path was
+     * built from one ULID and createImage() generated another — which meant
+     * that for images, and only for images, you could not go from a filename
+     * on disk to its row without a LIKE query.
+     */
     private function createImage(
+        string $ulid,
         string $relativePath,
         string $mime,
         int $sizeBytes,
@@ -335,7 +355,7 @@ class MediaLibrary
             // and here) because an image that reaches the library without
             // alt text is invisible to a screen reader on every page that
             // later uses it.
-            throw new MediaUploadException('Een afbeelding heeft alt-tekst nodig.');
+            throw new MediaUploadException(__('media.upload.alt_required'));
         }
 
         // SVG has no raster dimensions and getimagesize() often fails on it;
@@ -343,7 +363,7 @@ class MediaLibrary
         $dimensions = @getimagesize($absolutePath);
 
         return Image::query()->create([
-            'ulid' => (string) Str::ulid(),
+            'ulid' => $ulid,
             'path' => $relativePath,
             'alt_text' => $altText,
             'width' => $dimensions === false ? null : $dimensions[0],
@@ -407,7 +427,7 @@ class MediaLibrary
         };
     }
 
-    private function disk()
+    private function disk(): Filesystem
     {
         return Storage::disk(config('media.disk'));
     }

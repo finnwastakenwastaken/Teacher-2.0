@@ -5,7 +5,6 @@ import type { ImageOption } from '@/components/admin/image-field';
 import { PageDownloads } from '@/components/admin/page-downloads';
 import type {
     EducationLevelOption,
-    LibraryFile,
     PageDownload,
 } from '@/components/admin/page-downloads';
 import { PageForm } from '@/components/admin/page-form';
@@ -16,6 +15,7 @@ import type { EditorMediaLibrary } from '@/components/editor/media-library';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { index as topicsIndex } from '@/routes/admin/topics';
 import type { TipTapDoc } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 type Page = {
     id: number;
@@ -37,10 +37,11 @@ type Props = {
     topics: TopicOption[];
     mediaLibrary: EditorMediaLibrary;
     passwords: AccessPasswordOption[];
-    images: ImageOption[];
+    /** The image the banner field currently points at, if any. */
+    heroImage: ImageOption | null;
     educationLevels: EducationLevelOption[];
     downloads: PageDownload[];
-    downloadFiles: (LibraryFile & { id: number })[];
+    attachableFilesAvailable: boolean;
     uploadMaxBytes: number;
 };
 
@@ -50,21 +51,21 @@ export default function PagesEdit({
     topics,
     mediaLibrary,
     passwords,
-    images,
+    heroImage,
     educationLevels,
     downloads,
-    downloadFiles,
+    attachableFilesAvailable,
     uploadMaxBytes,
 }: Props) {
     useStatusToasts();
 
     return (
         <>
-            <Head title={`"${page.title}" bewerken`} />
+            <Head title={t('ui.content.edit_title', { title: page.title })} />
 
             <div className="flex flex-1 flex-col gap-8 p-4">
                 <h1 className="text-xl font-semibold tracking-tight">
-                    &quot;{page.title}&quot; bewerken
+                    {t('ui.content.edit_title', { title: page.title })}
                 </h1>
 
                 <PageForm
@@ -73,7 +74,7 @@ export default function PagesEdit({
                     page={page}
                     topics={topics}
                     passwords={passwords}
-                    images={images}
+                    heroImage={heroImage}
                 />
 
                 {/* The body is saved separately from the settings above: the
@@ -82,12 +83,10 @@ export default function PagesEdit({
                 <section className="grid gap-3 border-t border-border pt-8">
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">
-                            Inhoud
+                            {t('ui.content.page.body_heading')}
                         </h2>
                         <p className="text-sm text-muted-foreground">
-                            De tekst, afbeeldingen, bestanden en video&apos;s op
-                            deze pagina. Vergeet niet op &quot;Inhoud
-                            opslaan&quot; te klikken.
+                            {t('ui.content.page.body_description')}
                         </p>
                     </div>
 
@@ -105,11 +104,10 @@ export default function PagesEdit({
                 <section className="grid gap-3 border-t border-border pt-8">
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">
-                            Downloads
+                            {t('ui.content.page.downloads_heading')}
                         </h2>
                         <p className="text-sm text-muted-foreground">
-                            Bestanden onderaan de pagina, gegroepeerd per
-                            niveau. Elke wijziging wordt meteen opgeslagen.
+                            {t('ui.content.page.downloads_description')}
                         </p>
                     </div>
 
@@ -117,7 +115,7 @@ export default function PagesEdit({
                         pageId={page.id}
                         downloads={downloads}
                         levels={educationLevels}
-                        files={downloadFiles}
+                        attachableFilesAvailable={attachableFilesAvailable}
                         maxBytes={uploadMaxBytes}
                     />
                 </section>
@@ -130,7 +128,7 @@ export default function PagesEdit({
 // never as a link — see components/breadcrumbs.tsx — so its href is unused.
 PagesEdit.layout = {
     breadcrumbs: [
-        { title: 'Inhoud', href: topicsIndex.url() },
-        { title: 'Pagina bewerken', href: '#' },
+        { title: t('ui.content.title'), href: topicsIndex.url() },
+        { title: t('ui.content.page.edit'), href: '#' },
     ],
 };

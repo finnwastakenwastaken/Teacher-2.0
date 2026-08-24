@@ -25,6 +25,21 @@ export type TipTapHeadingLevel = 2 | 3 | 4;
 
 export type TipTapTextAlign = 'left' | 'center' | 'right' | 'justify';
 
+/**
+ * An imageAside sits on one side of the running text, which flows around it.
+ *
+ * Both are enumerations rather than numbers, because the renderer turns them
+ * into compiled Tailwind classes through a fixed map — a numeric width would
+ * have to become a style string, and nothing derived from stored content is
+ * allowed to become one.
+ *
+ * Optional here because they are optional in the stored JSON: the sanitiser
+ * only keeps keys the document actually carried. The editor always writes
+ * both, so this covers a body written by hand or by an older version.
+ */
+export type TipTapAsideSide = 'left' | 'right';
+export type TipTapAsideSize = 'small' | 'medium' | 'large';
+
 /** What a table cell carries. `colwidth` comes from the column resizer. */
 export type TipTapCellAttrs = {
     colspan?: number;
@@ -63,7 +78,15 @@ export type TipTapNode =
     | { type: 'tableCell'; attrs?: TipTapCellAttrs; content?: TipTapNode[] }
     | { type: 'fileEmbed'; attrs: { ulid: string } }
     | { type: 'youtubeEmbed'; attrs: { videoId: string } }
-    | { type: 'imageGallery'; attrs: { ulids: string[] } };
+    | { type: 'imageGallery'; attrs: { ulids: string[] } }
+    | {
+          type: 'imageAside';
+          attrs: {
+              ulid: string;
+              side?: TipTapAsideSide;
+              size?: TipTapAsideSize;
+          };
+      };
 
 export type TipTapDoc = {
     type: 'doc';

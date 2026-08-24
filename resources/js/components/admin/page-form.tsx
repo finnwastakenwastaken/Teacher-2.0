@@ -21,6 +21,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { slugify } from '@/lib/slug';
+import { t } from '@/lib/i18n';
 
 export type TopicOption = {
     id: number;
@@ -47,7 +48,8 @@ type PageFormProps = {
     iconData?: IconData | null;
     topics: TopicOption[];
     passwords: AccessPasswordOption[];
-    images: ImageOption[];
+    /** The image the banner field currently points at, if any. */
+    heroImage: ImageOption | null;
     initialTopicId?: number | null;
 };
 
@@ -57,7 +59,7 @@ export function PageForm({
     iconData = null,
     topics,
     passwords,
-    images,
+    heroImage,
     initialTopicId = null,
 }: PageFormProps) {
     const [slug, setSlug] = React.useState(page?.slug ?? '');
@@ -85,7 +87,9 @@ export function PageForm({
                 return (
                     <>
                         <div className="grid gap-2">
-                            <Label htmlFor="topic_id">Onderwerp</Label>
+                            <Label htmlFor="topic_id">
+                                {t('ui.forms.topic')}
+                            </Label>
                             <Select
                                 value={topicId === null ? '' : String(topicId)}
                                 onValueChange={(value) =>
@@ -93,7 +97,11 @@ export function PageForm({
                                 }
                             >
                                 <SelectTrigger id="topic_id" className="w-full">
-                                    <SelectValue placeholder="Kies een onderwerp" />
+                                    <SelectValue
+                                        placeholder={t(
+                                            'ui.forms.topic_placeholder',
+                                        )}
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {topics.map((topic) => (
@@ -116,7 +124,7 @@ export function PageForm({
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="title">Titel</Label>
+                            <Label htmlFor="title">{t('ui.forms.title')}</Label>
                             <Input
                                 id="title"
                                 name="title"
@@ -128,13 +136,15 @@ export function PageForm({
                                         setSlug(slugify(e.target.value));
                                     }
                                 }}
-                                placeholder="Bijv. De Planeten"
+                                placeholder={t(
+                                    'ui.forms.page_title_placeholder',
+                                )}
                             />
                             <InputError message={fieldErrors.title} />
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="slug">Slug</Label>
+                            <Label htmlFor="slug">{t('ui.forms.slug')}</Label>
                             <Input
                                 id="slug"
                                 name="slug"
@@ -144,7 +154,9 @@ export function PageForm({
                                     setSlug(e.target.value);
                                     setSlugTouched(true);
                                 }}
-                                placeholder="bijv-de-planeten"
+                                placeholder={t(
+                                    'ui.forms.page_slug_placeholder',
+                                )}
                             />
                             <InputError message={fieldErrors.slug} />
                         </div>
@@ -153,17 +165,21 @@ export function PageForm({
                             value={icon}
                             valueIcon={iconData}
                             onChange={setIcon}
-                            label="Icoon"
+                            label={t('ui.forms.icon')}
                         />
                         <input type="hidden" name="icon" value={icon ?? ''} />
 
                         <div className="grid gap-2">
-                            <Label htmlFor="description">Omschrijving</Label>
+                            <Label htmlFor="description">
+                                {t('ui.forms.description')}
+                            </Label>
                             <Textarea
                                 id="description"
                                 name="description"
                                 defaultValue={page?.description ?? ''}
-                                placeholder="Optionele korte omschrijving"
+                                placeholder={t(
+                                    'ui.forms.description_placeholder',
+                                )}
                             />
                             <InputError message={fieldErrors.description} />
                         </div>
@@ -177,9 +193,9 @@ export function PageForm({
 
                         <ImageField
                             name="hero_image_id"
-                            label="Bannerafbeelding"
-                            description="Brede afbeelding bovenaan de pagina, boven de titel. Optioneel."
-                            images={images}
+                            label={t('ui.forms.banner')}
+                            description={t('ui.forms.banner_hint')}
+                            selected={heroImage}
                             value={heroImageId}
                             onChange={setHeroImageId}
                         />
@@ -188,7 +204,7 @@ export function PageForm({
                         <AccessPasswordField
                             passwords={passwords}
                             defaultValue={page?.access_password_id ?? null}
-                            hint="Zonder eigen wachtwoord geldt dat van het dichtstbijzijnde bovenliggende onderwerp."
+                            hint={t('ui.forms.page_password_hint')}
                             error={fieldErrors.access_password_id}
                         />
 
@@ -206,9 +222,7 @@ export function PageForm({
                                 }
                             />
                             <Label htmlFor="is_hidden" className="font-normal">
-                                Verborgen — verschijnt niet in het menu of op de
-                                homepage, maar blijft bereikbaar via een directe
-                                link
+                                {t('ui.forms.hidden')}
                             </Label>
                         </div>
 
@@ -218,7 +232,7 @@ export function PageForm({
                             disabled={processing}
                         >
                             {processing && <Spinner />}
-                            Opslaan
+                            {t('ui.actions.save')}
                         </Button>
                     </>
                 );

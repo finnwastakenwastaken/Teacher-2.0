@@ -23,7 +23,10 @@ export function normaliseHref(input: string): string | null {
     // Protocol-relative: reads like a path but leaves the site. The server
     // refuses it, so refuse it here rather than silently repairing it into
     // an off-site link the owner did not think they were typing.
-    if (trimmed.startsWith('//')) {
+    //
+    // A backslash counts as the second slash: browsers normalise `/\host` to
+    // `//host`, so it is the same off-site link wearing a disguise.
+    if (/^\/[/\\]/.test(trimmed)) {
         return null;
     }
 

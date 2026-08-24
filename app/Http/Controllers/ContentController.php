@@ -123,7 +123,7 @@ class ContentController extends Controller
      * Empty groups are dropped. A level the owner added for another subject
      * should not leave a bare heading on every page that does not use it.
      *
-     * @return list<array{key: string, label: string, downloads: list<array<string, mixed>>}>
+     * @return array<int, array{key: string, label: string, downloads: array<int, array<string, mixed>>}>
      */
     private function downloadGroups(Page $page): array
     {
@@ -151,7 +151,7 @@ class ContentController extends Controller
         if ($untagged->isNotEmpty()) {
             $groups[] = [
                 'key' => 'all',
-                'label' => 'Voor iedereen',
+                'label' => __('content.downloads.everyone'),
                 'downloads' => $untagged->map($card)->values()->all(),
             ];
         }
@@ -218,6 +218,9 @@ class ContentController extends Controller
         return $media;
     }
 
+    /**
+     * @return list<array{title: string, href: string}>
+     */
     private function breadcrumbs(Topic|Page $node): array
     {
         $topic = $node instanceof Page ? $node->topic : $node;
@@ -248,6 +251,17 @@ class ContentController extends Controller
             abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
-        return redirect('/'.$target->fullPath(), HttpResponse::HTTP_MOVED_PERMANENTLY);
+        /*
+         * 301, because the old address really is gone and a search engine
+         * should carry its ranking over to the new one. But a bare 301 is
+         * cached by browsers until the profile is cleared, so a slug typo
+         * fixed an hour later stays broken for everyone who visited in
+         * between — and the owner has no way to reach into their browsers.
+         *
+         * An explicit max-age bounds that: the redirect is still permanent
+         * for a crawler, and a visitor re-asks the server after a day.
+         */
+        return redirect('/'.$target->fullPath(), HttpResponse::HTTP_MOVED_PERMANENTLY)
+            ->header('Cache-Control', 'public, max-age=86400');
     }
 }

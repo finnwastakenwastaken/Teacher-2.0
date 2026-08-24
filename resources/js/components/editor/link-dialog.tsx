@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { normaliseHref } from '@/lib/href';
+import { t } from '@/lib/i18n';
 
 type Props = {
     /** The href already on the selection, if any. */
@@ -34,9 +35,7 @@ export function LinkDialog({
         const href = normaliseHref(value);
 
         if (href === null) {
-            setError(
-                'Gebruik een adres dat begint met http://, https://, mailto: of /.',
-            );
+            setError(t('ui.editor.link_dialog.invalid'));
 
             return;
         }
@@ -55,20 +54,21 @@ export function LinkDialog({
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Link</DialogTitle>
+                    <DialogTitle>{t('ui.editor.link')}</DialogTitle>
                     <DialogDescription>
-                        Een adres op deze site begint met een schuine streep,
-                        bijvoorbeeld /natuurkunde/krachten.
+                        {t('ui.editor.link_dialog.description')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-2">
-                    <Label htmlFor="link-href">Adres</Label>
+                    <Label htmlFor="link-href">
+                        {t('ui.editor.link_dialog.address')}
+                    </Label>
                     <Input
                         id="link-href"
                         value={value}
                         autoComplete="off"
-                        placeholder="https://voorbeeld.nl"
+                        placeholder={t('ui.editor.link_dialog.placeholder')}
                         onChange={(event) => {
                             setValue(event.target.value);
                             setError(null);
@@ -92,11 +92,11 @@ export function LinkDialog({
                             variant="outline"
                             onClick={onRemove}
                         >
-                            Link verwijderen
+                            {t('ui.editor.link_dialog.remove')}
                         </Button>
                     )}
                     <Button type="button" onClick={submit}>
-                        Opslaan
+                        {t('ui.actions.save')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

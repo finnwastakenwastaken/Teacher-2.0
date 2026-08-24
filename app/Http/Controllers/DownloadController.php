@@ -28,7 +28,7 @@ class DownloadController extends Controller
 
         // The owner previewing their own page must not inflate the tally.
         // There is exactly one account, so "authenticated" is "the teacher".
-        if ($request->user() === null) {
+        if ($request->user() === null && $this->countable($request)) {
             $pageDownload->recordDownload();
         }
 
@@ -41,5 +41,39 @@ class DownloadController extends Controller
             // playback is what the body's file embed is for.
             inline: false,
         );
+    }
+
+    /**
+     * Whether this request represents someone actually taking the file.
+     *
+     * Two cases it is not. A resumed or parallel download sends a Range
+     * starting past byte zero — that is the same fetch continuing, and a
+     * download manager splitting a file into eight parts would otherwise
+     * count as eight. And a browser prefetch is the browser guessing, not a
+     * student deciding.
+     *
+     * What is deliberately *not* here is per-visitor deduplication. Counting
+     * the same student once would mean knowing which requests are the same
+     * student, and this site has no way to know that and no intention of
+     * acquiring one — `downloads_count` is an aggregate with nothing attached
+     * to it, which is the only reason it is allowed to exist at all. The
+     * number is "how often this file was fetched", and the admin guide says
+     * so rather than the code pretending otherwise.
+     */
+    private function countable(Request $request): bool
+    {
+        $range = $request->header('Range');
+
+        if (is_string($range) && ! preg_match('/^bytes=0-/', $range)) {
+            return false;
+        }
+
+        foreach (['Sec-Purpose', 'Purpose', 'X-Moz'] as $header) {
+            if (str_contains(strtolower((string) $request->header($header)), 'prefetch')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

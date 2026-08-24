@@ -14,6 +14,20 @@ services:
       context: .
       target: production
     restart: unless-stopped
+    # The production image already runs as www-data (see the USER line in the
+    # Dockerfile), so PHP-FPM here needs no privileged operation at all and
+    # can give up every capability. no-new-privileges additionally stops a
+    # setuid binary inside the container from being a way back up — nothing in
+    # the image is setuid today, and this keeps it that way if a base image
+    # ever ships one.
+    #
+    # The development target runs as root so its entrypoint can chown the
+    # bind-mounted storage directory; compose.dev.yaml adds back the four
+    # capabilities that needs.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - .env
     environment:
@@ -48,6 +62,19 @@ services:
       context: .
       target: web
     restart: unless-stopped
+    # nginx's master process starts as root to bind port 80 and to hand its
+    # own cache and run directories to the worker user, then drops. Those are
+    # the only privileged things it does, so everything else goes.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - app
     ports:
@@ -65,6 +92,19 @@ services:
   database:
     image: postgres:17-alpine
     restart: unless-stopped
+    # The postgres entrypoint starts as root, fixes ownership of the data
+    # directory and then re-executes as the postgres user. Those four
+    # capabilities are what that needs; the rest it never uses.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_DB: ${DB_DATABASE}
       POSTGRES_USER: ${DB_USERNAME}
@@ -88,6 +128,13 @@ services:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     profiles: ['tunnel']
+    # Only no-new-privileges here, not cap_drop. cloudflared makes an outbound
+    # connection and needs nothing, but its image is pulled by tag and updates
+    # on its own schedule — a capability list pinned against a version nobody
+    # here can test would eventually break the one service whose failure takes
+    # the whole site offline.
+    security_opt:
+      - no-new-privileges:true
     # The token is passed as an environment variable, never as a command
     # argument — arguments are visible to any user who can run `ps`.
     #

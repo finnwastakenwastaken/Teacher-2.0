@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { edit } from '@/routes/profile';
 import type { Auth } from '@/types';
+import { t } from '@/lib/i18n';
 
 /*
  * No "delete account" section here, and no e-mail verification notice.
@@ -26,15 +27,15 @@ export default function Profile() {
 
     return (
         <>
-            <Head title="Profielinstellingen" />
+            <Head title={t('ui.settings.profile.page_title')} />
 
-            <h1 className="sr-only">Profielinstellingen</h1>
+            <h1 className="sr-only">{t('ui.settings.profile.page_title')}</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Profiel"
-                    description="Pas je naam en e-mailadres aan"
+                    title={t('ui.settings.profile.title')}
+                    description={t('ui.settings.profile.description')}
                 />
 
                 <Form
@@ -45,7 +46,9 @@ export default function Profile() {
                     {({ processing, errors, recentlySuccessful }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Naam</Label>
+                                <Label htmlFor="name">
+                                    {t('ui.auth.name')}
+                                </Label>
 
                                 <Input
                                     id="name"
@@ -54,7 +57,7 @@ export default function Profile() {
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    placeholder="Volledige naam"
+                                    placeholder={t('ui.auth.full_name')}
                                 />
 
                                 <InputError
@@ -64,7 +67,9 @@ export default function Profile() {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">E-mailadres</Label>
+                                <Label htmlFor="email">
+                                    {t('ui.auth.email')}
+                                </Label>
 
                                 <Input
                                     id="email"
@@ -74,7 +79,7 @@ export default function Profile() {
                                     name="email"
                                     required
                                     autoComplete="username"
-                                    placeholder="E-mailadres"
+                                    placeholder={t('ui.auth.email')}
                                 />
 
                                 <InputError
@@ -89,7 +94,7 @@ export default function Profile() {
                                     data-test="update-profile-button"
                                 >
                                     {processing && <Spinner />}
-                                    Opslaan
+                                    {t('ui.actions.save')}
                                 </Button>
 
                                 {recentlySuccessful && (
@@ -97,7 +102,7 @@ export default function Profile() {
                                         className="rounded-md bg-success px-2 py-1 text-sm text-success-foreground"
                                         role="status"
                                     >
-                                        Opgeslagen
+                                        {t('ui.settings.profile.saved')}
                                     </p>
                                 )}
                             </div>
@@ -112,7 +117,7 @@ export default function Profile() {
 Profile.layout = {
     breadcrumbs: [
         {
-            title: 'Profielinstellingen',
+            title: t('ui.settings.profile.page_title'),
             href: edit(),
         },
     ],

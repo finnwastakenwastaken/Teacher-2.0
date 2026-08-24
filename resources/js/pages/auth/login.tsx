@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { t } from '@/lib/i18n';
 import { store } from '@/routes/login';
 import PasskeyVerify from '@/components/passkey-verify';
 
@@ -23,7 +24,7 @@ type Props = {
 export default function Login({ status }: Props) {
     return (
         <>
-            <Head title="Inloggen" />
+            <Head title={t('ui.auth.login.title')} />
 
             <PasskeyVerify />
 
@@ -35,7 +36,7 @@ export default function Login({ status }: Props) {
                 {({ processing, errors }) => (
                     <div className="grid gap-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="email">E-mailadres</Label>
+                            <Label htmlFor="email">{t('ui.auth.email')}</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -44,27 +45,31 @@ export default function Login({ status }: Props) {
                                 autoFocus
 
                                 autoComplete="email"
-                                placeholder="naam@school.nl"
+                                placeholder={t('ui.auth.email_placeholder')}
                             />
                             <InputError message={errors.email} />
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Wachtwoord</Label>
+                            <Label htmlFor="password">
+                                {t('ui.auth.password')}
+                            </Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
                                 required
 
                                 autoComplete="current-password"
-                                placeholder="Wachtwoord"
+                                placeholder={t('ui.auth.password')}
                             />
                             <InputError message={errors.password} />
                         </div>
 
                         <div className="flex items-center space-x-3">
                             <Checkbox id="remember" name="remember" />
-                            <Label htmlFor="remember">Aangemeld blijven</Label>
+                            <Label htmlFor="remember">
+                                {t('ui.auth.login.remember')}
+                            </Label>
                         </div>
 
                         <Button
@@ -75,7 +80,7 @@ export default function Login({ status }: Props) {
                             data-test="login-button"
                         >
                             {processing && <Spinner />}
-                            Inloggen
+                            {t('ui.auth.login.submit')}
                         </Button>
                     </div>
                 )}
@@ -91,6 +96,6 @@ export default function Login({ status }: Props) {
 }
 
 Login.layout = {
-    title: 'Inloggen',
-    description: 'Vul je e-mailadres en wachtwoord in om verder te gaan',
+    title: t('ui.auth.login.title'),
+    description: t('ui.auth.login.description'),
 };

@@ -134,6 +134,59 @@ class SearchTest extends TestCase
         $this->get('/natuurkunde/concept')->assertOk();
     }
 
+    /**
+     * Hiding a topic has to hide what is under it.
+     *
+     * This was the gap: the query filters pages.is_hidden, so a page that is
+     * itself visible stayed fully searchable — title and snippet — while its
+     * topic was hidden from every menu. Hiding a retired subject therefore
+     * did not retire it. The sitemap had always walked the ancestor chain;
+     * search now uses the same function rather than its own rule.
+     */
+    public function test_pages_under_a_hidden_topic_are_never_in_the_results()
+    {
+        $retired = Topic::query()->create([
+            'title' => 'Oud programma',
+            'slug' => 'oud-programma',
+            'is_hidden' => true,
+        ]);
+
+        $page = Page::query()->create([
+            'title' => 'Oude toetsstof',
+            'slug' => 'oude-toetsstof',
+            'topic_id' => $retired->id,
+        ]);
+
+        $page->writeContent(['type' => 'doc', 'content' => [
+            ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Zwaartekracht uitleg.']]],
+        ]]);
+
+        $this->assertSame([], $this->titles('zwaartekracht'));
+
+        // And the same for a page two levels down, because the walk has to
+        // reach the whole chain rather than only the immediate parent.
+        $sub = Topic::query()->create([
+            'title' => 'Hoofdstuk 3',
+            'slug' => 'hoofdstuk-3',
+            'parent_id' => $retired->id,
+        ]);
+
+        $deep = Page::query()->create([
+            'title' => 'Nog dieper',
+            'slug' => 'nog-dieper',
+            'topic_id' => $sub->id,
+        ]);
+
+        $deep->writeContent(['type' => 'doc', 'content' => [
+            ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Zwaartekracht uitleg.']]],
+        ]]);
+
+        $this->assertSame([], $this->titles('zwaartekracht'));
+
+        // Hidden is still not deleted: the direct link works.
+        $this->get('/oud-programma/oude-toetsstof')->assertOk();
+    }
+
     public function test_a_protected_page_is_absent_until_it_is_unlocked()
     {
         $password = AccessPassword::createWithPassword('5 VWO', 'geheim');

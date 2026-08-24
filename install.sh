@@ -301,6 +301,17 @@ configure_environment() {
         if [[ -z "$(get_env APP_KEY)" ]]; then
             fail 'APP_KEY is empty in the existing .env. Fix that by hand, or move the file aside and re-run.'
         fi
+        # Added to installations that predate it. Without a value of its own
+        # the passkey handle secret falls back to APP_KEY, so rotating the
+        # application key would silently unenrol every passkey — and key
+        # rotation is a supported operation here (APP_PREVIOUS_KEYS exists for
+        # exactly that). Writing it now, from the current APP_KEY, keeps the
+        # passkeys that are already enrolled working while making the two
+        # independent from here on.
+        if [[ -z "$(get_env PASSKEYS_USER_HANDLE_SECRET)" ]]; then
+            set_env PASSKEYS_USER_HANDLE_SECRET "$(get_env APP_KEY)"
+            info 'Pinned PASSKEYS_USER_HANDLE_SECRET so a future APP_KEY rotation cannot unenrol passkeys'
+        fi
         chmod 600 "$ENV_FILE"
         collect_tunnel_choice_from_env
         return
@@ -317,7 +328,14 @@ configure_environment() {
     # with anything Compose treats as syntax.
     set_env APP_KEY "base64:$(openssl rand -base64 32)"
     set_env DB_PASSWORD "$(openssl rand -hex 24)"
-    info 'Generated APP_KEY and a database password'
+    # Its own secret rather than Fortify's fallback to APP_KEY. The two have
+    # different lifetimes: APP_KEY can be rotated (that is what
+    # APP_PREVIOUS_KEYS is for) and the cost of rotating it is one round of
+    # re-logging-in, whereas changing the passkey handle secret unenrols every
+    # passkey with no way to get them back. Tying them together would make the
+    # cheap operation quietly do the expensive one.
+    set_env PASSKEYS_USER_HANDLE_SECRET "$(openssl rand -hex 32)"
+    info 'Generated APP_KEY, a database password and a passkey handle secret'
 
     # -- Domain --------------------------------------------------------------
     local domain

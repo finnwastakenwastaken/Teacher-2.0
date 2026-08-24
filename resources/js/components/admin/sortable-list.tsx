@@ -17,6 +17,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import * as React from 'react';
 import type { ReactNode } from 'react';
+import { t } from '@/lib/i18n';
 
 /*
  * Drag to reorder, for the admin lists that carry a manual sort_order.
@@ -34,10 +35,7 @@ import type { ReactNode } from 'react';
  */
 
 const screenReaderInstructions = {
-    draggable:
-        'Druk op spatie of enter om dit onderdeel op te pakken. ' +
-        'Gebruik daarna de pijltoetsen omhoog en omlaag om het te verplaatsen, ' +
-        'spatie of enter om het neer te zetten, en escape om te annuleren.',
+    draggable: t('ui.sortable.instructions'),
 };
 
 /*
@@ -120,23 +118,35 @@ export function SortableList<T>({
     const titleOf = (id: string | number) => {
         const item = items.find((candidate) => getId(candidate) === Number(id));
 
-        return item === undefined ? 'Onderdeel' : getTitle(item);
+        return item === undefined ? t('ui.sortable.unnamed') : getTitle(item);
     };
     const positionOf = (id: string | number) => ids.indexOf(Number(id)) + 1;
 
     const announcements: Announcements = {
         onDragStart: ({ active }) =>
-            `${titleOf(active.id)} opgepakt, plek ${positionOf(active.id)} van ${ids.length}.`,
+            t('ui.sortable.picked_up', {
+                title: titleOf(active.id),
+                position: positionOf(active.id),
+                total: ids.length,
+            }),
         onDragOver: ({ active, over }) =>
             over
-                ? `${titleOf(active.id)} staat nu op plek ${positionOf(over.id)} van ${ids.length}.`
+                ? t('ui.sortable.moved_over', {
+                      title: titleOf(active.id),
+                      position: positionOf(over.id),
+                      total: ids.length,
+                  })
                 : undefined,
         onDragEnd: ({ active, over }) =>
             over
-                ? `${titleOf(active.id)} neergezet op plek ${positionOf(over.id)} van ${ids.length}.`
-                : `${titleOf(active.id)} teruggezet op zijn oude plek.`,
+                ? t('ui.sortable.dropped', {
+                      title: titleOf(active.id),
+                      position: positionOf(over.id),
+                      total: ids.length,
+                  })
+                : t('ui.sortable.returned', { title: titleOf(active.id) }),
         onDragCancel: ({ active }) =>
-            `Verplaatsen van ${titleOf(active.id)} geannuleerd.`,
+            t('ui.sortable.cancelled', { title: titleOf(active.id) }),
     };
 
     return (
@@ -211,7 +221,7 @@ function DraggableRow({ id, title, children, className }: SortableRowProps) {
         >
             <button
                 type="button"
-                aria-label={`Verplaats ${title}`}
+                aria-label={t('ui.sortable.handle', { title })}
                 className="mt-2 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring active:cursor-grabbing"
                 {...attributes}
                 {...listeners}

@@ -8,8 +8,10 @@ use App\Models\Page;
 use App\Models\Setting;
 use App\Models\Topic;
 use App\Models\User;
+use App\Support\ContentLanguage;
 use App\Support\SiteSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -80,6 +82,7 @@ class SiteSettingsTest extends TestCase
             'home_subheading' => 'Al het lesmateriaal op één plek.',
             'home_banner_image_id' => null,
             'home_content' => null,
+            'content_language' => 'dutch',
             ...$overrides,
         ];
     }
@@ -409,5 +412,58 @@ class SiteSettingsTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertNull($page->fresh()->hero_image_id);
+    }
+
+    public function test_the_settings_screen_offers_the_content_languages()
+    {
+        $this->actingAs(User::factory()->create())
+            ->get('/admin/instellingen')
+            ->assertInertia(fn ($inertia) => $inertia
+                ->where('settings.content_language', 'dutch')
+                ->has('contentLanguages', 2)
+                ->where('contentLanguages.0.value', 'dutch')
+            );
+    }
+
+    /**
+     * The value reaches a PostgreSQL configuration lookup, so it is an
+     * allow-list at the request layer as well as in the SQL.
+     */
+    public function test_the_content_language_must_be_one_of_the_offered_configurations()
+    {
+        $this->actingAs(User::factory()->create())
+            ->put('/admin/instellingen', $this->payload(['content_language' => 'simple']))
+            ->assertSessionHasErrors('content_language');
+
+        $this->assertSame('dutch', ContentLanguage::current());
+    }
+
+    /**
+     * Changing it has to re-derive what is already stored. Without that the
+     * setting takes effect only for pages saved afterwards, and search
+     * silently keeps missing words on everything written before.
+     */
+    public function test_changing_the_content_language_reindexes_existing_pages()
+    {
+        $topic = Topic::query()->create(['title' => 'Science', 'slug' => 'science']);
+
+        $page = Page::query()->create([
+            'title' => 'Forces',
+            'slug' => 'forces',
+            'topic_id' => $topic->id,
+        ]);
+
+        $vector = fn (): string => (string) DB::table('pages')
+            ->where('id', $page->id)
+            ->value(DB::raw('search_vector::text'));
+
+        $this->assertStringContainsString("'forces'", $vector());
+
+        $this->actingAs(User::factory()->create())
+            ->put('/admin/instellingen', $this->payload(['content_language' => 'english']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('english', ContentLanguage::current());
+        $this->assertStringContainsString("'forc'", $vector());
     }
 }

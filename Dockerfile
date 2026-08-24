@@ -121,8 +121,18 @@ COPY --from=build /var/www/html/public/build ./public/build
 # effectively invisible to version control and trivially lost in a multi-stage
 # copy. Losing them produces a container that boots and then fails on the first
 # write. This project has been bitten by exactly that before — do not remove.
+#
+# The two that compose mounts a named volume over — app/private and
+# app/backups — have a second reason, and it is the one that bites hardest.
+# Docker creates a mount point that does not exist in the image as root, and
+# this stage runs as www-data, so the volume is then unwritable for the life of
+# the container. app/backups is not in the repository at all (no .gitignore
+# marks it), which is exactly how it came to be missing here: every backup
+# failed with `Permission denied` from tar, on production only, because the
+# development target runs as root and cannot see the difference.
 RUN mkdir -p \
         storage/app/private \
+        storage/app/backups \
         storage/app/public \
         storage/framework/cache/data \
         storage/framework/sessions \
@@ -151,7 +161,21 @@ CMD ["php-fpm"]
 # =============================================================================
 FROM nginx:1.29-alpine AS web
 
-COPY docker/nginx/app.conf /etc/nginx/conf.d/default.conf
+# A template rather than a finished config: the official entrypoint runs
+# envsubst over /etc/nginx/templates/*.template at boot and writes the result
+# into conf.d. The only thing substituted is the Vite dev server's origin in
+# the CSP, which must be absent from a deployed site — see the long comment in
+# the file itself for why a literal `localhost` there is not harmless.
+#
+# Both variables default to empty so the image is correct on its own, with no
+# environment at all; compose.dev.yaml fills them in. The filter is what stops
+# envsubst eating nginx's own $uri and $request_uri, which it would otherwise
+# happily do — it substitutes $VAR as well as ${VAR}.
+ENV CSP_DEV_SRC="" \
+    CSP_DEV_CONNECT="" \
+    NGINX_ENVSUBST_FILTER="^CSP_"
+
+COPY docker/nginx/app.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /var/www/html/public /var/www/html/public
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

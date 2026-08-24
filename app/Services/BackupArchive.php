@@ -81,13 +81,15 @@ class BackupArchive
      * mode, because two sites' content cannot be reconciled without asking
      * questions no command line can ask. The caller is responsible for having
      * confirmed with a human.
+     *
+     * @return array<string, mixed>
      */
     public function restore(string $absolutePath, ?callable $progress = null): array
     {
         $report = $progress ?? static fn (string $step) => null;
 
         if (! File::isFile($absolutePath)) {
-            throw new BackupException("Er staat geen bestand op {$absolutePath}.");
+            throw new BackupException(__('backup.missing_file', ['path' => $absolutePath]));
         }
 
         $staging = $this->staging();
@@ -150,7 +152,11 @@ class BackupArchive
         return Carbon::createFromFormat('Y-m-d-His', $matches[1]) ?: null;
     }
 
-    /** Delete all but the $keep newest archives, and report what went. */
+    /**
+     * Delete all but the $keep newest archives, and report what went.
+     *
+     * @return Collection<int, string>
+     */
     public function prune(int $keep): Collection
     {
         if ($keep < 1) {
@@ -182,11 +188,11 @@ class BackupArchive
         $pattern = '/^'.preg_quote(config('backup.name_prefix'), '/').'\d{4}-\d{2}-\d{2}-\d{6}\.tar\.gz$/';
 
         if (preg_match($pattern, $name) !== 1) {
-            throw new BackupException('Dat is geen naam van een back-upbestand.');
+            throw new BackupException(__('backup.not_a_backup_name'));
         }
 
         if (! Storage::disk(config('backup.disk'))->exists($name)) {
-            throw new BackupException("Er is geen back-up met de naam {$name}.");
+            throw new BackupException(__('backup.not_found', ['name' => $name]));
         }
 
         return $name;
@@ -249,7 +255,7 @@ class BackupArchive
     private function restoreDatabase(string $source): void
     {
         if (! File::isFile($source)) {
-            throw new BackupException('Deze back-up bevat geen database.');
+            throw new BackupException(__('backup.no_database'));
         }
 
         $connection = config('database.default');
@@ -344,19 +350,19 @@ class BackupArchive
 
         if (! File::isFile($path)) {
             throw new BackupException(
-                'Dit bestand is geen back-up van deze site: er zit geen manifest.json in.'
+                __('backup.no_manifest')
             );
         }
 
         $manifest = json_decode(File::get($path), true);
 
         if (! is_array($manifest) || ! isset($manifest['format'])) {
-            throw new BackupException('Het manifest van deze back-up is onleesbaar.');
+            throw new BackupException(__('backup.unreadable_manifest'));
         }
 
         if ((int) $manifest['format'] > (int) config('backup.format')) {
             throw new BackupException(
-                "Deze back-up is gemaakt met een nieuwere versie van de site (formaat {$manifest['format']}). Werk de site eerst bij."
+                __('backup.newer_format', ['format' => $manifest['format']])
             );
         }
 
@@ -387,7 +393,7 @@ class BackupArchive
 
         if (! $process->isSuccessful()) {
             throw new BackupException(trim(
-                $process->getErrorOutput() ?: $process->getOutput() ?: 'Onbekende fout.'
+                $process->getErrorOutput() ?: $process->getOutput() ?: __('backup.unknown_error')
             ));
         }
     }

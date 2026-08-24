@@ -59,14 +59,14 @@ class EducationLevelController extends Controller
     {
         EducationLevel::query()->create($request->validated());
 
-        return back()->with('status', 'Niveau toegevoegd.');
+        return back()->with('status', __('admin.levels.created'));
     }
 
     public function update(UpdateEducationLevelRequest $request, EducationLevel $level): RedirectResponse
     {
         $level->update($request->validated());
 
-        return back()->with('status', 'Niveau bijgewerkt.');
+        return back()->with('status', __('admin.levels.updated'));
     }
 
     /**
@@ -86,7 +86,7 @@ class EducationLevelController extends Controller
                 Rule::exists('education_levels', 'id')->whereNot('id', $level->id),
             ],
         ], [
-            'merge_into.exists' => 'Het gekozen niveau om samen te voegen bestaat niet.',
+            'merge_into.exists' => __('admin.levels.merge_target_missing'),
         ]);
 
         try {
@@ -101,7 +101,7 @@ class EducationLevelController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', 'Niveau verwijderd.');
+        return back()->with('status', __('admin.levels.deleted'));
     }
 
     /**

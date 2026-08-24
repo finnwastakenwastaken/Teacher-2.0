@@ -3,13 +3,32 @@
 namespace App\Models;
 
 use App\Exceptions\DependentRecordsExistException;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Hash;
 
 /**
  * A named, reusable password guarding a topic branch or a single page.
+ *
+ * The columns, for static analysis.
+ *
+ * Eloquent resolves these at runtime, so nothing here changes behaviour —
+ * but without them every `$model->column` is an undefined property to
+ * PHPStan, and a genuine typo becomes indistinguishable from a hundred
+ * false ones. Keep in step with the migrations: a column added without a
+ * line here is invisible to the analyser, and a line here without a column
+ * is a lie it will believe.
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $password_hash
+ * @property CarbonImmutable|null $created_at
+ * @property CarbonImmutable|null $updated_at
+ * @property-read Collection<int, Topic> $topics
+ * @property-read Collection<int, Page> $pages
  */
 #[Fillable(['name'])]
 class AccessPassword extends Model
@@ -65,25 +84,26 @@ class AccessPassword extends Model
             $parts = [];
 
             if ($topics !== []) {
-                $parts[] = 'onderwerpen: '.implode(', ', $topics);
+                $parts[] = __('admin.dependents.topics').': '.implode(', ', $topics);
             }
 
             if ($pages !== []) {
-                $parts[] = "pagina's: ".implode(', ', $pages);
+                $parts[] = __('admin.dependents.pages').': '.implode(', ', $pages);
             }
 
-            throw new DependentRecordsExistException(
-                'Dit wachtwoord is nog in gebruik en kan niet worden verwijderd ('
-                .implode(' — ', $parts).').'
-            );
+            throw new DependentRecordsExistException(__('admin.dependents.password_in_use', [
+                'usages' => implode(' — ', $parts),
+            ]));
         });
     }
 
+    /** @return HasMany<Topic, $this> */
     public function topics(): HasMany
     {
         return $this->hasMany(Topic::class);
     }
 
+    /** @return HasMany<Page, $this> */
     public function pages(): HasMany
     {
         return $this->hasMany(Page::class);

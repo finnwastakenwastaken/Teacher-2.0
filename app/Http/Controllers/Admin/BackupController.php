@@ -44,10 +44,10 @@ class BackupController extends Controller
         try {
             $name = $archive->create();
         } catch (BackupException $e) {
-            return back()->with('error', 'De back-up is niet gelukt: '.$e->getMessage());
+            return back()->with('error', __('admin.backups.failed', ['reason' => $e->getMessage()]));
         }
 
-        return back()->with('status', "Back-up gemaakt: {$name}");
+        return back()->with('status', __('admin.backups.created', ['name' => $name]));
     }
 
     public function download(string $name, BackupArchive $archive): Response
@@ -69,6 +69,6 @@ class BackupController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', 'Back-up verwijderd.');
+        return back()->with('status', __('admin.backups.deleted'));
     }
 }

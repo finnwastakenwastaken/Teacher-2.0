@@ -30,3 +30,19 @@ export type TwoFactorSetupData = {
 export type TwoFactorSecretKey = {
     secretKey: string;
 };
+
+/**
+ * What App\Support\PasswordPolicy::describe() sends. Rendered as a checklist
+ * beside every new-password field so the requirements are visible before
+ * submitting rather than revealed one failed attempt at a time.
+ *
+ * The server remains the authority; this only decides what to draw.
+ */
+export type PasswordPolicy = {
+    min: number;
+    letters: boolean;
+    mixedCase: boolean;
+    numbers: boolean;
+    symbols: boolean;
+    uncompromised: boolean;
+};

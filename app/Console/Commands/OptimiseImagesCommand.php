@@ -43,8 +43,8 @@ class OptimiseImagesCommand extends Command
 
         if ($images->isEmpty()) {
             $this->info($this->option('all')
-                ? 'Er staan geen afbeeldingen in de bibliotheek.'
-                : sprintf('Geen afbeeldingen groter dan %s. Niets te doen.', $this->bytes($ceiling)));
+                ? 'There are no images in the library.'
+                : sprintf('No images larger than %s. Nothing to do.', $this->bytes($ceiling)));
 
             return self::SUCCESS;
         }
@@ -57,7 +57,7 @@ class OptimiseImagesCommand extends Command
             $absolute = $disk->path($image->path);
 
             if (! is_file($absolute)) {
-                $this->warn(sprintf('Bestand ontbreekt, overgeslagen: %s', $image->path));
+                $this->warn(sprintf('File missing, skipped: %s', $image->path));
 
                 continue;
             }
@@ -74,7 +74,22 @@ class OptimiseImagesCommand extends Command
                 continue;
             }
 
+            // false on a stat failure, and false used as an integer is 0 —
+            // which would print a 100% saving for a file that could not even
+            // be measured. replace() checks the same thing again before it
+            // trusts the value; this one only has to keep the report honest.
             $newSize = filesize($optimised->path);
+
+            if ($newSize === false) {
+                @unlink($optimised->path);
+
+                $this->warn(sprintf(
+                    '%s: the converted file cannot be read. Skipped.',
+                    $image->original_filename
+                ));
+
+                continue;
+            }
 
             // Captured before the swap: replace() writes the new values onto
             // this same model, so reading them afterwards would report the
@@ -105,15 +120,15 @@ class OptimiseImagesCommand extends Command
         }
 
         if ($rows === []) {
-            $this->info('Alle afbeeldingen zijn al zo klein als ze kunnen zijn.');
+            $this->info('Every image is already as small as it can be.');
 
             return self::SUCCESS;
         }
 
-        $this->table(['Bestand', 'Was', 'Wordt', 'Verschil'], $rows);
+        $this->table(['File', 'Before', 'After', 'Change'], $rows);
 
         $this->info(sprintf(
-            '%d afbeeldingen: %s → %s (%s bespaard).',
+            '%d images: %s → %s (%s saved).',
             count($rows),
             $this->bytes($before),
             $this->bytes($after),
@@ -122,7 +137,7 @@ class OptimiseImagesCommand extends Command
 
         if (! $this->option('force')) {
             $this->newLine();
-            $this->comment('Er is nog niets veranderd. Voer het opnieuw uit met --force om dit door te voeren.');
+            $this->comment('Nothing has been changed yet. Run it again with --force to apply this.');
         }
 
         return self::SUCCESS;
@@ -154,7 +169,34 @@ class OptimiseImagesCommand extends Command
             @unlink($optimised->path);
 
             $this->warn(sprintf(
-                '%s: het omgezette bestand is onleesbaar. Het origineel blijft staan.',
+                '%s: the converted file cannot be read. The original is left in place.',
+                $image->original_filename
+            ));
+
+            return false;
+        }
+
+        /*
+         * An image that was already WebP keeps its extension, so the new path
+         * *is* the old one and the move below overwrites the original. That
+         * is fine as long as the row is then updated — but if the update
+         * fails, the row goes on describing bytes that no longer exist: the
+         * old width, height and size against a different file. The image
+         * still renders, so nothing looks wrong; the library just quietly
+         * reports the wrong numbers forever.
+         *
+         * So when the path is unchanged, the original is set aside first and
+         * only discarded once the row has been written. When it changes there
+         * is nothing to set aside — the old file is still where the row says
+         * it is until the update succeeds.
+         */
+        $rescue = $newPath === $oldPath ? $disk->path($oldPath).'.pre-optimise' : null;
+
+        if ($rescue !== null && ! @rename($disk->path($oldPath), $rescue)) {
+            @unlink($optimised->path);
+
+            $this->warn(sprintf(
+                '%s: the original could not be set aside. Skipped.',
                 $image->original_filename
             ));
 
@@ -164,8 +206,12 @@ class OptimiseImagesCommand extends Command
         if (! @rename($optimised->path, $disk->path($newPath))) {
             @unlink($optimised->path);
 
+            if ($rescue !== null) {
+                @rename($rescue, $disk->path($oldPath));
+            }
+
             $this->warn(sprintf(
-                '%s: kon het nieuwe bestand niet op zijn plek zetten. Overgeslagen.',
+                '%s: the new file could not be moved into place. Skipped.',
                 $image->original_filename
             ));
 
@@ -174,18 +220,37 @@ class OptimiseImagesCommand extends Command
 
         // The row moves first, then the old file. A row pointing at a missing
         // file is a broken image; an unreferenced file is merely waste.
-        DB::transaction(function () use ($image, $newPath, $optimised, $size, $dimensions): void {
-            $image->forceFill([
-                'path' => $newPath,
-                'mime' => $optimised->mime,
-                'size_bytes' => $size,
-                'width' => $dimensions[0],
-                'height' => $dimensions[1],
-                'original_filename' => $optimised->renamed($image->original_filename),
-            ])->save();
-        });
+        try {
+            DB::transaction(function () use ($image, $newPath, $optimised, $size, $dimensions): void {
+                $image->forceFill([
+                    'path' => $newPath,
+                    'mime' => $optimised->mime,
+                    'size_bytes' => $size,
+                    'width' => $dimensions[0],
+                    'height' => $dimensions[1],
+                    'original_filename' => $optimised->renamed($image->original_filename),
+                ])->save();
+            });
+        } catch (Throwable $e) {
+            if ($rescue !== null) {
+                @rename($rescue, $disk->path($oldPath));
+            } else {
+                $disk->delete($newPath);
+            }
 
-        if ($newPath !== $oldPath) {
+            report($e);
+
+            $this->warn(sprintf(
+                '%s: the database could not be updated. The original has been restored.',
+                $image->original_filename
+            ));
+
+            return false;
+        }
+
+        if ($rescue !== null) {
+            @unlink($rescue);
+        } elseif ($newPath !== $oldPath) {
             $disk->delete($oldPath);
         }
 

@@ -1,7 +1,10 @@
 import { router } from '@inertiajs/react';
+import { FolderOpen } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
 import PageDownloadController from '@/actions/App/Http/Controllers/Admin/PageDownloadController';
+import { DownloadPickerDialog } from '@/components/admin/download-picker-dialog';
+import type { AttachableFile } from '@/components/admin/download-picker-dialog';
 import { MediaUploader } from '@/components/admin/media-uploader';
 import type { UploadedRecord } from '@/components/admin/media-uploader';
 import { FileTypeIcon } from '@/components/file-type-icon';
@@ -10,15 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { formatBytes } from '@/lib/format';
 import type { MediaFileKind } from '@/types';
+import { t } from '@/lib/i18n';
 
 /*
  * The downloads section of a page.
@@ -33,14 +30,6 @@ export type EducationLevelOption = {
     id: number;
     name: string;
     slug: string;
-};
-
-export type LibraryFile = {
-    ulid: string;
-    kind: MediaFileKind;
-    mime: string;
-    size_bytes: number;
-    original_filename: string;
 };
 
 export type PageDownload = {
@@ -60,8 +49,15 @@ type Props = {
     pageId: number;
     downloads: PageDownload[];
     levels: EducationLevelOption[];
-    /* Media files, with the numeric id the attachment endpoint needs. */
-    files: (LibraryFile & { id: number })[];
+    /**
+     * Whether anything remains to attach — a single boolean sent by
+     * App\Http\Controllers\Admin\PageController::edit instead of the whole
+     * media library, which the dialog now searches for itself (see
+     * resources/js/components/admin/file-picker-list.tsx). Decides only
+     * whether the "choose a file" button appears; the dialog finds out what
+     * that something actually is once it's open.
+     */
+    attachableFilesAvailable: boolean;
     maxBytes: number;
 };
 
@@ -97,11 +93,7 @@ function attachDownload(
             },
             onError: () => {
                 settled = true;
-                reject(
-                    new Error(
-                        'Het bestand is geüpload, maar kon niet aan deze pagina worden gekoppeld.',
-                    ),
-                );
+                reject(new Error(t('ui.downloads.attach_failed')));
             },
             // A cancelled visit fires neither of the two above — Inertia
             // cancels one in flight when another starts, and navigating away
@@ -110,11 +102,7 @@ function attachDownload(
             // never uploads while the row sits on "Bezig" forever.
             onFinish: () => {
                 if (!settled) {
-                    reject(
-                        new Error(
-                            'Het koppelen aan deze pagina is afgebroken. Het bestand staat wel in de mediabibliotheek.',
-                        ),
-                    );
+                    reject(new Error(t('ui.downloads.attach_cancelled')));
                 }
             },
         });
@@ -135,7 +123,7 @@ function LevelCheckboxes({
     if (levels.length === 0) {
         return (
             <p className="text-xs text-muted-foreground">
-                Er zijn nog geen niveaus. Voeg ze toe bij Niveaus.
+                {t('ui.downloads.no_levels')}
             </p>
         );
     }
@@ -198,7 +186,9 @@ function DownloadRow({
     function remove() {
         if (
             !confirm(
-                `"${download.label ?? download.filename}" van deze pagina halen? Het bestand zelf blijft in de mediabibliotheek.`,
+                t('ui.downloads.confirm_remove', {
+                    name: download.label ?? download.filename,
+                }),
             )
         ) {
             return;
@@ -225,7 +215,9 @@ function DownloadRow({
                     {download.label ?? download.filename}
                 </span>
                 {levelNames.length === 0 ? (
-                    <Badge variant="secondary">Voor iedereen</Badge>
+                    <Badge variant="secondary">
+                        {t('ui.downloads.everyone')}
+                    </Badge>
                 ) : (
                     levelNames.map((name) => (
                         <Badge key={name} variant="secondary">
@@ -235,7 +227,9 @@ function DownloadRow({
                 )}
                 <span className="text-xs text-muted-foreground">
                     {download.filename} · {formatBytes(download.sizeBytes)} ·{' '}
-                    {download.downloadsCount}× gedownload
+                    {t('ui.downloads.fetched', {
+                        count: download.downloadsCount,
+                    })}
                 </span>
 
                 <div className="ml-auto flex gap-2">
@@ -244,10 +238,12 @@ function DownloadRow({
                         size="sm"
                         onClick={() => setEditing((open) => !open)}
                     >
-                        {editing ? 'Sluiten' : 'Bewerken'}
+                        {editing
+                            ? t('ui.downloads.close')
+                            : t('ui.actions.edit')}
                     </Button>
                     <Button variant="destructive" size="sm" onClick={remove}>
-                        Verwijderen
+                        {t('ui.actions.delete')}
                     </Button>
                 </div>
             </div>
@@ -257,7 +253,7 @@ function DownloadRow({
                     <div className="flex flex-wrap items-end gap-3">
                         <div className="grid gap-2">
                             <Label htmlFor={`label-${download.ulid}`}>
-                                Naam op de pagina
+                                {t('ui.downloads.label_field')}
                             </Label>
                             <Input
                                 id={`label-${download.ulid}`}
@@ -270,7 +266,7 @@ function DownloadRow({
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor={`order-${download.ulid}`}>
-                                Volgorde
+                                {t('ui.downloads.order')}
                             </Label>
                             <Input
                                 id={`order-${download.ulid}`}
@@ -286,7 +282,7 @@ function DownloadRow({
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Niveaus</Label>
+                        <Label>{t('ui.downloads.levels')}</Label>
                         <LevelCheckboxes
                             levels={levels}
                             selected={selected}
@@ -294,13 +290,12 @@ function DownloadRow({
                             idPrefix={download.ulid}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Laat alles leeg voor een download die voor iedereen
-                            bedoeld is.
+                            {t('ui.downloads.levels_hint')}
                         </p>
                     </div>
 
                     <Button size="sm" className="w-fit" onClick={save}>
-                        Opslaan
+                        {t('ui.actions.save')}
                     </Button>
                 </div>
             )}
@@ -312,15 +307,18 @@ export function PageDownloads({
     pageId,
     downloads,
     levels,
-    files,
+    attachableFilesAvailable,
     maxBytes,
 }: Props) {
-    const [fileId, setFileId] = React.useState<string>('');
-    const [label, setLabel] = React.useState('');
+    const [picking, setPicking] = React.useState(false);
     const [selected, setSelected] = React.useState<number[]>([]);
 
-    const attached = new Set(downloads.map((download) => download.mediaFileId));
-    const available = files.filter((file) => !attached.has(file.id));
+    const attachedIds = downloads.map((download) => download.mediaFileId);
+
+    // An empty library and one whose every file is already here read the same
+    // from here now that neither ships to the browser to tell apart — the
+    // dialog's own search says which, once it's open.
+    const libraryMessage = t('ui.downloads.library_empty');
 
     function toggle(id: number, checked: boolean) {
         setSelected((current) =>
@@ -328,19 +326,19 @@ export function PageDownloads({
         );
     }
 
-    function add() {
-        void attachDownload(pageId, {
-            media_file_id: Number(fileId),
-            label: label === '' ? null : label,
+    /*
+     * The dialog holds the choice until this resolves, so the rejection has
+     * to travel: it is what leaves the dialog open, with the file still
+     * chosen, when the attach failed and the validation message says why.
+     */
+    async function attachChosen(file: AttachableFile, label: string | null) {
+        await attachDownload(pageId, {
+            media_file_id: file.id,
+            label,
             education_levels: selected,
-        })
-            .then(() => {
-                setFileId('');
-                setLabel('');
-            })
-            // The error is already on screen as a validation message; this
-            // only stops an unhandled rejection.
-            .catch(() => undefined);
+        });
+
+        setPicking(false);
     }
 
     /*
@@ -359,7 +357,9 @@ export function PageDownloads({
     async function uploadAndAttach(record: UploadedRecord) {
         if (record.type === 'image') {
             toast.info(
-                `"${record.original_filename}" is een afbeelding en staat nu in de mediabibliotheek. Downloads zijn documenten of video's.`,
+                t('ui.downloads.image_not_a_download', {
+                    name: record.original_filename,
+                }),
             );
 
             return;
@@ -376,7 +376,7 @@ export function PageDownloads({
         <div className="grid gap-4">
             {downloads.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                    Nog geen downloads op deze pagina.
+                    {t('ui.downloads.empty')}
                 </p>
             ) : (
                 <ul className="divide-y divide-border rounded-lg border border-border">
@@ -391,10 +391,12 @@ export function PageDownloads({
             )}
 
             <div className="grid gap-4 rounded-lg border border-dashed border-border p-4">
-                <h3 className="text-sm font-semibold">Download toevoegen</h3>
+                <h3 className="text-sm font-semibold">
+                    {t('ui.downloads.add_heading')}
+                </h3>
 
                 <div className="grid gap-2">
-                    <Label>Niveaus</Label>
+                    <Label>{t('ui.downloads.levels')}</Label>
                     <LevelCheckboxes
                         levels={levels}
                         selected={selected}
@@ -402,9 +404,7 @@ export function PageDownloads({
                         idPrefix="new-download"
                     />
                     <p className="text-xs text-muted-foreground">
-                        Geldt voor wat je hieronder toevoegt of uploadt. Laat
-                        alles leeg voor een download die voor iedereen bedoeld
-                        is.
+                        {t('ui.downloads.new_levels_hint')}
                     </p>
                 </div>
 
@@ -412,73 +412,42 @@ export function PageDownloads({
                     compact
                     maxBytes={maxBytes}
                     onUploaded={uploadAndAttach}
-                    title="Nieuw bestand uploaden"
-                    description={`Komt meteen als download op deze pagina te staan, met de niveaus hierboven. Maximaal ${formatBytes(maxBytes)} per bestand.`}
+                    title={t('ui.downloads.upload_title')}
+                    description={t('ui.downloads.upload_description', {
+                        size: formatBytes(maxBytes),
+                    })}
                 />
 
-                {available.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        {files.length === 0
-                            ? 'Er staan nog geen bestanden in de mediabibliotheek.'
-                            : 'Alle bestanden uit de mediabibliotheek staan al op deze pagina.'}
-                    </p>
+                {attachableFilesAvailable ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-fit"
+                        onClick={() => setPicking(true)}
+                    >
+                        <FolderOpen aria-hidden="true" />
+                        {t('ui.downloads.choose_file')}
+                    </Button>
                 ) : (
-                    <>
-                        <div className="flex flex-wrap items-end gap-3">
-                            <div className="grid gap-2">
-                                <Label htmlFor="new-download-file">
-                                    Bestand
-                                </Label>
-                                <Select
-                                    value={fileId}
-                                    onValueChange={setFileId}
-                                >
-                                    <SelectTrigger
-                                        id="new-download-file"
-                                        className="w-72"
-                                    >
-                                        <SelectValue placeholder="Kies een bestand" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {available.map((file) => (
-                                            <SelectItem
-                                                key={file.ulid}
-                                                value={String(file.id)}
-                                            >
-                                                {file.original_filename} (
-                                                {formatBytes(file.size_bytes)})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="new-download-label">
-                                    Naam op de pagina
-                                </Label>
-                                <Input
-                                    id="new-download-label"
-                                    value={label}
-                                    placeholder="Optioneel"
-                                    onChange={(event) =>
-                                        setLabel(event.target.value)
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        <Button
-                            size="sm"
-                            className="w-fit"
-                            disabled={fileId === ''}
-                            onClick={add}
-                        >
-                            Toevoegen
-                        </Button>
-                    </>
+                    <p className="text-sm text-muted-foreground">
+                        {libraryMessage}
+                    </p>
                 )}
             </div>
+
+            {/* Mounted only while open, like the editor's pickers, so the
+                chosen file and the label start empty every time. */}
+            {picking && (
+                <DownloadPickerDialog
+                    exclude={attachedIds}
+                    emptyMessage={libraryMessage}
+                    levelNames={levels
+                        .filter((level) => selected.includes(level.id))
+                        .map((level) => level.name)}
+                    onAttach={attachChosen}
+                    onClose={() => setPicking(false)}
+                />
+            )}
         </div>
     );
 }

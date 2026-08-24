@@ -23,7 +23,7 @@ class EnsureAdminNotClaimed
     {
         if (AdminAccount::exists()) {
             return redirect()->route('login')
-                ->with('status', __('De installatie is al voltooid. Log hieronder in.'));
+                ->with('status', __('auth.claim.already_completed'));
         }
 
         return $next($request);

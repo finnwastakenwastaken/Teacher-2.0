@@ -8,6 +8,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { t } from '@/lib/i18n';
 
 export type AccessPasswordOption = {
     id: number;
@@ -41,7 +42,9 @@ export function AccessPasswordField({
 
     return (
         <div className="grid gap-2">
-            <Label htmlFor="access_password_id">Wachtwoord</Label>
+            <Label htmlFor="access_password_id">
+                {t('ui.password_field.label')}
+            </Label>
 
             {/*
              * Submitted as an empty string when nothing is chosen; the Form
@@ -63,7 +66,9 @@ export function AccessPasswordField({
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value={NO_PASSWORD}>Geen wachtwoord</SelectItem>
+                    <SelectItem value={NO_PASSWORD}>
+                        {t('ui.password_field.none')}
+                    </SelectItem>
                     {passwords.map((password) => (
                         <SelectItem
                             key={password.id}
@@ -76,9 +81,7 @@ export function AccessPasswordField({
             </Select>
 
             <p className="text-xs text-muted-foreground">
-                {passwords.length === 0
-                    ? 'Er zijn nog geen wachtwoorden. Maak er eerst een aan bij Wachtwoorden.'
-                    : hint}
+                {passwords.length === 0 ? t('ui.password_field.empty') : hint}
             </p>
 
             <InputError message={error} />

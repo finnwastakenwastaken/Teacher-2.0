@@ -234,17 +234,22 @@ class ImageOptimiser
 
     /**
      * A conversion failure is only fatal for a format the browser cannot show.
+     *
+     * Returns null — meaning "keep what arrived" — or throws. The return type
+     * is `null` rather than `?OptimisedImage` because there is no optimised
+     * image to hand back from here; the old signature invited the caller to
+     * handle a case that cannot occur. Callers still `return` it, so the null
+     * flows out as their own ?OptimisedImage.
      */
-    private function refuseOrKeep(string $mime, string $reason): ?OptimisedImage
+    private function refuseOrKeep(string $mime, string $reason): null
     {
         if ($this->isDisplayable($mime)) {
             return null;
         }
 
-        throw new MediaUploadException(sprintf(
-            'Deze afbeelding kon niet worden omgezet naar een formaat dat browsers kunnen tonen (%s).',
-            $reason
-        ));
+        throw new MediaUploadException(
+            __('media.image.undisplayable', ['reason' => $reason])
+        );
     }
 
     private function temporaryPath(): string

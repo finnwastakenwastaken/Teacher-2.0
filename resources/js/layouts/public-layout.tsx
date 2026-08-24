@@ -1,6 +1,8 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { Search } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
+import LocaleSwitcher from '@/components/locale-switcher';
+import { t } from '@/lib/i18n';
 import { Input } from '@/components/ui/input';
 import { dashboard, search } from '@/routes';
 
@@ -55,18 +57,20 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                         <Input
                             type="search"
                             name="q"
-                            aria-label="Zoeken"
-                            placeholder="Zoeken"
+                            aria-label={t('ui.public.header.search')}
+                            placeholder={t('ui.public.header.search')}
                             className="h-9"
                         />
                     </form>
+
+                    <LocaleSwitcher />
 
                     {auth.user && (
                         <Link
                             href={dashboard()}
                             className="text-sm text-muted-foreground hover:text-foreground sm:ml-0"
                         >
-                            Beheer
+                            {t('ui.public.header.admin')}
                         </Link>
                     )}
                 </div>

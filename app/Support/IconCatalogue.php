@@ -35,7 +35,10 @@ class IconCatalogue
     public const LIBRARIES = [
         'lucide' => ['label' => 'Lucide', 'licence' => 'ISC'],
         'tabler' => ['label' => 'Tabler', 'licence' => 'MIT'],
-        'tabler-filled' => ['label' => 'Tabler (gevuld)', 'licence' => 'MIT'],
+        // The only label that is a word rather than a name, so the only one
+        // translated — see libraries(). "Lucide", "Tabler" and "Material
+        // Design Icons" are what those projects call themselves.
+        'tabler-filled' => ['label' => 'admin.icons.tabler_filled', 'licence' => 'MIT'],
         'mdi' => ['label' => 'Material Design Icons', 'licence' => 'Apache-2.0'],
     ];
 
@@ -109,7 +112,7 @@ class IconCatalogue
      * "circuit" or "flask" expects. Results are capped because the catalogue
      * holds around fifteen thousand icons and nobody scrolls that.
      *
-     * @return list<array{key: string, name: string, library: string, nodes: array<int, mixed>}>
+     * @return array<int, array{key: string, name: string, library: string, nodes: array<int, mixed>}>
      */
     public static function search(?string $query, ?string $library, int $limit): array
     {
@@ -164,7 +167,7 @@ class IconCatalogue
     /**
      * The libraries, for the picker's filter.
      *
-     * @return list<array{value: string, label: string, count: int}>
+     * @return array<int, array{value: string, label: string, count: int}>
      */
     public static function libraries(): array
     {
@@ -176,7 +179,9 @@ class IconCatalogue
         return collect(self::LIBRARIES)
             ->map(fn (array $meta, string $value) => [
                 'value' => $value,
-                'label' => $meta['label'],
+                // __() returns the key unchanged when it is not a key, which
+                // is exactly what the three project names need.
+                'label' => __($meta['label']),
                 'count' => (int) $counts->get($value, 0),
             ])
             ->filter(fn (array $library) => $library['count'] > 0)

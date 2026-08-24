@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { SortableList, SortableRow } from '@/components/admin/sortable-list';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
+import { t } from '@/lib/i18n';
 
 /*
  * Education levels are seeded but entirely the owner's to reshape — schools
@@ -42,7 +43,7 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
     const inUse = level.downloadsCount > 0;
 
     function remove() {
-        if (!confirm(`Niveau "${level.name}" verwijderen?`)) {
+        if (!confirm(t('ui.levels.confirm_delete', { name: level.name }))) {
             return;
         }
 
@@ -72,7 +73,7 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="space-y-2">
                                 <Label htmlFor={`name-${level.slug}`}>
-                                    Naam
+                                    {t('ui.levels.name')}
                                 </Label>
                                 <Input
                                     id={`name-${level.slug}`}
@@ -89,7 +90,7 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
                                 size="sm"
                                 disabled={processing}
                             >
-                                Opslaan
+                                {t('ui.actions.save')}
                             </Button>
                             <Button
                                 type="button"
@@ -97,7 +98,7 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
                                 size="sm"
                                 onClick={() => setMode('view')}
                             >
-                                Annuleren
+                                {t('ui.actions.cancel')}
                             </Button>
                         </div>
                     )}
@@ -110,22 +111,27 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
         return (
             <div className="space-y-3 p-4">
                 <p className="text-sm">
-                    <span className="font-medium">{level.name}</span> is nog
-                    gekoppeld aan {level.downloadsCount} download(s). Kies naar
-                    welk niveau die downloads verhuizen.
+                    <span className="font-medium">{level.name}</span>{' '}
+                    {t('ui.levels.merge_intro_after', {
+                        count: level.downloadsCount,
+                    })}
                 </p>
 
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="space-y-2">
                         <Label htmlFor={`merge-${level.slug}`}>
-                            Samenvoegen met
+                            {t('ui.levels.merge_into')}
                         </Label>
                         <Select value={mergeInto} onValueChange={setMergeInto}>
                             <SelectTrigger
                                 id={`merge-${level.slug}`}
                                 className="w-56"
                             >
-                                <SelectValue placeholder="Kies een niveau" />
+                                <SelectValue
+                                    placeholder={t(
+                                        'ui.levels.merge_placeholder',
+                                    )}
+                                />
                             </SelectTrigger>
                             <SelectContent>
                                 {others.map((other) => (
@@ -146,14 +152,14 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
                         disabled={mergeInto === ''}
                         onClick={merge}
                     >
-                        Samenvoegen en verwijderen
+                        {t('ui.levels.merge_confirm')}
                     </Button>
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setMode('view')}
                     >
-                        Annuleren
+                        {t('ui.actions.cancel')}
                     </Button>
                 </div>
             </div>
@@ -165,8 +171,10 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
             <span className="font-medium">{level.name}</span>
             <Badge variant="secondary">
                 {inUse
-                    ? `${level.downloadsCount} download(s)`
-                    : 'niet in gebruik'}
+                    ? t('ui.levels.download_count', {
+                          count: level.downloadsCount,
+                      })
+                    : t('ui.levels.not_in_use')}
             </Badge>
 
             <div className="ml-auto flex gap-2">
@@ -175,7 +183,7 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
                     size="sm"
                     onClick={() => setMode('edit')}
                 >
-                    Bewerken
+                    {t('ui.actions.edit')}
                 </Button>
                 {/*
                  * A level in use cannot simply be deleted — its downloads
@@ -188,7 +196,7 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
                     disabled={inUse && others.length === 0}
                     onClick={() => (inUse ? setMode('merge') : remove())}
                 >
-                    Verwijderen
+                    {t('ui.actions.delete')}
                 </Button>
             </div>
         </div>
@@ -211,16 +219,15 @@ export default function LevelsIndex({ levels }: Props) {
 
     return (
         <>
-            <Head title="Niveaus" />
+            <Head title={t('ui.levels.title')} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">
-                        Niveaus
+                        {t('ui.levels.title')}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Waarmee je downloads kunt labelen. Leerlingen zien de
-                        downloads gegroepeerd per niveau.
+                        {t('ui.levels.description')}
                     </p>
                 </div>
 
@@ -234,18 +241,22 @@ export default function LevelsIndex({ levels }: Props) {
                     {({ processing, errors }) => (
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="space-y-2">
-                                <Label htmlFor="new-name">Nieuw niveau</Label>
+                                <Label htmlFor="new-name">
+                                    {t('ui.levels.new')}
+                                </Label>
                                 <Input
                                     id="new-name"
                                     name="name"
-                                    placeholder="Bijvoorbeeld: VMBO-GT"
+                                    placeholder={t(
+                                        'ui.levels.name_placeholder',
+                                    )}
                                 />
                                 <InputError
                                     message={errors.name ?? errors.slug}
                                 />
                             </div>
                             <Button type="submit" disabled={processing}>
-                                Toevoegen
+                                {t('ui.actions.add')}
                             </Button>
                         </div>
                     )}
@@ -253,7 +264,7 @@ export default function LevelsIndex({ levels }: Props) {
 
                 {levels.length === 0 ? (
                     <p className="text-muted-foreground">
-                        Er zijn nog geen niveaus.
+                        {t('ui.levels.empty')}
                     </p>
                 ) : (
                     <div className="rounded-lg border border-border">
@@ -262,7 +273,7 @@ export default function LevelsIndex({ levels }: Props) {
                             getId={(level) => level.id}
                             getTitle={(level) => level.name}
                             onReorder={reorder}
-                            label="Niveaus"
+                            label={t('ui.levels.title')}
                         >
                             {(level) => (
                                 <SortableRow
@@ -290,7 +301,7 @@ export default function LevelsIndex({ levels }: Props) {
 LevelsIndex.layout = {
     breadcrumbs: [
         {
-            title: 'Niveaus',
+            title: t('ui.levels.title'),
             href: EducationLevelController.index.url(),
         },
     ],

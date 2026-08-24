@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/card';
 import { regenerateRecoveryCodes } from '@/routes/two-factor';
 
+import { t } from '@/lib/i18n';
+
 type Props = {
     recoveryCodesList: string[];
     fetchRecoveryCodes: () => Promise<void>;
@@ -57,11 +59,10 @@ export default function TwoFactorRecoveryCodes({
             <CardHeader>
                 <CardTitle className="flex gap-3">
                     <LockKeyhole className="size-4" aria-hidden="true" />
-                    Herstelcodes
+                    {t('ui.settings.recovery.title')}
                 </CardTitle>
                 <CardDescription>
-                    Met een herstelcode kom je binnen als je je telefoon kwijt
-                    bent. Bewaar ze in een wachtwoordmanager.
+                    {t('ui.settings.recovery.description')}
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -76,7 +77,9 @@ export default function TwoFactorRecoveryCodes({
                             className="size-4"
                             aria-hidden="true"
                         />
-                        {codesAreVisible ? 'Verberg' : 'Toon'} herstelcodes
+                        {codesAreVisible
+                            ? t('ui.settings.recovery.hide')
+                            : t('ui.settings.recovery.show')}
                     </Button>
 
                     {canRegenerateCodes && (
@@ -92,7 +95,8 @@ export default function TwoFactorRecoveryCodes({
                                     disabled={processing}
                                     aria-describedby="regenerate-warning"
                                 >
-                                    <RefreshCw /> Nieuwe codes maken
+                                    <RefreshCw />{' '}
+                                    {t('ui.settings.recovery.regenerate')}
                                 </Button>
                             )}
                         </Form>
@@ -112,7 +116,7 @@ export default function TwoFactorRecoveryCodes({
                                     ref={codesSectionRef}
                                     className="grid gap-1 rounded-lg bg-muted p-4 font-mono text-sm"
                                     role="list"
-                                    aria-label="Herstelcodes"
+                                    aria-label={t('ui.settings.recovery.title')}
                                 >
                                     {recoveryCodesList.length ? (
                                         recoveryCodesList.map((code, index) => (
@@ -127,7 +131,9 @@ export default function TwoFactorRecoveryCodes({
                                     ) : (
                                         <div
                                             className="space-y-2"
-                                            aria-label="Herstelcodes worden geladen"
+                                            aria-label={t(
+                                                'ui.settings.recovery.loading',
+                                            )}
                                         >
                                             {Array.from(
                                                 { length: 8 },
@@ -145,13 +151,17 @@ export default function TwoFactorRecoveryCodes({
 
                                 <div className="text-xs text-muted-foreground select-none">
                                     <p id="regenerate-warning">
-                                        Elke herstelcode werkt één keer en
-                                        vervalt daarna. Heb je er meer nodig,
-                                        klik dan hierboven op{' '}
+                                        {t(
+                                            'ui.settings.recovery.single_use_before',
+                                        )}
                                         <span className="font-bold">
-                                            Nieuwe codes maken
+                                            {t(
+                                                'ui.settings.recovery.regenerate',
+                                            )}
                                         </span>
-                                        .
+                                        {t(
+                                            'ui.settings.recovery.single_use_after',
+                                        )}
                                     </p>
                                 </div>
                             </>

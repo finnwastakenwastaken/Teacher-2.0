@@ -55,6 +55,7 @@ trait StoredOnPrivateDisk
     /**
      * Pages whose body embeds this file, via App\Support\PageContent.
      */
+    /** @return MorphMany<PageMediaReference, $this> */
     public function pageReferences(): MorphMany
     {
         return $this->morphMany(PageMediaReference::class, 'referenceable');
@@ -66,20 +67,20 @@ trait StoredOnPrivateDisk
      * Deletes block and report rather than cascading (the technical reference),
      * so this is the single place each library answers "is it still in use".
      *
-     * @return array<string, list<string>> Human label => page titles using it.
+     * @return array<string, array<int, string>> Human label => page titles using it.
      */
     public function dependents(): array
     {
         $pages = $this->pageReferences()
             ->with('page:id,title')
             ->get()
-            ->map(fn (PageMediaReference $reference) => $reference->page?->title)
+            ->map(fn (PageMediaReference $reference) => $reference->page->title)
             ->filter()
             ->unique()
             ->values()
             ->all();
 
-        $dependents = $pages === [] ? [] : ['Gebruikt op' => $pages];
+        $dependents = $pages === [] ? [] : [__('admin.dependents.used_on') => $pages];
 
         return [...$dependents, ...$this->extraDependents()];
     }
@@ -91,7 +92,7 @@ trait StoredOnPrivateDisk
      * additionally offered as level-tagged downloads and override this — a
      * file nothing embeds but a page still offers must not look deletable.
      *
-     * @return array<string, list<string>>
+     * @return array<string, array<int, string>>
      */
     protected function extraDependents(): array
     {
@@ -99,7 +100,7 @@ trait StoredOnPrivateDisk
     }
 
     /**
-     * @param  array<string, list<string>>  $dependents
+     * @param  array<string, array<int, string>>  $dependents
      */
     protected function dependencyMessage(array $dependents): string
     {
@@ -109,7 +110,8 @@ trait StoredOnPrivateDisk
             $parts[] = $label.': '.implode(', ', $users);
         }
 
-        return 'Dit bestand is nog in gebruik en kan niet worden verwijderd. '
-            .implode(' — ', $parts);
+        return __('admin.dependents.file_in_use', [
+            'usages' => implode(' — ', $parts),
+        ]);
     }
 }

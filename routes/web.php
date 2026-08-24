@@ -4,6 +4,7 @@ use App\Http\Controllers\ContentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SitemapController;
@@ -32,6 +33,12 @@ Route::get('zoeken', [SearchController::class, 'show'])->name('search');
 // not copy — a crawler looks for these exact paths.
 Route::get('robots.txt', [SitemapController::class, 'robots'])->name('robots');
 Route::get('sitemap.xml', [SitemapController::class, 'show'])->name('sitemap');
+
+// Switching the interface language. A POST because it writes a cookie, and a
+// redirect because the switch has to be a full page load — <html lang> and
+// the document title are rendered by Blade. Content is never translated; only
+// the interface is. Dutch URL, like the rest of the visitor-facing site.
+Route::post('taal', [LocaleController::class, 'store'])->name('locale.store');
 
 // Entering a password for protected content. Takes the path the visitor was
 // trying to reach rather than a password id, so it cannot be used to probe

@@ -21,6 +21,12 @@ use Inertia\Response;
  */
 class AccessPasswordController extends Controller
 {
+    /**
+     * Short enough to read out to a class, long enough that the limiter is
+     * bounding a real search rather than a list of a dozen obvious guesses.
+     */
+    private const MIN_LENGTH = 8;
+
     public function index(): Response
     {
         return Inertia::render('admin/passwords/index', [
@@ -41,15 +47,20 @@ class AccessPasswordController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:60', Rule::unique('access_passwords', 'name')],
-            // Short on purpose. This is read out to a class and typed on a
-            // phone; the admin password policy does not belong here, and the
-            // rate limiter is what makes a short one survive contact.
-            'password' => ['required', 'string', 'min:4', 'max:255'],
+            // Short on purpose — this is read out to a class and typed on a
+            // phone, so the admin password policy does not belong here. But
+            // not as short as it was. Four characters is a keyspace of about
+            // 1.7 million in theory and about a dozen in practice, because
+            // what people actually pick is `2024`, `havo`, a class code. The
+            // limiter below is what has to survive that guess, and at four
+            // characters it was being asked to hold off an attack measured
+            // in hours. Eight is still sayable across a classroom.
+            'password' => ['required', 'string', 'min:'.self::MIN_LENGTH, 'max:255'],
         ], $this->messages());
 
         AccessPassword::createWithPassword($validated['name'], $validated['password']);
 
-        return back()->with('status', 'Wachtwoord toegevoegd.');
+        return back()->with('status', __('admin.passwords.created'));
     }
 
     /**
@@ -67,7 +78,7 @@ class AccessPasswordController extends Controller
                 'required', 'string', 'max:60',
                 Rule::unique('access_passwords', 'name')->ignore($password),
             ],
-            'password' => ['nullable', 'string', 'min:4', 'max:255'],
+            'password' => ['nullable', 'string', 'min:'.self::MIN_LENGTH, 'max:255'],
         ], $this->messages());
 
         $password->update(['name' => $validated['name']]);
@@ -75,21 +86,27 @@ class AccessPasswordController extends Controller
         if (filled($validated['password'] ?? null)) {
             $password->changePassword($validated['password']);
 
-            return back()->with('status', 'Wachtwoord gewijzigd. Iedereen moet het opnieuw invoeren.');
+            return back()->with('status', __('admin.passwords.changed'));
         }
 
-        return back()->with('status', 'Wachtwoord bijgewerkt.');
+        return back()->with('status', __('admin.passwords.updated'));
     }
 
     public function destroy(AccessPassword $password): RedirectResponse
     {
         try {
             $password->delete();
+            // Thrown from a `deleting` model event, which PHPStan cannot
+            // see from here — so it reports this catch as dead. It is not:
+            // remove it and "this still has things depending on it" becomes
+            // a 500. The guard lives on the model exactly so that no delete
+            // path can skip it.
+            // @phpstan-ignore catch.neverThrown
         } catch (DependentRecordsExistException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', 'Wachtwoord verwijderd.');
+        return back()->with('status', __('admin.passwords.deleted'));
     }
 
     /**
@@ -98,10 +115,10 @@ class AccessPasswordController extends Controller
     private function messages(): array
     {
         return [
-            'name.required' => 'Vul een naam in.',
-            'name.unique' => 'Er bestaat al een wachtwoord met deze naam.',
-            'password.required' => 'Vul een wachtwoord in.',
-            'password.min' => 'Het wachtwoord moet minstens 4 tekens lang zijn.',
+            'name.required' => __('admin.passwords.name_required'),
+            'name.unique' => __('admin.passwords.name_taken'),
+            'password.required' => __('admin.passwords.password_required'),
+            'password.min' => __('admin.passwords.password_min', ['count' => self::MIN_LENGTH]),
         ];
     }
 }

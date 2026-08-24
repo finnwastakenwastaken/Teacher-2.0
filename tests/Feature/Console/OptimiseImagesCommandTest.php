@@ -55,7 +55,7 @@ class OptimiseImagesCommandTest extends TestCase
         $image = $this->storeImage();
 
         $this->artisan('media:optimise')
-            ->expectsOutputToContain('Er is nog niets veranderd')
+            ->expectsOutputToContain('Nothing has been changed yet')
             ->assertSuccessful();
 
         $fresh = $image->fresh();
@@ -99,7 +99,7 @@ class OptimiseImagesCommandTest extends TestCase
         $image = $this->storeImage();
 
         $this->artisan('media:optimise --force')
-            ->expectsOutputToContain('Geen afbeeldingen groter dan')
+            ->expectsOutputToContain('No images larger than')
             ->assertSuccessful();
 
         $this->assertSame('image/png', $image->fresh()->mime);
@@ -117,7 +117,7 @@ class OptimiseImagesCommandTest extends TestCase
         Storage::disk('local')->delete($image->path);
 
         $this->artisan('media:optimise --force')
-            ->expectsOutputToContain('Bestand ontbreekt')
+            ->expectsOutputToContain('File missing')
             ->assertSuccessful();
 
         $this->assertSame('image/png', $image->fresh()->mime);

@@ -28,6 +28,18 @@ class SiteSettings
      * because the bytes are on the private disk and are served through
      * App\Support\MediaAccess like everything else — see brandingImageIds().
      */
+    /*
+     * The two Dutch strings here are deliberately *not* translated, and that
+     * is not an oversight.
+     *
+     * They are homepage copy, which is content — the owner edits it on the
+     * settings screen and it is then stored, once, in whatever language they
+     * wrote it in. Running them through __() would make the heading of an
+     * unedited site change language as each visitor switched, which is
+     * exactly the behaviour the rest of this feature exists to avoid. A
+     * default the owner has not touched yet is still content; it just has not
+     * been written yet.
+     */
     public const DEFAULTS = [
         'site_title' => null,          // null => config('app.name')
         'site_logo_image_id' => null,
@@ -36,6 +48,11 @@ class SiteSettings
         'home_subheading' => 'Bekijk en download lesmateriaal per onderwerp.',
         'home_banner_image_id' => null,
         'home_content' => null,        // A TipTap document, or null.
+        // A PostgreSQL text-search configuration name, not a locale code —
+        // the language the owner writes in, which is a different question
+        // from the language a visitor reads the interface in. See
+        // App\Support\ContentLanguage.
+        'content_language' => ContentLanguage::DEFAULT,
     ];
 
     /**
@@ -55,11 +72,11 @@ class SiteSettings
     public static function all(): array
     {
         $stored = Setting::query()
-            ->whereIn('key', array_keys(static::DEFAULTS))
+            ->whereIn('key', array_keys(self::DEFAULTS))
             ->pluck('value', 'key')
             ->all();
 
-        $values = [...static::DEFAULTS, ...$stored];
+        $values = [...self::DEFAULTS, ...$stored];
 
         $values['site_title'] = filled($values['site_title'])
             ? $values['site_title']
@@ -70,8 +87,8 @@ class SiteSettings
         // at every reader is what keeps `===` comparisons honest — both the
         // in_array() check that publishes a branding image and the picker's
         // id match in React would silently miss otherwise.
-        foreach (static::IMAGE_KEYS as $key) {
-            $values[$key] = static::asId($values[$key] ?? null);
+        foreach (self::IMAGE_KEYS as $key) {
+            $values[$key] = self::asId($values[$key] ?? null);
         }
 
         return $values;
@@ -95,7 +112,7 @@ class SiteSettings
     public static function put(array $values): void
     {
         foreach ($values as $key => $value) {
-            if (! array_key_exists($key, static::DEFAULTS)) {
+            if (! array_key_exists($key, self::DEFAULTS)) {
                 continue;
             }
 
@@ -106,13 +123,13 @@ class SiteSettings
     /**
      * Image ids currently used as branding.
      *
-     * @return list<int>
+     * @return array<int, int>
      */
     public static function brandingImageIds(): array
     {
         $values = static::all();
 
-        return collect(static::IMAGE_KEYS)
+        return collect(self::IMAGE_KEYS)
             ->map(fn (string $key) => $values[$key] ?? null)
             ->filter(fn (?int $id) => $id !== null)
             ->values()

@@ -16,6 +16,7 @@ import { FileTypeIcon } from '@/components/file-type-icon';
 import { Button } from '@/components/ui/button';
 import { formatBytes } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 /*
  * A single document or video, referenced by ULID.
@@ -33,7 +34,7 @@ function FileEmbedView(props: ReactNodeViewProps) {
     const file = findLibraryFile(library, props.node.attrs.ulid);
 
     return (
-        <NodeViewWrapper className="my-4">
+        <NodeViewWrapper className="clear-both my-4">
             <div
                 className={cn(
                     'rounded-lg border border-border bg-card p-3',
@@ -42,7 +43,7 @@ function FileEmbedView(props: ReactNodeViewProps) {
             >
                 {file === null ? (
                     <p className="text-sm text-muted-foreground">
-                        Dit bestand bestaat niet meer. Verwijder dit blok.
+                        {t('ui.editor.blocks.file_missing')}
                     </p>
                 ) : (
                     <FileEmbedBody file={file} />
@@ -56,7 +57,7 @@ function FileEmbedView(props: ReactNodeViewProps) {
                         onClick={() => props.deleteNode()}
                     >
                         <Trash2 aria-hidden="true" />
-                        Verwijderen
+                        {t('ui.actions.delete')}
                     </Button>
                 </div>
             </div>
@@ -100,7 +101,8 @@ function FileEmbedBody({
                     {file.original_filename}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                    Downloadblok · {formatBytes(file.size_bytes)}
+                    {t('ui.editor.blocks.download_block')} ·{' '}
+                    {formatBytes(file.size_bytes)}
                 </p>
             </div>
         </div>

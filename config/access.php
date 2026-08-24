@@ -18,4 +18,20 @@ return [
      */
     'attempts_per_minute' => (int) env('ACCESS_ATTEMPTS_PER_MINUTE', 5),
 
+    /*
+     * The IP-independent backstop, as a multiple of the per-IP limit.
+     *
+     * A per-IP limiter bounds one attacker's rate, not the total: addresses
+     * are cheap, so N of them buy N times the attempts. This second bucket
+     * counts every attempt against a given password regardless of who is
+     * asking, which is the only thing that actually caps the search.
+     *
+     * Ten by default — fifty attempts a minute across the whole internet. A
+     * class of thirty all fat-fingering the same password at once stays well
+     * inside it; a script does not. Raise it if a large school genuinely
+     * trips it, but understand that it is the ceiling on a brute-force
+     * attempt and nothing else is.
+     */
+    'global_attempt_multiplier' => (int) env('ACCESS_GLOBAL_ATTEMPT_MULTIPLIER', 10),
+
 ];

@@ -79,7 +79,7 @@ databasewachtwoord nodig om de stack op een bestaand volume te starten.
 ### Automatisch laten draaien
 
 ```bash
-printf '#!/bin/sh\ncd /opt/teacher && docker compose exec -T app php artisan backup:run --prune\n' > /usr/local/bin/teacher-backup.sh
+printf '#!/bin/sh\ncd /opt/teacher || exit 1\ndocker compose exec -T app php artisan backup:run --prune\ndocker compose exec -T app php artisan media:prune-uploads\n' > /usr/local/bin/teacher-backup.sh
 ```
 
 ```bash
@@ -91,6 +91,12 @@ Elke nacht om half drie:
 ```bash
 echo '30 2 * * * root /usr/local/bin/teacher-backup.sh' > /etc/cron.d/teacher-backup
 ```
+
+De tweede regel ruimt de resten op van uploads die wel begonnen maar nooit
+afgemaakt zijn. Dat gebeurt ook elke keer dat de container opstart, en op een
+machine die af en toe herstart is dat genoeg — maar een server die maanden
+ongestoord draait start nooit op, en een afgebroken upload van twee gigabyte
+blijft dan in het media-volume staan waar hij elke nacht mee wordt geback-upt.
 
 `--prune` bewaart de nieuwste paar back-ups en gooit de rest weg, zodat het
 volume niet oneindig groeit. Hoeveel dat er zijn staat in `BACKUP_KEEP` in
@@ -235,6 +241,15 @@ Beveiligingsupdates gaan automatisch als je bij de installatie
 `unattended-upgrades` hebt aangezet. Herstart de machine na een kernel-update;
 de stack komt vanzelf weer op, want alle containers staan op
 `restart: unless-stopped`.
+
+**Dat commando werkt de machine bij, niet de site.** Alles wat de site echt
+draait — nginx, PHP, PostgreSQL, ImageMagick, OpenSSL, de tunnel — komt niet
+uit de apt van deze machine; het zit in containers die op hun eigen
+basis-images zijn gebouwd. `update.sh` is wat díe bijwerkt: hij haalt bij elke
+run alle basis-images opnieuw op en bouwt daar tegenaan. Hem af en toe draaien
+is dus ook zinvol als er niets nieuws te halen valt, en een server die een jaar
+met rust wordt gelaten loopt op al die onderdelen een jaar achter — hoe groen
+`apt upgrade` er ook uitziet.
 
 ---
 
@@ -395,6 +410,17 @@ account (5 per minuut) en op het invoeren van een paginawachtwoord. Die laatste
 telt per IP-adres, wat alleen klopt omdat de applicatie de proxy vertrouwt voor
 het echte adres van de bezoeker.
 
+**HSTS zet je bij Cloudflare, niet hier.** De webserver van de site ziet alleen
+gewoon HTTP — Cloudflare regelt de versleuteling en de tunnel brengt het verzoek
+daarvandaan binnen — en kan een browser dus niet beloven dat dit domein altijd
+HTTPS is. Cloudflare kan dat wel: zet **SSL/TLS → Edge Certificates → HTTP
+Strict Transport Security** aan zodra de site draait en werkt. Doe dat *daarna*
+en niet ervoor: browsers onthouden HSTS, dus aanzetten terwijl er over HTTPS nog
+iets stuk is, is lastig terug te draaien.
+
+De rest — `X-Frame-Options`, `Referrer-Policy`, het content-securitybeleid —
+stuurt de site zelf mee en vraagt niets van jou.
+
 ---
 
 ## 10. Wat je nooit moet doen
@@ -469,7 +495,35 @@ Een volle schijf uit zich vaak eerst als traagheid en pas daarna als fouten.
 
 ### Een migratie is misgegaan tijdens een update
 
-De applicatiecontainer stopt dan met een foutmelding in het logboek. De site
-blijft in die situatie op de oude code draaien totdat het bouwen slaagt. Zet de
-database terug uit de back-up van vlak voor de update en meld de foutmelding —
-dit hoort niet te gebeuren en is een fout in de software, niet in de server.
+`update.sh` bouwt eerst, migreert daarna en vervangt de containers pas als
+laatste — in die volgorde en om precies deze reden: elk van die stappen stopt
+de update terwijl de oude versie nog draait. Een mislukte bouw of een mislukte
+migratie laat uw site dus gewoon draaien op wat er al stond, en het script
+zegt dat er ook bij.
+
+Meld de foutmelding in beide gevallen — dit hoort niet te gebeuren en is een
+fout in de software, niet in uw server.
+
+Als de migratie zelf misging, kan de database halverwege twee versies staan:
+PostgreSQL zet elke migratie apart in een transactie, maar de hele reeks niet.
+Zet hem terug uit de dump die `update.sh` vooraf heeft weggeschreven. **Die
+dump is platte SQL en geen back-uparchief, dus `restore.sh` neemt hem niet
+aan** — u leest hem zo terug, met het nieuwste bestand uit `/var/backups`:
+
+```bash
+docker compose stop app
+```
+
+```bash
+gunzip -c /var/backups/teacher-db-pre-update-2026-08-24-1130.sql.gz | docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+```bash
+docker compose start app
+```
+
+`update.sh` drukt deze drie regels zelf af zodra hij ergens stopt, dus u hoeft
+deze pagina daarvoor niet eerst te zoeken.
+
+De zeven nieuwste dumps blijven staan, oudere worden bij elke run opgeruimd;
+met `TEACHER_KEEP_DUMPS` verandert u dat aantal.

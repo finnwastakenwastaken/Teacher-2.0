@@ -35,6 +35,9 @@ class StoreEducationLevelRequest extends FormRequest
         ]);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [
@@ -47,9 +50,9 @@ class StoreEducationLevelRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'Vul een naam in.',
-            'slug.required' => 'De naam moet minstens één letter of cijfer bevatten.',
-            'slug.unique' => 'Er bestaat al een niveau met deze naam.',
+            'name.required' => __('admin.levels.name_required'),
+            'slug.required' => __('admin.levels.slug_required'),
+            'slug.unique' => __('admin.levels.name_taken'),
         ];
     }
 }

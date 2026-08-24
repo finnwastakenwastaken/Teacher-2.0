@@ -121,6 +121,41 @@ class PageDownloadTest extends TestCase
         $this->assertSame(0, $download->fresh()->downloads_count);
     }
 
+    /**
+     * The tally is meant to read as "how often was this taken". A download
+     * manager splitting a file into eight ranged requests, or a browser
+     * prefetching a link nobody clicked, is not eight students and not one.
+     *
+     * What is deliberately absent is per-visitor deduplication: knowing that
+     * two requests are the same student means identifying students, which
+     * this site has no way to do and no intention of acquiring.
+     */
+    public function test_a_resumed_or_prefetched_request_does_not_count()
+    {
+        Storage::fake('local');
+        $page = $this->makePage();
+        $download = $page->downloads()->create(['media_file_id' => $this->makeFile()->id]);
+
+        $this->withHeaders(['Range' => 'bytes=500-'])
+            ->get(route('downloads.show', $download));
+
+        $this->withHeaders(['Sec-Purpose' => 'prefetch;anonymous-client-ip'])
+            ->get(route('downloads.show', $download));
+
+        $this->assertSame(0, $download->fresh()->downloads_count);
+
+        // withHeaders() adds to the defaults for the whole test rather than
+        // for one request, so without this the next call would still be
+        // carrying the prefetch header set above.
+        $this->flushHeaders();
+
+        // A range starting at zero is the fetch itself, not a continuation.
+        $this->withHeaders(['Range' => 'bytes=0-'])
+            ->get(route('downloads.show', $download));
+
+        $this->assertSame(1, $download->fresh()->downloads_count);
+    }
+
     public function test_a_video_download_is_sent_as_an_attachment_not_inline()
     {
         Storage::fake('local');
@@ -186,7 +221,7 @@ class PageDownloadTest extends TestCase
         $this->get('/natuurkunde/de-planeten')->assertInertia(
             fn (AssertableInertia $inertia) => $inertia
                 ->where('downloadGroups.0.key', 'all')
-                ->where('downloadGroups.0.label', 'Voor iedereen')
+                ->where('downloadGroups.0.label', __('content.downloads.everyone'))
                 // Falls back to the filename when the owner gave no label.
                 ->where('downloadGroups.0.downloads.0.label', 'formuleblad.pdf')
                 ->where('downloadGroups.1.label', 'HAVO')

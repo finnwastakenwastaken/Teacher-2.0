@@ -13,6 +13,7 @@ import {
     isYouTubeId,
     youTubeEmbedUrl,
 } from '@/lib/youtube';
+import { t } from '@/lib/i18n';
 
 /*
  * A YouTube video, stored as its 11-character id and nothing else.
@@ -31,7 +32,7 @@ function YouTubeEmbedView(props: ReactNodeViewProps) {
     const valid = typeof videoId === 'string' && isYouTubeId(videoId);
 
     return (
-        <NodeViewWrapper className="my-4">
+        <NodeViewWrapper className="clear-both my-4">
             <div
                 className={cn(
                     'rounded-lg border border-border bg-card p-3',
@@ -42,7 +43,7 @@ function YouTubeEmbedView(props: ReactNodeViewProps) {
                     <div className="aspect-video w-full overflow-hidden rounded-md bg-muted">
                         <iframe
                             src={youTubeEmbedUrl(videoId)}
-                            title="YouTube-video"
+                            title={t('ui.public.youtube_title')}
                             loading="lazy"
                             allowFullScreen
                             // Same reason as the public renderer: without it
@@ -53,7 +54,7 @@ function YouTubeEmbedView(props: ReactNodeViewProps) {
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        Ongeldige YouTube-video. Verwijder dit blok.
+                        {t('ui.editor.blocks.youtube_invalid')}
                     </p>
                 )}
 
@@ -65,7 +66,7 @@ function YouTubeEmbedView(props: ReactNodeViewProps) {
                         onClick={() => props.deleteNode()}
                     >
                         <Trash2 aria-hidden="true" />
-                        Verwijderen
+                        {t('ui.actions.delete')}
                     </Button>
                 </div>
             </div>

@@ -26,7 +26,7 @@ class UnlockController extends Controller
             'path' => ['required', 'string'],
             'password' => ['required', 'string'],
         ], [
-            'password.required' => 'Vul het wachtwoord in.',
+            'password.required' => __('content.unlock.password_required'),
         ]);
 
         $node = ContentPathResolver::resolve(trim($validated['path'], '/'));
@@ -41,30 +41,50 @@ class UnlockController extends Controller
             return back();
         }
 
+        // Two buckets, because they bound different things.
+        //
         // Per IP and per password: one class hammering their own password
-        // must not lock a different class out of theirs. Relies on
-        // trustProxies (the technical reference) or every visitor behind the
-        // tunnel shares one bucket.
-        $key = 'unlock:'.$request->ip().':'.$passwordId;
+        // must not lock a different class out of theirs. This is the one that
+        // keeps the feature usable. It relies on trustProxies (the technical reference
+        // invariant 5) and on nginx overwriting X-Forwarded-For, or a visitor
+        // supplies their own address and the bucket count is unbounded.
+        //
+        // Per password, whoever is asking: the backstop. A per-IP limit
+        // multiplies linearly with addresses, and addresses are cheap — so on
+        // its own it bounds one attacker's rate rather than the total. This
+        // one caps the search itself. It is set well above what a whole class
+        // getting it wrong looks like, so the only thing it can realistically
+        // stop is a machine.
         $perMinute = (int) config('access.attempts_per_minute');
 
-        if (RateLimiter::tooManyAttempts($key, $perMinute)) {
-            $seconds = RateLimiter::availableIn($key);
+        $keys = [
+            'unlock:'.$request->ip().':'.$passwordId => $perMinute,
+            'unlock:'.$passwordId => $perMinute * (int) config('access.global_attempt_multiplier'),
+        ];
 
-            return back()->withErrors([
-                'password' => "Te veel pogingen. Probeer het over {$seconds} seconden opnieuw.",
-            ]);
+        foreach ($keys as $key => $limit) {
+            if (RateLimiter::tooManyAttempts($key, $limit)) {
+                $seconds = RateLimiter::availableIn($key);
+
+                return back()->withErrors([
+                    'password' => __('content.unlock.throttled', ['seconds' => $seconds]),
+                ]);
+            }
         }
 
         $password = AccessPassword::query()->find($passwordId);
 
         if ($password === null || ! Hash::check($validated['password'], $password->password_hash)) {
-            RateLimiter::hit($key);
+            foreach (array_keys($keys) as $key) {
+                RateLimiter::hit($key);
+            }
 
-            return back()->withErrors(['password' => 'Dit wachtwoord klopt niet.']);
+            return back()->withErrors(['password' => __('content.unlock.incorrect')]);
         }
 
-        RateLimiter::clear($key);
+        foreach (array_keys($keys) as $key) {
+            RateLimiter::clear($key);
+        }
 
         // Unlocks everything this password guards, not just this page. The
         // record is what gets shared with a class; making them re-enter it

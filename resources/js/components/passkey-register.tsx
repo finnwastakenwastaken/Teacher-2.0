@@ -4,6 +4,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { t } from '@/lib/i18n';
 
 type Props = {
     onSuccess: () => void;
@@ -59,7 +60,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
     if (!isSupported) {
         return (
             <div className="text-sm text-muted-foreground">
-                Deze browser ondersteunt geen passkeys.
+                {t('ui.settings.passkeys.unsupported')}
             </div>
         );
     }
@@ -67,7 +68,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
     if (!showForm) {
         return (
             <Button variant="outline" onClick={() => setShowForm(true)}>
-                Passkey toevoegen
+                {t('ui.settings.passkeys.add')}
             </Button>
         );
     }
@@ -78,18 +79,20 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
             className="space-y-4 rounded-lg border border-border bg-muted/50 p-4"
         >
             <div className="grid gap-2">
-                <Label htmlFor="passkey-name">Naam van de passkey</Label>
+                <Label htmlFor="passkey-name">
+                    {t('ui.settings.passkeys.name_label')}
+                </Label>
                 <Input
                     id="passkey-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Bijvoorbeeld: laptop school, iPhone"
+                    placeholder={t('ui.settings.passkeys.name_placeholder')}
                     className="mt-1 block w-full border-foreground/20"
                     autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
-                    Met een naam herken je later welk apparaat dit is.
+                    {t('ui.settings.passkeys.name_hint')}
                 </p>
             </div>
 
@@ -97,10 +100,12 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
 
             <div className="flex gap-2">
                 <Button type="submit" disabled={isLoading || !name.trim()}>
-                    {isLoading ? 'Bezig…' : 'Passkey opslaan'}
+                    {isLoading
+                        ? t('ui.settings.passkeys.saving')
+                        : t('ui.settings.passkeys.save')}
                 </Button>
                 <Button type="button" variant="ghost" onClick={handleCancel}>
-                    Annuleren
+                    {t('ui.actions.cancel')}
                 </Button>
             </div>
         </form>

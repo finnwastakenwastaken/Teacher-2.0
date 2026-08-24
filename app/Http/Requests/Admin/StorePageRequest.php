@@ -38,6 +38,9 @@ class StorePageRequest extends FormRequest
         ]);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [
@@ -60,10 +63,10 @@ class StorePageRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'topic_id.required' => 'Kies een onderwerp voor deze pagina.',
-            'title.required' => 'Vul een titel in.',
-            'slug.required' => 'Vul een slug in.',
-            'slug.regex' => 'De slug mag alleen kleine letters, cijfers en koppeltekens bevatten.',
+            'topic_id.required' => __('admin.pages.topic_required'),
+            'title.required' => __('admin.fields.title_required'),
+            'slug.required' => __('admin.fields.slug_required'),
+            'slug.regex' => __('admin.fields.slug_format'),
         ];
     }
 }

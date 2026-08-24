@@ -55,6 +55,39 @@ class HandleInertiaRequests extends Middleware
             // session (and consumes the flash) when a page actually renders.
             'status' => fn () => $request->session()->get('status'),
             'error' => fn () => $request->session()->get('error'),
+            // Resolved eagerly, exactly as Inertia resolves its own `errors`
+            // prop one line above in its middleware. A closure would be
+            // evaluated after the controller has run, by which point a
+            // controller that redirects has already aged the flashed bag
+            // away and this would silently be empty.
+            'errorList' => $this->allValidationErrors($request),
         ];
+    }
+
+    /**
+     * Every validation message per field, not just the first.
+     *
+     * Inertia's own `errors` prop keeps one message per key — see
+     * Middleware::resolveValidationErrors — which is right for a field with a
+     * single rule and wrong for a password, where four requirements can fail
+     * at once and the owner would otherwise meet them one submission at a
+     * time.
+     *
+     * Shared alongside `errors` rather than by flipping Inertia's
+     * `withAllErrors`, which would turn every `errors.title` in the front end
+     * into an array and break the twenty-odd screens typed against a string.
+     * Screens that want the full list opt in; nothing else changes.
+     *
+     * @return array<string, list<string>>
+     */
+    private function allValidationErrors(Request $request): array
+    {
+        if (! $request->hasSession() || ! $request->session()->has('errors')) {
+            return [];
+        }
+
+        $bag = $request->session()->get('errors')->getBag('default');
+
+        return array_map(array_values(...), $bag->messages());
     }
 }

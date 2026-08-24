@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAdminNotClaimed;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -26,9 +27,26 @@ return Application::configure(basePath: dirname(__DIR__))
         // bucket, meaning one attacker could lock out the whole school while
         // brute-force protection stopped being per-visitor at all.
         //
-        // Trusting all proxies is safe here specifically because nothing but
-        // our own nginx can reach PHP-FPM; it is not exposed to the network.
-        $middleware->trustProxies(at: '*');
+        // `at: '*'` does NOT mean "trust every proxy in the chain": Laravel
+        // maps it to the calling IP, so exactly one hop is trusted — our own
+        // nginx, which is the only thing that can reach PHP-FPM. What makes
+        // that safe is the other half of the arrangement, in
+        // docker/nginx/app.conf: nginx overwrites the X-Forwarded-* headers
+        // with what it actually observed, so the values arriving here are
+        // never the visitor's own. Neither half works alone.
+        //
+        // X-Forwarded-Host is deliberately absent from this list. Laravel
+        // trusts it by default, Symfony's getHost() takes the *first* value,
+        // and there is no trustHosts() here to catch it — so with it enabled
+        // a single request header rewrote every absolute URL the site
+        // generates, the Sitemap: line in robots.txt included. Nothing needs
+        // it: nginx passes the real Host, and behind the tunnel cloudflared
+        // sets that to the public hostname already. Adding it back reopens
+        // the hole even with the nginx side in place.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO,
+        );
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
@@ -36,8 +54,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.unclaimed' => EnsureAdminNotClaimed::class,
         ]);
 
+        // SetLocale before HandleInertiaRequests, so everything shared with
+        // Inertia — and everything Blade renders around it — is already in
+        // the right language. Both of these have to be settled before the
+        // first byte or the page flashes; see the comments in each class.
         $middleware->web(append: [
             HandleAppearance::class,
+            SetLocale::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);

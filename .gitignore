@@ -11,6 +11,15 @@
 /resources/js/routes
 /resources/js/wayfinder
 /vendor
+
+# Playwright output. The trace is uploaded from CI on failure; neither
+# belongs in the repository.
+/playwright-report
+/test-results
+# A real admin session, saved by the setup project. Short-lived, and a
+# credential even so.
+/tests/e2e/.auth
+
 .DS_Store
 .env
 .env.backup

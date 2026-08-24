@@ -27,13 +27,14 @@ English.
 |---|---|---|
 | [Deployment](docs/deployment.md) | Getting it onto a server, start to finish | English |
 | [Maintenance](docs/maintenance.md) | Backups, updates, recovery, troubleshooting | English |
-| [Beheerdersgids](docs/beheerdersgids.md) | The teacher who publishes the material | Dutch |
+| [Administration](docs/administration.md) | The teacher who publishes the material | English |
+| [Beheerdersgids](docs/beheerdersgids.md) | Same as *Administration* | Dutch |
 | [Installatiegids](docs/installatiegids.md) | Same as *Deployment* | Dutch |
 | [Onderhoud en beveiliging](docs/onderhoud-en-beveiliging.md) | Same as *Maintenance* | Dutch |
 | [Technical reference](docs/technical-reference.md) | Developers | English |
 
-> The Dutch and English server guides are translations of each other. A change
-> to one belongs in the other.
+> The Dutch and English guides are translations of each other. A change to
+> one belongs in the other.
 
 ---
 

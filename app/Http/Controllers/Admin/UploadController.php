@@ -105,6 +105,8 @@ class UploadController extends Controller
      * write keyed on it. That is not a leak of the "address media by ULID"
      * rule: this endpoint is behind `auth`, and public routes still resolve
      * media by ULID only.
+     *
+     * @return array<string, mixed>
      */
     private function describe(Image|MediaFile $record): array
     {

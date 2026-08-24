@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import PublicLayout from '@/layouts/public-layout';
+import { t } from '@/lib/i18n';
 
 type Result = {
     id: number;
@@ -30,33 +31,39 @@ export default function ContentSearch({ query, results }: Props) {
 
     return (
         <PublicLayout>
-            <Head title={query ? `Zoeken naar ${query}` : 'Zoeken'} />
+            <Head
+                title={
+                    query
+                        ? t('ui.public.search.title_for', { query })
+                        : t('ui.public.search.title')
+                }
+            />
 
             <h1 className="mb-6 text-2xl font-semibold tracking-tight">
-                Zoeken
+                {t('ui.public.search.title')}
             </h1>
 
             <form onSubmit={submit} className="mb-8 flex items-end gap-2">
                 <div className="flex-1 space-y-2">
-                    <Label htmlFor="q">Zoekterm</Label>
+                    <Label htmlFor="q">{t('ui.public.search.field')}</Label>
                     <Input
                         id="q"
                         name="q"
                         value={term}
                         autoFocus
                         onChange={(event) => setTerm(event.target.value)}
-                        placeholder="Bijvoorbeeld: zwaartekracht"
+                        placeholder={t('ui.public.search.placeholder')}
                     />
                 </div>
                 <Button type="submit">
                     <Search className="size-4" aria-hidden="true" />
-                    Zoeken
+                    {t('ui.public.search.title')}
                 </Button>
             </form>
 
             {query !== '' && results.length === 0 && (
                 <p className="text-muted-foreground">
-                    Geen resultaten voor &ldquo;{query}&rdquo;.
+                    {t('ui.public.search.none', { query })}
                 </p>
             )}
 

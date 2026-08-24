@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
+import { t } from '@/lib/i18n';
 
 /*
  * Named, reusable passwords. One record covers a class's worth of material:
@@ -33,14 +34,20 @@ function usageLabel(password: AccessPassword): string {
     const parts: string[] = [];
 
     if (password.topicsCount > 0) {
-        parts.push(`${password.topicsCount} onderwerp(en)`);
+        parts.push(
+            t('ui.passwords.topic_count', { count: password.topicsCount }),
+        );
     }
 
     if (password.pagesCount > 0) {
-        parts.push(`${password.pagesCount} pagina('s)`);
+        parts.push(
+            t('ui.passwords.page_count', { count: password.pagesCount }),
+        );
     }
 
-    return parts.length === 0 ? 'niet in gebruik' : parts.join(' · ');
+    return parts.length === 0
+        ? t('ui.passwords.not_in_use')
+        : parts.join(' · ');
 }
 
 function PasswordRow({ password }: { password: AccessPassword }) {
@@ -49,7 +56,9 @@ function PasswordRow({ password }: { password: AccessPassword }) {
     const inUse = password.topicsCount > 0 || password.pagesCount > 0;
 
     function remove() {
-        if (!confirm(`Wachtwoord "${password.name}" verwijderen?`)) {
+        if (
+            !confirm(t('ui.passwords.confirm_delete', { name: password.name }))
+        ) {
             return;
         }
 
@@ -72,7 +81,7 @@ function PasswordRow({ password }: { password: AccessPassword }) {
                             <div className="flex flex-wrap items-end gap-3">
                                 <div className="space-y-2">
                                     <Label htmlFor={`name-${password.id}`}>
-                                        Naam
+                                        {t('ui.passwords.name')}
                                     </Label>
                                     <Input
                                         id={`name-${password.id}`}
@@ -84,14 +93,16 @@ function PasswordRow({ password }: { password: AccessPassword }) {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor={`secret-${password.id}`}>
-                                        Nieuw wachtwoord
+                                        {t('ui.passwords.new_password')}
                                     </Label>
                                     <Input
                                         id={`secret-${password.id}`}
                                         name="password"
                                         type="text"
                                         autoComplete="off"
-                                        placeholder="Laat leeg om te behouden"
+                                        placeholder={t(
+                                            'ui.passwords.keep_placeholder',
+                                        )}
                                     />
                                     <InputError message={errors.password} />
                                 </div>
@@ -100,7 +111,7 @@ function PasswordRow({ password }: { password: AccessPassword }) {
                                     size="sm"
                                     disabled={processing}
                                 >
-                                    Opslaan
+                                    {t('ui.actions.save')}
                                 </Button>
                                 <Button
                                     type="button"
@@ -108,13 +119,12 @@ function PasswordRow({ password }: { password: AccessPassword }) {
                                     size="sm"
                                     onClick={() => setEditing(false)}
                                 >
-                                    Annuleren
+                                    {t('ui.actions.cancel')}
                                 </Button>
                             </div>
 
                             <p className="text-xs text-muted-foreground">
-                                Als je het wachtwoord wijzigt, moet iedereen die
-                                het al had ingevoerd het opnieuw invoeren.
+                                {t('ui.passwords.change_warning')}
                             </p>
                         </div>
                     )}
@@ -134,20 +144,16 @@ function PasswordRow({ password }: { password: AccessPassword }) {
                     size="sm"
                     onClick={() => setEditing(true)}
                 >
-                    Bewerken
+                    {t('ui.actions.edit')}
                 </Button>
                 <Button
                     variant="destructive"
                     size="sm"
                     disabled={inUse}
-                    title={
-                        inUse
-                            ? 'Haal dit wachtwoord eerst weg bij de onderwerpen en pagina’s die het gebruiken.'
-                            : undefined
-                    }
+                    title={inUse ? t('ui.passwords.in_use') : undefined}
                     onClick={remove}
                 >
-                    Verwijderen
+                    {t('ui.actions.delete')}
                 </Button>
             </div>
         </li>
@@ -159,18 +165,15 @@ export default function PasswordsIndex({ passwords }: Props) {
 
     return (
         <>
-            <Head title="Wachtwoorden" />
+            <Head title={t('ui.passwords.title')} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">
-                        Wachtwoorden
+                        {t('ui.passwords.title')}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Stel een wachtwoord in bij een onderwerp of pagina. Wie
-                        het invoert, kan alles openen dat met hetzelfde
-                        wachtwoord beveiligd is. De naam is zichtbaar voor
-                        leerlingen, zet er dus niets gevoeligs in.
+                        {t('ui.passwords.description')}
                     </p>
                 </div>
 
@@ -184,16 +187,22 @@ export default function PasswordsIndex({ passwords }: Props) {
                     {({ processing, errors }) => (
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="space-y-2">
-                                <Label htmlFor="new-name">Naam</Label>
+                                <Label htmlFor="new-name">
+                                    {t('ui.passwords.name')}
+                                </Label>
                                 <Input
                                     id="new-name"
                                     name="name"
-                                    placeholder="Bijvoorbeeld: 5 VWO"
+                                    placeholder={t(
+                                        'ui.passwords.name_placeholder',
+                                    )}
                                 />
                                 <InputError message={errors.name} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="new-secret">Wachtwoord</Label>
+                                <Label htmlFor="new-secret">
+                                    {t('ui.passwords.password')}
+                                </Label>
                                 <Input
                                     id="new-secret"
                                     name="password"
@@ -203,7 +212,7 @@ export default function PasswordsIndex({ passwords }: Props) {
                                 <InputError message={errors.password} />
                             </div>
                             <Button type="submit" disabled={processing}>
-                                Toevoegen
+                                {t('ui.actions.add')}
                             </Button>
                         </div>
                     )}
@@ -211,7 +220,7 @@ export default function PasswordsIndex({ passwords }: Props) {
 
                 {passwords.length === 0 ? (
                     <p className="text-muted-foreground">
-                        Er zijn nog geen wachtwoorden.
+                        {t('ui.passwords.empty')}
                     </p>
                 ) : (
                     <ul className="divide-y divide-border rounded-lg border border-border">
@@ -231,7 +240,7 @@ export default function PasswordsIndex({ passwords }: Props) {
 PasswordsIndex.layout = {
     breadcrumbs: [
         {
-            title: 'Wachtwoorden',
+            title: t('ui.passwords.title'),
             href: AccessPasswordController.index.url(),
         },
     ],

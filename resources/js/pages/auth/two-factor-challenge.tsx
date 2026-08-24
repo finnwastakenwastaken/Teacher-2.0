@@ -10,6 +10,7 @@ import {
     InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { OTP_MAX_LENGTH } from '@/hooks/use-two-factor-auth';
+import { t } from '@/lib/i18n';
 import { store } from '@/routes/two-factor/login';
 
 export default function TwoFactorChallenge() {
@@ -23,17 +24,16 @@ export default function TwoFactorChallenge() {
     }>(() => {
         if (showRecoveryInput) {
             return {
-                title: 'Herstelcode',
-                description:
-                    'Vul een van je herstelcodes in om te bevestigen dat jij het bent.',
-                toggleText: 'inloggen met een code uit de app',
+                title: t('ui.auth.two_factor.recovery_title'),
+                description: t('ui.auth.two_factor.recovery_description'),
+                toggleText: t('ui.auth.two_factor.recovery_toggle'),
             };
         }
 
         return {
-            title: 'Inlogcode',
-            description: 'Vul de code in uit je authenticator-app.',
-            toggleText: 'inloggen met een herstelcode',
+            title: t('ui.auth.two_factor.code_title'),
+            description: t('ui.auth.two_factor.code_description'),
+            toggleText: t('ui.auth.two_factor.code_toggle'),
         };
     }, [showRecoveryInput]);
 
@@ -50,7 +50,7 @@ export default function TwoFactorChallenge() {
 
     return (
         <>
-            <Head title="Tweestapsverificatie" />
+            <Head title={t('ui.auth.two_factor.title')} />
 
             <div className="space-y-6">
                 <Form
@@ -66,7 +66,9 @@ export default function TwoFactorChallenge() {
                                     <Input
                                         name="recovery_code"
                                         type="text"
-                                        placeholder="Herstelcode"
+                                        placeholder={t(
+                                            'ui.auth.two_factor.recovery_placeholder',
+                                        )}
                                         autoFocus={showRecoveryInput}
                                         required
                                     />
@@ -108,11 +110,11 @@ export default function TwoFactorChallenge() {
                                 className="w-full"
                                 disabled={processing}
                             >
-                                Doorgaan
+                                {t('ui.auth.two_factor.submit')}
                             </Button>
 
                             <div className="text-center text-sm text-muted-foreground">
-                                <span>of </span>
+                                <span>{t('ui.auth.two_factor.or')}</span>
                                 <button
                                     type="button"
                                     className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"

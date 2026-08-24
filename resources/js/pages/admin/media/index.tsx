@@ -12,6 +12,7 @@ import {
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { index as mediaIndex } from '@/routes/admin/media';
 import type { MediaFile, MediaImage } from '@/types';
+import { t } from '@/lib/i18n';
 
 /*
  * The two libraries are deliberately separate rather than one list with a
@@ -31,16 +32,15 @@ export default function MediaIndex({ images, files, maxBytes }: Props) {
 
     return (
         <>
-            <Head title="Media" />
+            <Head title={t('ui.media.title')} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">
-                        Media
+                        {t('ui.media.title')}
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        Afbeeldingen, documenten en video&apos;s die je in
-                        pagina&apos;s kunt gebruiken.
+                        {t('ui.media.description')}
                     </p>
                 </div>
 
@@ -48,11 +48,13 @@ export default function MediaIndex({ images, files, maxBytes }: Props) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Afbeeldingen</CardTitle>
+                        <CardTitle>{t('ui.media.images')}</CardTitle>
                         <CardDescription>
                             {images.length === 0
-                                ? 'Nog niets geüpload.'
-                                : `${images.length} ${images.length === 1 ? 'afbeelding' : 'afbeeldingen'}.`}
+                                ? t('ui.media.empty')
+                                : t('ui.media.image_count', {
+                                      count: images.length,
+                                  })}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -62,11 +64,13 @@ export default function MediaIndex({ images, files, maxBytes }: Props) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Bestanden</CardTitle>
+                        <CardTitle>{t('ui.media.files')}</CardTitle>
                         <CardDescription>
                             {files.length === 0
-                                ? 'Nog niets geüpload.'
-                                : `${files.length} ${files.length === 1 ? 'bestand' : 'bestanden'} (documenten en video's).`}
+                                ? t('ui.media.empty')
+                                : t('ui.media.file_count', {
+                                      count: files.length,
+                                  })}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -81,7 +85,7 @@ export default function MediaIndex({ images, files, maxBytes }: Props) {
 MediaIndex.layout = {
     breadcrumbs: [
         {
-            title: 'Media',
+            title: t('ui.media.title'),
             href: mediaIndex.url(),
         },
     ],

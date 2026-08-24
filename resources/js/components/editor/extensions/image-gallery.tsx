@@ -17,6 +17,7 @@ import type {
 } from '@/components/editor/media-library';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 /*
  * One or more images, referenced by ULID.
@@ -45,7 +46,7 @@ function ImageGalleryView(props: ReactNodeViewProps) {
         .filter((image): image is EditorLibraryImage => image !== null);
 
     return (
-        <NodeViewWrapper className="my-4">
+        <NodeViewWrapper className="clear-both my-4">
             <div
                 className={cn(
                     'rounded-lg border border-border bg-card p-3',
@@ -54,7 +55,7 @@ function ImageGalleryView(props: ReactNodeViewProps) {
             >
                 {images.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        Deze afbeeldingen bestaan niet meer. Verwijder dit blok.
+                        {t('ui.editor.blocks.images_missing')}
                     </p>
                 ) : (
                     <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -76,9 +77,9 @@ function ImageGalleryView(props: ReactNodeViewProps) {
 
                 <div className="mt-3 flex items-center justify-between gap-3">
                     <p className="text-xs text-muted-foreground">
-                        {images.length === 1
-                            ? '1 afbeelding'
-                            : `${images.length} afbeeldingen`}
+                        {t('ui.editor.blocks.image_count', {
+                            count: images.length,
+                        })}
                     </p>
                     <Button
                         type="button"
@@ -87,7 +88,7 @@ function ImageGalleryView(props: ReactNodeViewProps) {
                         onClick={() => props.deleteNode()}
                     >
                         <Trash2 aria-hidden="true" />
-                        Verwijderen
+                        {t('ui.actions.delete')}
                     </Button>
                 </div>
             </div>

@@ -17,6 +17,7 @@ import {
     destroy as destroyImage,
 } from '@/routes/admin/media/images';
 import type { MediaImage } from '@/types';
+import { t } from '@/lib/i18n';
 
 function ImageCard({
     image,
@@ -28,7 +29,9 @@ function ImageCard({
     const remove = () => {
         if (
             !confirm(
-                `Weet je zeker dat je "${image.original_filename}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+                t('ui.library.confirm_delete', {
+                    name: image.original_filename,
+                }),
             )
         ) {
             return;
@@ -75,10 +78,10 @@ function ImageCard({
                     size="sm"
                     onClick={() => onEdit(image)}
                 >
-                    Alt-tekst bewerken
+                    {t('ui.library.edit_alt')}
                 </Button>
                 <Button variant="destructive" size="sm" onClick={remove}>
-                    Verwijderen
+                    {t('ui.actions.delete')}
                 </Button>
             </div>
         </li>
@@ -105,7 +108,7 @@ export function ImageLibrary({ images }: { images: MediaImage[] }) {
         const value = altText.trim();
 
         if (value === '') {
-            setError('Alt-tekst is verplicht bij elke afbeelding.');
+            setError(t('ui.library.alt_required'));
 
             return;
         }
@@ -120,8 +123,7 @@ export function ImageLibrary({ images }: { images: MediaImage[] }) {
                 onSuccess: () => setEditing(null),
                 onError: (errors) =>
                     setError(
-                        errors.alt_text ??
-                            'De alt-tekst kon niet worden opgeslagen.',
+                        errors.alt_text ?? t('ui.library.alt_save_failed'),
                     ),
                 onFinish: () => setSaving(false),
             },
@@ -131,7 +133,7 @@ export function ImageLibrary({ images }: { images: MediaImage[] }) {
     if (images.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
-                Er zijn nog geen afbeeldingen geüpload.
+                {t('ui.library.no_images')}
             </p>
         );
     }
@@ -158,16 +160,16 @@ export function ImageLibrary({ images }: { images: MediaImage[] }) {
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Alt-tekst bewerken</DialogTitle>
+                        <DialogTitle>{t('ui.library.edit_alt')}</DialogTitle>
                         <DialogDescription>
-                            Beschrijf kort wat er op de afbeelding te zien is.
-                            Deze tekst wordt voorgelezen door schermlezers en
-                            getoond als de afbeelding niet laadt.
+                            {t('ui.library.alt_dialog_description')}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="alt-text">Alt-tekst</Label>
+                        <Label htmlFor="alt-text">
+                            {t('ui.library.alt_label')}
+                        </Label>
                         <Textarea
                             id="alt-text"
                             rows={3}
@@ -182,10 +184,10 @@ export function ImageLibrary({ images }: { images: MediaImage[] }) {
                             variant="outline"
                             onClick={() => setEditing(null)}
                         >
-                            Annuleren
+                            {t('ui.actions.cancel')}
                         </Button>
                         <Button onClick={save} disabled={saving}>
-                            Opslaan
+                            {t('ui.actions.save')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

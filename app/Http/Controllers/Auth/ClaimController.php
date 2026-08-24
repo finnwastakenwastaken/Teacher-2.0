@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ClaimAdminRequest;
 use App\Support\AdminAccount;
 use App\Support\AdminSetupToken;
+use App\Support\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -24,6 +25,9 @@ class ClaimController extends Controller
     {
         return Inertia::render('auth/claim', [
             'setupTokenRequired' => AdminSetupToken::isConfigured(),
+            // So the screen can list the requirements before they are broken,
+            // rather than revealing them one failed submission at a time.
+            'passwordPolicy' => PasswordPolicy::describe(),
         ]);
     }
 
@@ -41,7 +45,7 @@ class ClaimController extends Controller
             // and this one — extremely unlikely given the advisory lock, but
             // fail into the same "already set up" redirect rather than a 500.
             return redirect()->route('login')
-                ->with('status', __('De installatie is al voltooid. Log hieronder in.'));
+                ->with('status', __('auth.claim.already_completed'));
         }
 
         Auth::login($user);

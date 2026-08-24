@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { index as iconsIndex } from '@/routes/admin/icons';
+import { t } from '@/lib/i18n';
 
 /*
  * The catalogue is generated from the icon packages' own exported data by
@@ -135,7 +136,7 @@ export function IconPicker({
                     </>
                 ) : (
                     <span className="text-muted-foreground">
-                        Geen icoon gekozen
+                        {t('ui.icons.none_chosen')}
                     </span>
                 )}
             </Button>
@@ -143,13 +144,13 @@ export function IconPicker({
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Kies een icoon</DialogTitle>
+                        <DialogTitle>{t('ui.icons.dialog_title')}</DialogTitle>
                     </DialogHeader>
 
                     <div className="grid gap-3">
                         <Input
                             type="search"
-                            placeholder="Zoek een icoon…"
+                            placeholder={t('ui.icons.search_placeholder')}
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             autoFocus
@@ -159,7 +160,7 @@ export function IconPicker({
                             <div
                                 className="flex flex-wrap gap-1"
                                 role="group"
-                                aria-label="Filter op verzameling"
+                                aria-label={t('ui.icons.filter_label')}
                             >
                                 <Button
                                     type="button"
@@ -169,7 +170,7 @@ export function IconPicker({
                                     }
                                     onClick={() => setLibrary(null)}
                                 >
-                                    Alles
+                                    {t('ui.icons.all')}
                                 </Button>
                                 {libraries.map((option) => (
                                     <Button
@@ -195,7 +196,7 @@ export function IconPicker({
                             className="w-fit"
                             onClick={() => choose(null)}
                         >
-                            Geen icoon
+                            {t('ui.icons.none')}
                         </Button>
 
                         <div
@@ -222,13 +223,15 @@ export function IconPicker({
                             response.icons.length === 0 &&
                             !loading && (
                                 <p className="text-sm text-muted-foreground">
-                                    Geen iconen gevonden.
+                                    {t('ui.icons.no_results')}
                                 </p>
                             )}
 
                         {response?.capped && (
                             <p className="text-xs text-muted-foreground">
-                                {response.total} iconen, verfijn je zoekopdracht
+                                {t('ui.icons.capped', {
+                                    count: response.total,
+                                })}
                             </p>
                         )}
                     </div>

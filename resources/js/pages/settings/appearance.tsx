@@ -1,20 +1,21 @@
 import { Head } from '@inertiajs/react';
 import AppearanceTabs from '@/components/appearance-tabs';
 import Heading from '@/components/heading';
+import { t } from '@/lib/i18n';
 import { edit as editAppearance } from '@/routes/appearance';
 
 export default function Appearance() {
     return (
         <>
-            <Head title="Weergave" />
+            <Head title={t('ui.settings.appearance.title')} />
 
-            <h1 className="sr-only">Weergave</h1>
+            <h1 className="sr-only">{t('ui.settings.appearance.title')}</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Weergave"
-                    description="Kies of de site licht of donker wordt getoond. Deze keuze geldt alleen op dit apparaat."
+                    title={t('ui.settings.appearance.title')}
+                    description={t('ui.settings.appearance.description')}
                 />
                 <AppearanceTabs />
             </div>
@@ -25,7 +26,7 @@ export default function Appearance() {
 Appearance.layout = {
     breadcrumbs: [
         {
-            title: 'Weergave',
+            title: t('ui.settings.appearance.title'),
             href: editAppearance(),
         },
     ],

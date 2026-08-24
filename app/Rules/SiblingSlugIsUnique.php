@@ -44,7 +44,7 @@ class SiblingSlugIsUnique implements ValidationRule
             ->exists();
 
         if ($topicConflict || $pageConflict) {
-            $fail('Deze slug is al in gebruik binnen hetzelfde onderdeel.');
+            $fail(__('admin.fields.slug_taken'));
         }
     }
 }

@@ -17,6 +17,10 @@ export type EditorLibraryImage = {
 };
 
 export type EditorLibraryFile = {
+    // The numeric id travels with the file because this one list also feeds
+    // the downloads section, whose attach endpoint is a relational write.
+    // The editor itself never uses it — embeds are stored by ULID.
+    id: number;
     ulid: string;
     kind: MediaFileKind;
     mime: string;

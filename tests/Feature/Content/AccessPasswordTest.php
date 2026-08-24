@@ -196,7 +196,7 @@ class AccessPasswordTest extends TestCase
             ->assertInertia(fn ($inertia) => $inertia->component('content/topic'));
 
         $this->actingAs(User::factory()->create())
-            ->put(route('admin.passwords.update', $password), ['name' => '5 VWO', 'password' => 'nieuw'])
+            ->put(route('admin.passwords.update', $password), ['name' => '5 VWO', 'password' => 'nieuw-wachtwoord'])
             ->assertSessionHas('status');
 
         // actingAs sticks for the rest of the test, and the admin sees
@@ -233,6 +233,60 @@ class AccessPasswordTest extends TestCase
         $this->assertTrue(
             RateLimiter::tooManyAttempts('unlock:127.0.0.1:'.$password->id, config('access.attempts_per_minute'))
         );
+    }
+
+    /**
+     * The per-IP bucket bounds one attacker's rate, not the total: addresses
+     * are cheap, so N of them buy N times the attempts. This second bucket is
+     * what actually caps the search, and it must count attempts arriving from
+     * everywhere rather than from anyone in particular.
+     */
+    public function test_unlock_attempts_are_also_bounded_independently_of_the_ip()
+    {
+        [, , $page] = $this->tree();
+        $password = $this->makePassword('5 VWO', 'zwaartekracht');
+        $page->update(['access_password_id' => $password->id]);
+
+        $globalLimit = (int) config('access.attempts_per_minute')
+            * (int) config('access.global_attempt_multiplier');
+
+        // Every attempt from a different address, so the per-IP bucket never
+        // fills and only the global one can stop this.
+        for ($i = 0; $i <= $globalLimit; $i++) {
+            $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.'.($i % 250)])
+                ->post(route('unlock.store'), [
+                    'path' => 'natuurkunde/sterrenkunde/de-planeten',
+                    'password' => 'fout',
+                ]);
+        }
+
+        $this->assertTrue(
+            RateLimiter::tooManyAttempts('unlock:'.$password->id, $globalLimit),
+            'A distributed guess must still hit a ceiling.'
+        );
+
+        // And a fresh address is refused too, which is the whole point.
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.77'])
+            ->from('/natuurkunde/sterrenkunde/de-planeten')
+            ->post(route('unlock.store'), [
+                'path' => 'natuurkunde/sterrenkunde/de-planeten',
+                'password' => 'zwaartekracht',
+            ])
+            ->assertSessionHasErrors('password');
+    }
+
+    public function test_a_content_password_must_be_long_enough_to_be_worth_rate_limiting()
+    {
+        $admin = User::factory()->create();
+
+        $this->actingAs($admin)
+            ->from(route('admin.passwords.index'))
+            ->post(route('admin.passwords.store'), ['name' => 'Kort', 'password' => '2024'])
+            ->assertSessionHasErrors('password');
+
+        $this->actingAs($admin)
+            ->post(route('admin.passwords.store'), ['name' => 'Lang genoeg', 'password' => 'zwaartekracht'])
+            ->assertSessionHas('status');
     }
 
     public function test_the_admin_sees_protected_content_without_a_cookie()

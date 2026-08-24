@@ -8,7 +8,12 @@
              are already applied on the html element above. --}}
         <script>
             (function() {
-                const appearance = '{{ $appearance ?? "dark" }}';
+                {{-- @json, not {{ }}. Blade's default escaping is for HTML,
+                     and this is a JavaScript context: entities are not
+                     decoded inside <script>, and htmlspecialchars leaves a
+                     backslash alone, so a cookie ending in one used to escape
+                     the closing quote and break this whole block. --}}
+                const appearance = @json($appearance ?? 'dark');
 
                 if (appearance === 'system') {
                     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -44,6 +49,21 @@
 
         {{-- Read by resources/js/app.tsx for the document title template. --}}
         <meta name="app-name" content="{{ $siteBranding['title'] }}">
+
+        {{-- The interface dictionary, active locale only.
+
+             Here rather than as an Inertia shared prop for two reasons: a
+             shared prop is re-sent on every visit, and this cannot change
+             without a full page load anyway — switching language sets a
+             cookie and reloads, because the lang attribute above and the
+             title below are rendered by Blade.
+
+             @json for the same reason as the appearance block: this is a
+             JavaScript context, and Blade's {{ }} escapes for HTML. --}}
+        <script>
+            window.__translations = @json($translations ?? []);
+            window.__locale = @json($locale ?? 'nl');
+        </script>
 
         @fonts
 

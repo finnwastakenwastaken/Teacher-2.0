@@ -9,9 +9,28 @@ services:
   app:
     build:
       target: development
+    # compose.yaml drops every capability because the production image runs as
+    # www-data. The development target runs as root so its entrypoint can
+    # chown the bind-mounted storage and bootstrap/cache directories, and
+    # php-fpm then forks its workers as www-data — hence these five back.
+    # Without them the container starts and then fails on the first write.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     environment:
       APP_ENV: local
       APP_DEBUG: 'true'
+      # Development is served over plain HTTP, so a Secure-only session cookie
+      # is wrong here — and it fails in a way that looks like anything but a
+      # cookie problem. A browser will not store one over http:// unless the
+      # origin is trustworthy, and only localhost qualifies: reaching the site
+      # from another container by service name (`http://web`, which is how the
+      # browser tests reach it) drops the session silently, and every login
+      # looks like a wrong password.
+      SESSION_SECURE_COOKIE: 'false'
     volumes:
       - .:/var/www/html
       # node_modules and vendor live in named volumes rather than on the
@@ -23,9 +42,20 @@ services:
   web:
     build:
       target: web
+    # The Vite dev server, named here rather than in the config file, because
+    # a CSP origin is resolved by the visitor's browser: `localhost:5173`
+    # baked into the shipped policy would point at the *student's* machine.
+    # The image defaults both to empty, so production needs no counterpart to
+    # this block. The leading space belongs to the value — the policy reads
+    # `script-src 'self' 'unsafe-inline'${CSP_DEV_SRC}`, so that an empty
+    # value leaves no stray separator behind.
+    environment:
+      CSP_DEV_SRC: ' http://localhost:5173'
+      CSP_DEV_CONNECT: ' http://localhost:5173 ws://localhost:5173'
     volumes:
       - ./public:/var/www/html/public
-      - ./docker/nginx/app.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mounted where the entrypoint's envsubst step looks, not into conf.d.
+      - ./docker/nginx/app.conf:/etc/nginx/templates/default.conf.template:ro
       - media:/var/www/html/storage/app/private:ro
 
   # Vite runs on the application image, not a plain Node image.
@@ -62,6 +92,35 @@ services:
       # Hyper-V, and a local PostgreSQL install would collide too.
       - '127.0.0.1:55432:5432'
 
+  # Browser tests. Behind a profile, so a normal `up -d` never starts it:
+  #
+  #   docker compose -f compose.yaml -f compose.dev.yaml exec app php artisan e2e:seed
+  #   docker compose -f compose.yaml -f compose.dev.yaml --profile e2e run --rm e2e
+  #
+  # It talks to `web` rather than to a published port, so the tests go through
+  # the same nginx that ships — which is the whole reason for a browser runner
+  # rather than a DOM simulator. See playwright.config.ts.
+  #
+  # The image tag must match the @playwright/test version in package.json:
+  # Playwright refuses to drive browsers it did not ship with.
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    profiles: ['e2e']
+    working_dir: /work
+    environment:
+      E2E_BASE_URL: http://web
+      CI: ${CI:-}
+    depends_on:
+      - web
+    volumes:
+      - .:/work
+      # Its own node_modules, deliberately. The application image is Alpine
+      # (musl) and this one is Ubuntu (glibc), so one shared tree would hand
+      # one of them native binaries built for the other.
+      - e2e_node_modules:/work/node_modules
+    command: sh -c "npm ci --no-audit --no-fund && npx playwright test"
+
 volumes:
   node_modules:
+  e2e_node_modules:
   vendor:

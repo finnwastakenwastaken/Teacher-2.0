@@ -78,7 +78,7 @@ class AccessControl
 
     public static function isUnlocked(int $passwordId, Request $request): bool
     {
-        $presented = $request->cookie(static::cookieName($passwordId));
+        $presented = $request->cookie(self::cookieName($passwordId));
 
         if (! is_string($presented) || $presented === '') {
             return false;
@@ -90,7 +90,7 @@ class AccessControl
             return false;
         }
 
-        return hash_equals(static::fingerprint($password), $presented);
+        return hash_equals(self::fingerprint($password), $presented);
     }
 
     /**
@@ -104,8 +104,8 @@ class AccessControl
     public static function unlockCookie(AccessPassword $password): SymfonyCookie
     {
         return Cookie::make(
-            name: static::cookieName($password->id),
-            value: static::fingerprint($password),
+            name: self::cookieName($password->id),
+            value: self::fingerprint($password),
             minutes: (int) config('access.unlock_days') * 24 * 60,
             httpOnly: true,
         );

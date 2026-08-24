@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\EducationLevelController;
 use App\Http\Controllers\Admin\IconController;
 use App\Http\Controllers\Admin\MediaLibraryController;
+use App\Http\Controllers\Admin\MediaSearchController;
 use App\Http\Controllers\Admin\PageController;
 use App\Http\Controllers\Admin\PageDownloadController;
 use App\Http\Controllers\Admin\SiteSettingsController;
@@ -21,6 +22,14 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Icon search for the picker. Read-only JSON, and the only place the
     // ~15,000-icon catalogue is ever queried from the browser.
     Route::get('icons', [IconController::class, 'index'])->name('icons.index');
+
+    // Media search for the page editor's pickers and the downloads section.
+    // Same shape as the icon search above: read-only JSON, queried a page at
+    // a time instead of shipping the whole library into every page-edit
+    // payload. See App\Http\Controllers\Admin\MediaSearchController.
+    Route::get('media/search/images', [MediaSearchController::class, 'images'])->name('media.search.images');
+    Route::get('media/search/files', [MediaSearchController::class, 'files'])->name('media.search.files');
+    Route::get('media/search/image-options', [MediaSearchController::class, 'imageOptions'])->name('media.search.image-options');
 
     // Drag-and-drop ordering. These reorder siblings and nothing else — a
     // move between parents still goes through the edit form, which is where

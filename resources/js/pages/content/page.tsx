@@ -6,6 +6,7 @@ import { PublicBreadcrumbs } from '@/components/public-breadcrumbs';
 import PublicLayout from '@/layouts/public-layout';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import type { PageMedia, TipTapDoc } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 type Props = {
     page: {
@@ -65,7 +66,7 @@ export default function ContentPage({
             ) : (
                 downloadGroups.length === 0 && (
                     <p className="text-muted-foreground">
-                        Deze pagina heeft nog geen inhoud.
+                        {t('ui.public.page_empty')}
                     </p>
                 )
             )}

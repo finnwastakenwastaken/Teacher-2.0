@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { normaliseHref } from '@/lib/href';
 import { cn } from '@/lib/utils';
 import type { TipTapDoc } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 /*
  * A cut-down page editor: text, links and lists, and nothing that embeds a
@@ -115,7 +116,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                 <div className="flex flex-wrap items-center gap-1 border-b border-border bg-card p-2">
                     <ToolbarButton
                         icon={Bold}
-                        label="Vet"
+                        label={t('ui.editor.bold')}
                         active={state.bold}
                         onClick={() =>
                             editor.chain().focus().toggleBold().run()
@@ -123,7 +124,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={Italic}
-                        label="Cursief"
+                        label={t('ui.editor.italic')}
                         active={state.italic}
                         onClick={() =>
                             editor.chain().focus().toggleItalic().run()
@@ -131,7 +132,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={SubscriptIcon}
-                        label="Subscript (H₂O)"
+                        label={t('ui.editor.subscript')}
                         active={state.subscript}
                         onClick={() =>
                             editor.chain().focus().toggleSubscript().run()
@@ -139,7 +140,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={SuperscriptIcon}
-                        label="Superscript (m/s²)"
+                        label={t('ui.editor.superscript')}
                         active={state.superscript}
                         onClick={() =>
                             editor.chain().focus().toggleSuperscript().run()
@@ -147,7 +148,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={Heading2}
-                        label="Kop"
+                        label={t('ui.editor.heading')}
                         active={state.heading2}
                         onClick={() =>
                             editor
@@ -159,7 +160,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={List}
-                        label="Opsomming"
+                        label={t('ui.editor.bullet_list')}
                         active={state.bulletList}
                         onClick={() =>
                             editor.chain().focus().toggleBulletList().run()
@@ -167,7 +168,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={ListOrdered}
-                        label="Genummerde lijst"
+                        label={t('ui.editor.ordered_list')}
                         active={state.orderedList}
                         onClick={() =>
                             editor.chain().focus().toggleOrderedList().run()
@@ -175,7 +176,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={Quote}
-                        label="Citaat"
+                        label={t('ui.editor.blockquote')}
                         active={state.blockquote}
                         onClick={() =>
                             editor.chain().focus().toggleBlockquote().run()
@@ -183,7 +184,7 @@ export function SimpleTextEditor({ content, onChange, labelledBy }: Props) {
                     />
                     <ToolbarButton
                         icon={Link2}
-                        label="Link"
+                        label={t('ui.editor.link')}
                         active={state.link}
                         onClick={() => setLinkOpen(true)}
                     />

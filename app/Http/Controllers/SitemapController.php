@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Page;
 use App\Models\Topic;
-use App\Support\AccessControl;
+use App\Support\ContentVisibility;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 
@@ -88,25 +88,10 @@ class SitemapController extends Controller
      */
     private function isListable(Topic|Page $node): bool
     {
-        if ($node->is_hidden) {
-            return false;
-        }
-
-        if (AccessControl::effectivePasswordId($node) !== null) {
-            return false;
-        }
-
-        $ancestor = $node instanceof Page ? $node->topic : $node->parent;
-
-        while ($ancestor !== null) {
-            if ($ancestor->is_hidden) {
-                return false;
-            }
-
-            $ancestor = $ancestor->parent;
-        }
-
-        return true;
+        // Lives in ContentVisibility because search asks a version of the
+        // same question, and when the two were written separately they
+        // diverged: this one walked the ancestor chain and search did not.
+        return ContentVisibility::isPubliclyListable($node);
     }
 
     /**

@@ -105,6 +105,27 @@ class PageContentTest extends TestCase
         $this->assertArrayNotHasKey('marks', $clean['content'][0]['content'][0]);
     }
 
+    /**
+     * `//host` was refused and `/\host` was not, although browsers normalise
+     * the two to the same off-site address. Only the site owner writes these,
+     * so this is a mistyped link rather than an attack — but a link that
+     * leaves the site while looking like a path is worth refusing either way.
+     */
+    public function test_a_protocol_relative_link_is_refused_however_it_is_spelled()
+    {
+        foreach (['//evil.example', '/\\evil.example', '/\\/evil.example'] as $href) {
+            $clean = PageContent::sanitise($this->doc([
+                $this->paragraph('x', [['type' => 'link', 'attrs' => ['href' => $href]]]),
+            ]));
+
+            $this->assertArrayNotHasKey(
+                'marks',
+                $clean['content'][0]['content'][0],
+                "{$href} leaves the site and must not survive as a link."
+            );
+        }
+    }
+
     public function test_ordinary_links_are_kept()
     {
         foreach (['https://example.nl/x', 'http://example.nl', 'mailto:docent@school.nl', '/natuurkunde'] as $href) {

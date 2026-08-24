@@ -84,4 +84,12 @@ return [
 
     'x_accel_prefix' => '/__backup/',
 
+    // Whether to hand the bytes to nginx or stream them from PHP. Defaulted
+    // from the media setting so a deployment that turns X-Accel off gets both,
+    // but a *separate* key: MediaStream used to read config('media.x_accel')
+    // for archives too, which made how a backup is transported a property of
+    // the media library. Turning one off for a reason that has nothing to do
+    // with the other is the accident a shared switch invites.
+    'x_accel' => env('BACKUP_X_ACCEL', env('MEDIA_X_ACCEL', true)),
+
 ];

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\PasswordPolicy;
 use App\Support\SiteSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -64,15 +65,13 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
-            : null,
-        );
+        /*
+         * The requirements themselves live in PasswordPolicy, because they
+         * are also rendered on screen as a checklist and two copies of the
+         * same five rules drift. See that class for why production is strict
+         * and why development is not.
+         */
+        Password::defaults(fn (): Password => PasswordPolicy::rule());
     }
 
     /**

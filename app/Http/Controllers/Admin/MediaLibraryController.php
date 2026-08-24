@@ -49,33 +49,45 @@ class MediaLibraryController extends Controller
             // and by the media library service.
             'alt_text' => ['required', 'string', 'max:500'],
         ], [
-            'alt_text.required' => 'Alt-tekst is verplicht bij elke afbeelding.',
+            'alt_text.required' => __('admin.media.alt_required'),
         ]);
 
         $image->update($validated);
 
-        return back()->with('status', 'Afbeelding bijgewerkt.');
+        return back()->with('status', __('admin.media.image_updated'));
     }
 
     public function destroyImage(Image $image): RedirectResponse
     {
         try {
             $image->delete();
+            // Thrown from a `deleting` model event, which PHPStan cannot
+            // see from here — so it reports this catch as dead. It is not:
+            // remove it and "this still has things depending on it" becomes
+            // a 500. The guard lives on the model exactly so that no delete
+            // path can skip it.
+            // @phpstan-ignore catch.neverThrown
         } catch (DependentRecordsExistException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', 'Afbeelding verwijderd.');
+        return back()->with('status', __('admin.media.image_deleted'));
     }
 
     public function destroyFile(MediaFile $mediaFile): RedirectResponse
     {
         try {
             $mediaFile->delete();
+            // Thrown from a `deleting` model event, which PHPStan cannot
+            // see from here — so it reports this catch as dead. It is not:
+            // remove it and "this still has things depending on it" becomes
+            // a 500. The guard lives on the model exactly so that no delete
+            // path can skip it.
+            // @phpstan-ignore catch.neverThrown
         } catch (DependentRecordsExistException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', 'Bestand verwijderd.');
+        return back()->with('status', __('admin.media.file_deleted'));
     }
 }

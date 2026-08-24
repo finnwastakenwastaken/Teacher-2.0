@@ -39,7 +39,13 @@ class AdminAccount
     }
 
     /**
-     * @param  array{name: string, email: string, password: string}  $attributes
+     * The three keys are required, but the shape is written loosely on
+     * purpose: both callers arrive from a validator, which is typed as
+     * returning a plain array. Declaring the exact shape here only moved the
+     * complaint to the call site, where the guarantee is the validation rules
+     * rather than anything the analyser can see.
+     *
+     * @param  array<string, mixed>  $attributes
      *
      * @throws AdminAlreadyClaimedException
      */

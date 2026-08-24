@@ -39,7 +39,7 @@ class ClaimAdminRequest extends FormRequest
             if (! AdminSetupToken::matches($this->input('setup_token'))) {
                 $validator->errors()->add(
                     'setup_token',
-                    __('Deze installatiecode is onjuist.'),
+                    __('auth.claim.setup_token_invalid'),
                 );
             }
         });

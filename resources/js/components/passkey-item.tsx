@@ -10,6 +10,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { t } from '@/lib/i18n';
+
 import type { Passkey } from '@/types/auth';
 
 type Props = {
@@ -64,25 +66,34 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                         className="text-error hover:bg-destructive/10 hover:text-error"
                     >
                         <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Verwijderen</span>
+                        <span className="sr-only">
+                            {t('ui.settings.passkeys.delete_sr')}
+                        </span>
                     </Button>
                 </DialogTrigger>
                 <DialogContent>
-                    <DialogTitle>Passkey verwijderen</DialogTitle>
+                    <DialogTitle>
+                        {t('ui.settings.passkeys.delete')}
+                    </DialogTitle>
                     <DialogDescription>
-                        Weet je zeker dat je de passkey "{passkey.name}" wilt
-                        verwijderen? Je kunt er daarna niet meer mee inloggen.
+                        {t('ui.settings.passkeys.delete_confirm', {
+                            name: `"${passkey.name}"`,
+                        })}
                     </DialogDescription>
                     <DialogFooter className="gap-2">
                         <DialogClose asChild>
-                            <Button variant="secondary">Annuleren</Button>
+                            <Button variant="secondary">
+                                {t('ui.actions.cancel')}
+                            </Button>
                         </DialogClose>
                         <Button
                             variant="destructive"
                             onClick={handleDelete}
                             disabled={isDeleting}
                         >
-                            {isDeleting ? 'Bezig…' : 'Passkey verwijderen'}
+                            {isDeleting
+                                ? t('ui.settings.passkeys.deleting')
+                                : t('ui.settings.passkeys.delete')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

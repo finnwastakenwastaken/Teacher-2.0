@@ -38,7 +38,7 @@ class MediaAccess
             return true;
         }
 
-        return static::isPubliclyReachable($file, $request);
+        return self::isPubliclyReachable($file, $request);
     }
 
     /**
@@ -86,7 +86,7 @@ class MediaAccess
             return true;
         }
 
-        foreach (static::pagesShowing($file) as $page) {
+        foreach (self::pagesShowing($file) as $page) {
             if (AccessControl::allows($page, $request)) {
                 return true;
             }

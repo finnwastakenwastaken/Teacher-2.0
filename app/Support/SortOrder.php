@@ -36,13 +36,13 @@ class SortOrder
 
         if ($records->count() !== count($ids)) {
             throw ValidationException::withMessages([
-                'ids' => 'De volgorde kon niet worden opgeslagen: onbekend onderdeel.',
+                'ids' => __('admin.sort.unknown_group'),
             ]);
         }
 
         if ($groupBy !== null && $records->pluck($groupBy)->unique()->count() > 1) {
             throw ValidationException::withMessages([
-                'ids' => 'Onderdelen kunnen alleen binnen hetzelfde onderdeel worden gesorteerd.',
+                'ids' => __('admin.sort.cross_group'),
             ]);
         }
 

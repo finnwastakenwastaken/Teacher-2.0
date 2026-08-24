@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { extractYouTubeId } from '@/lib/youtube';
+import { t } from '@/lib/i18n';
 
 type Props = {
     onSelect: (videoId: string) => void;
@@ -26,9 +27,7 @@ export function YouTubeDialog({ onSelect, onClose }: Props) {
         const videoId = extractYouTubeId(value);
 
         if (videoId === null) {
-            setError(
-                'Dit is geen geldige YouTube-link. Plak de volledige link of alleen de video-ID.',
-            );
+            setError(t('ui.editor.youtube_dialog.invalid'));
 
             return;
         }
@@ -47,23 +46,21 @@ export function YouTubeDialog({ onSelect, onClose }: Props) {
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>YouTube-video invoegen</DialogTitle>
+                    <DialogTitle>{t('ui.editor.insert_youtube')}</DialogTitle>
                     <DialogDescription>
-                        Plak de link naar de video. Alleen de video-ID wordt
-                        opgeslagen en de video wordt zonder tracking-cookies
-                        getoond.
+                        {t('ui.editor.youtube_dialog.description')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-2">
                     <Label htmlFor="youtube-url">
-                        YouTube-link of video-ID
+                        {t('ui.editor.youtube_dialog.label')}
                     </Label>
                     <Input
                         id="youtube-url"
                         value={value}
                         autoComplete="off"
-                        placeholder="https://www.youtube.com/watch?v=..."
+                        placeholder={t('ui.editor.youtube_dialog.placeholder')}
                         onChange={(event) => {
                             setValue(event.target.value);
                             setError(null);
@@ -82,10 +79,10 @@ export function YouTubeDialog({ onSelect, onClose }: Props) {
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={onClose}>
-                        Annuleren
+                        {t('ui.actions.cancel')}
                     </Button>
                     <Button type="button" onClick={submit}>
-                        Invoegen
+                        {t('ui.editor.youtube_dialog.insert')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

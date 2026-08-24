@@ -10,31 +10,34 @@ import {
     store as confirmStore,
 } from '@/actions/Laravel/Passkeys/Http/Controllers/PasskeyConfirmationController';
 import PasskeyVerify from '@/components/passkey-verify';
+import { t } from '@/lib/i18n';
 
 export default function ConfirmPassword() {
     return (
         <>
-            <Head title="Wachtwoord bevestigen" />
+            <Head title={t('ui.auth.confirm.title')} />
 
             <PasskeyVerify
                 routes={{
                     options: confirmOptions(),
                     submit: confirmStore(),
                 }}
-                label="Bevestigen met een passkey"
-                loadingLabel="Bezig…"
-                separator="Of bevestig met je wachtwoord"
+                label={t('ui.auth.confirm.passkey')}
+                loadingLabel={t('ui.auth.confirm.working')}
+                separator={t('ui.auth.confirm.separator')}
             />
 
             <Form {...store.form()} resetOnSuccess={['password']}>
                 {({ processing, errors }) => (
                     <div className="space-y-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Wachtwoord</Label>
+                            <Label htmlFor="password">
+                                {t('ui.auth.password')}
+                            </Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
-                                placeholder="Wachtwoord"
+                                placeholder={t('ui.auth.password')}
                                 autoComplete="current-password"
                                 autoFocus
                             />
@@ -49,7 +52,7 @@ export default function ConfirmPassword() {
                                 data-test="confirm-password-button"
                             >
                                 {processing && <Spinner />}
-                                Wachtwoord bevestigen
+                                {t('ui.auth.confirm.submit')}
                             </Button>
                         </div>
                     </div>
@@ -60,7 +63,6 @@ export default function ConfirmPassword() {
 }
 
 ConfirmPassword.layout = {
-    title: 'Wachtwoord bevestigen',
-    description:
-        'Dit is een beveiligd onderdeel. Bevestig je wachtwoord om verder te gaan.',
+    title: t('ui.auth.confirm.title'),
+    description: t('ui.auth.confirm.description'),
 };

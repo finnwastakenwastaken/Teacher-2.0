@@ -1,37 +1,43 @@
-import { Form, Head } from '@inertiajs/react';
-import { useRef } from 'react';
+import { Form, Head, usePage } from '@inertiajs/react';
+import { useRef, useState } from 'react';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
+import PasswordRequirements from '@/components/password-requirements';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/security';
+import type { PasswordPolicy } from '@/types';
 import type { Props as ManagePasskeysProps } from '@/components/manage-passkeys';
 import ManagePasskeys from '@/components/manage-passkeys';
 import type { Props as ManageTwoFactorProps } from '@/components/manage-two-factor';
 import ManageTwoFactor from '@/components/manage-two-factor';
+import { t } from '@/lib/i18n';
 
 type Props = {
     passwordRules: string;
+    passwordPolicy: PasswordPolicy;
 } & ManagePasskeysProps &
     ManageTwoFactorProps;
 
 export default function Security(props: Props) {
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
+    const { errorList } = usePage().props;
+    const [password, setPassword] = useState('');
 
     return (
         <>
-            <Head title="Beveiliging" />
+            <Head title={t('ui.settings.security.title')} />
 
-            <h1 className="sr-only">Beveiliging</h1>
+            <h1 className="sr-only">{t('ui.settings.security.title')}</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Wachtwoord wijzigen"
-                    description="Gebruik een lang, uniek wachtwoord. Ben je het kwijt, dan is het commando admin:reset-password op de server de enige manier terug."
+                    title={t('ui.settings.security.password_title')}
+                    description={t('ui.settings.security.password_description')}
                 />
 
                 <Form
@@ -60,7 +66,7 @@ export default function Security(props: Props) {
                         <>
                             <div className="grid gap-2">
                                 <Label htmlFor="current_password">
-                                    Huidig wachtwoord
+                                    {t('ui.settings.security.current_password')}
                                 </Label>
 
                                 <PasswordInput
@@ -69,7 +75,9 @@ export default function Security(props: Props) {
                                     name="current_password"
                                     className="mt-1 block w-full"
                                     autoComplete="current-password"
-                                    placeholder="Huidig wachtwoord"
+                                    placeholder={t(
+                                        'ui.settings.security.current_password',
+                                    )}
                                 />
 
                                 <InputError message={errors.current_password} />
@@ -77,7 +85,7 @@ export default function Security(props: Props) {
 
                             <div className="grid gap-2">
                                 <Label htmlFor="password">
-                                    Nieuw wachtwoord
+                                    {t('ui.settings.security.new_password')}
                                 </Label>
 
                                 <PasswordInput
@@ -86,16 +94,34 @@ export default function Security(props: Props) {
                                     name="password"
                                     className="mt-1 block w-full"
                                     autoComplete="new-password"
-                                    placeholder="Nieuw wachtwoord"
+                                    placeholder={t(
+                                        'ui.settings.security.new_password',
+                                    )}
                                     passwordrules={props.passwordRules}
+                                    aria-describedby="password-requirements"
+                                    value={password}
+                                    onChange={(event) =>
+                                        setPassword(event.target.value)
+                                    }
                                 />
 
-                                <InputError message={errors.password} />
+                                <PasswordRequirements
+                                    id="password-requirements"
+                                    policy={props.passwordPolicy}
+                                    value={password}
+                                />
+
+                                {/* messages, not message — several
+                                    requirements can fail at once. */}
+                                <InputError
+                                    message={errors.password}
+                                    messages={errorList?.password}
+                                />
                             </div>
 
                             <div className="grid gap-2">
                                 <Label htmlFor="password_confirmation">
-                                    Nieuw wachtwoord herhalen
+                                    {t('ui.settings.security.repeat_password')}
                                 </Label>
 
                                 <PasswordInput
@@ -103,7 +129,9 @@ export default function Security(props: Props) {
                                     name="password_confirmation"
                                     className="mt-1 block w-full"
                                     autoComplete="new-password"
-                                    placeholder="Nieuw wachtwoord herhalen"
+                                    placeholder={t(
+                                        'ui.settings.security.repeat_password',
+                                    )}
                                     passwordrules={props.passwordRules}
                                 />
 
@@ -117,7 +145,7 @@ export default function Security(props: Props) {
                                     disabled={processing}
                                     data-test="update-password-button"
                                 >
-                                    Opslaan
+                                    {t('ui.actions.save')}
                                 </Button>
                             </div>
                         </>
@@ -142,7 +170,7 @@ export default function Security(props: Props) {
 Security.layout = {
     breadcrumbs: [
         {
-            title: 'Beveiliging',
+            title: t('ui.settings.security.title'),
             href: edit(),
         },
     ],

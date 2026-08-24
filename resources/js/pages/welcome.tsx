@@ -5,6 +5,7 @@ import type { ContentSummary } from '@/components/content-summary-card';
 import { RichText } from '@/components/content/rich-text';
 import PublicLayout from '@/layouts/public-layout';
 import type { TipTapDoc } from '@/types/tiptap';
+import { t } from '@/lib/i18n';
 
 /*
  * The public homepage: the owner's introduction, then the category grid.
@@ -62,7 +63,7 @@ export default function Welcome({ home, topics, icons }: Props) {
 
             {topics.length === 0 ? (
                 <p className="text-muted-foreground">
-                    Er is nog geen lesmateriaal gepubliceerd.
+                    {t('ui.public.nothing_published')}
                 </p>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

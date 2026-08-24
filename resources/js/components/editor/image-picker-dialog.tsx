@@ -16,54 +16,131 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { images as searchImages } from '@/routes/admin/media/search';
+import { t } from '@/lib/i18n';
+
+type SearchResponse = {
+    images: EditorLibraryImage[];
+    total: number;
+    capped: boolean;
+};
 
 type Props = {
-    images: EditorLibraryImage[];
     maxBytes: number;
+    /**
+     * How many pictures the block being built can hold. A gallery is a batch;
+     * an image beside text is one picture, so ticking a second one replaces
+     * the first rather than adding to it.
+     */
+    multiple?: boolean;
     /** Registers the new image with the editor's library. */
     onUploaded: (record: UploadedRecord) => void;
+    /**
+     * Called once for every already-existing image the owner ticks — never
+     * for an upload, which reaches the library through `onUploaded` instead.
+     * The editor's node views resolve an embed from their own copy of the
+     * library (GrowingEditorLibrary), which only ever held what a page's body
+     * already showed once this dialog stopped receiving the whole library in
+     * its props; picking an image found by search has to register it there
+     * too; or the block just inserted would render as missing until the page
+     * reloads.
+     */
+    onPicked: (image: EditorLibraryImage) => void;
     onSelect: (ulids: string[]) => void;
     onClose: () => void;
 };
 
 /**
- * Images are chosen by eye, so this is a grid — and multi-select, because the
- * block is a gallery: one block can carry several pictures.
+ * Images are chosen by eye, so this is a grid.
  *
  * Mounted only while open (see page-editor.tsx), so its state starts fresh
  * every time without an effect to reset it.
  *
- * Uploading here does not insert anything: the gallery is a batch, so a new
- * image is ticked and joins whatever else is already selected. Nothing reaches
- * the page until "Invoegen".
+ * Uploading here does not insert anything: a new image is ticked and joins
+ * whatever else is already selected. Nothing reaches the page until
+ * "Invoegen".
+ *
+ * `multiple` is one component rather than two, unlike the downloads picker,
+ * because nothing on either side of the click differs: the same grid, the
+ * same uploader, and the same insert-and-close afterwards. Only how many
+ * tiles may be ticked at once changes, and the block that results.
+ *
+ * Searched on the server, the same way resources/js/components/admin/file-picker-list.tsx
+ * searches documents and videos — see the comment there for why. A freshly
+ * uploaded image is prepended to the results locally rather than waiting on
+ * a fresh search: it was just created, so query results that predate it
+ * cannot know about it yet.
  */
 export function ImagePickerDialog({
-    images,
     maxBytes,
+    multiple = true,
     onUploaded,
+    onPicked,
     onSelect,
     onClose,
 }: Props) {
     const [query, setQuery] = React.useState('');
-    const [selected, setSelected] = React.useState<string[]>([]);
+    const [selected, setSelected] = React.useState<EditorLibraryImage[]>([]);
+    const [response, setResponse] = React.useState<SearchResponse | null>(null);
+    const [loading, setLoading] = React.useState(false);
+    // This session's own uploads, kept visible regardless of the current
+    // query — the owner just created them and expects to see them, the same
+    // way the gallery is a batch they are still assembling.
+    const [uploaded, setUploaded] = React.useState<EditorLibraryImage[]>([]);
 
-    const needle = query.trim().toLowerCase();
+    React.useEffect(() => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+            setLoading(true);
 
-    const matches =
-        needle === ''
-            ? images
-            : images.filter(
-                  (image) =>
-                      image.original_filename.toLowerCase().includes(needle) ||
-                      image.alt_text.toLowerCase().includes(needle),
-              );
+            fetch(searchImages.url({ query: { q: query } }), {
+                headers: { Accept: 'application/json' },
+                signal: controller.signal,
+            })
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data: SearchResponse | null) => {
+                    if (data) {
+                        setResponse(data);
+                    }
+                })
+                .catch(() => {
+                    /* aborted or offline; the previous results stay put */
+                })
+                .finally(() => setLoading(false));
+        }, 150);
 
-    const toggle = (ulid: string) => {
-        setSelected((current) =>
-            current.includes(ulid)
-                ? current.filter((entry) => entry !== ulid)
-                : [...current, ulid],
-        );
+        return () => {
+            controller.abort();
+            clearTimeout(timer);
+        };
+    }, [query]);
+
+    const seen = new Set<string>();
+    const matches = [...uploaded, ...(response?.images ?? [])].filter(
+        (image) => {
+            if (seen.has(image.ulid)) {
+                return false;
+            }
+
+            seen.add(image.ulid);
+
+            return true;
+        },
+    );
+
+    const selectedUlids = new Set(selected.map((image) => image.ulid));
+
+    const toggle = (image: EditorLibraryImage) => {
+        if (selectedUlids.has(image.ulid)) {
+            setSelected((current) =>
+                current.filter((entry) => entry.ulid !== image.ulid),
+            );
+
+            return;
+        }
+
+        onPicked(image);
+        setSelected((current) => (multiple ? [...current, image] : [image]));
     };
 
     return (
@@ -77,54 +154,84 @@ export function ImagePickerDialog({
         >
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
-                    <DialogTitle>Afbeeldingen invoegen</DialogTitle>
+                    <DialogTitle>
+                        {multiple
+                            ? t('ui.editor.insert_images')
+                            : t('ui.editor.insert_image_aside')}
+                    </DialogTitle>
                     <DialogDescription>
-                        Kies één of meer afbeeldingen. Ze worden als één
-                        galerijblok ingevoegd, in de volgorde waarin je ze
-                        aanklikt.
+                        {/* The single-image description is where the phone
+                            behaviour is stated: the owner arranges this on a
+                            desktop and would otherwise never see it stack. */}
+                        {multiple
+                            ? t('ui.editor.image_dialog.description')
+                            : t('ui.editor.image_dialog.description_aside')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <MediaUploader
                     compact
                     maxBytes={maxBytes}
-                    title="Nieuwe afbeelding uploaden"
-                    description="Komt in de mediabibliotheek en wordt hier meteen aangevinkt."
+                    title={t('ui.editor.image_dialog.upload_title')}
+                    description={t('ui.editor.image_dialog.upload_description')}
                     onUploaded={(record) => {
                         onUploaded(record);
 
                         if (record.type === 'image') {
-                            setSelected((current) => [...current, record.ulid]);
+                            const image: EditorLibraryImage = {
+                                ulid: record.ulid,
+                                alt_text: record.alt_text,
+                                original_filename: record.original_filename,
+                                url: record.url,
+                            };
+
+                            setUploaded((current) => [image, ...current]);
+                            setSelected((current) =>
+                                multiple ? [...current, image] : [image],
+                            );
 
                             return;
                         }
 
                         toast.info(
-                            `"${record.original_filename}" is geen afbeelding. Voeg hem in met de knop "Bestand invoegen".`,
+                            t('ui.editor.image_dialog.not_an_image', {
+                                name: record.original_filename,
+                            }),
                         );
                     }}
                 />
 
                 <div className="grid gap-2">
-                    <Label htmlFor="image-picker-search">Zoeken</Label>
+                    <Label htmlFor="image-picker-search">
+                        {t('ui.editor.image_dialog.search')}
+                    </Label>
                     <Input
                         id="image-picker-search"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Bestandsnaam of alt-tekst"
+                        placeholder={t(
+                            'ui.editor.image_dialog.search_placeholder',
+                        )}
                         autoComplete="off"
                     />
                 </div>
 
-                {images.length === 0 ? (
+                {response !== null &&
+                matches.length === 0 &&
+                !loading &&
+                query.trim() === '' ? (
                     <p className="text-sm text-muted-foreground">
-                        Er zijn nog geen afbeeldingen. Upload er hierboven een,
-                        of bij Media.
+                        {t('ui.editor.image_dialog.empty')}
                     </p>
                 ) : (
-                    <ul className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
+                    <ul
+                        className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3"
+                        aria-busy={loading}
+                    >
                         {matches.map((image) => {
-                            const position = selected.indexOf(image.ulid);
+                            const position = selected.findIndex(
+                                (entry) => entry.ulid === image.ulid,
+                            );
                             const isSelected = position !== -1;
 
                             return (
@@ -132,7 +239,7 @@ export function ImagePickerDialog({
                                     <button
                                         type="button"
                                         aria-pressed={isSelected}
-                                        onClick={() => toggle(image.ulid)}
+                                        onClick={() => toggle(image)}
                                         className={cn(
                                             'relative w-full overflow-hidden rounded-lg border border-border bg-card text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                                             isSelected && 'ring-2 ring-ring',
@@ -149,7 +256,18 @@ export function ImagePickerDialog({
 
                                         {isSelected && (
                                             <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                                                {position + 1}
+                                                {/* The number is the order the
+                                                    gallery will show them in;
+                                                    with one image there is no
+                                                    order to state. */}
+                                                {multiple ? (
+                                                    position + 1
+                                                ) : (
+                                                    <Check
+                                                        aria-hidden="true"
+                                                        className="size-4"
+                                                    />
+                                                )}
                                             </span>
                                         )}
 
@@ -164,27 +282,33 @@ export function ImagePickerDialog({
                             );
                         })}
 
-                        {matches.length === 0 && (
-                            <li className="text-sm text-muted-foreground">
-                                Geen afbeeldingen gevonden.
-                            </li>
-                        )}
+                        {matches.length === 0 &&
+                            !loading &&
+                            query.trim() !== '' && (
+                                <li className="text-sm text-muted-foreground">
+                                    {t('ui.editor.image_dialog.no_results')}
+                                </li>
+                            )}
                     </ul>
                 )}
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={onClose}>
-                        Annuleren
+                        {t('ui.actions.cancel')}
                     </Button>
                     <Button
                         type="button"
                         disabled={selected.length === 0}
-                        onClick={() => onSelect(selected)}
+                        onClick={() =>
+                            onSelect(selected.map((image) => image.ulid))
+                        }
                     >
                         <Check aria-hidden="true" />
                         {selected.length <= 1
-                            ? 'Invoegen'
-                            : `${selected.length} invoegen`}
+                            ? t('ui.editor.image_dialog.insert')
+                            : t('ui.editor.image_dialog.insert_count', {
+                                  count: selected.length,
+                              })}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -4,6 +4,9 @@ Deze gids is voor jou als eigenaar van de website: de docent die het
 lesmateriaal publiceert. Je hebt geen technische kennis nodig — alles in deze
 gids doe je in de browser.
 
+> Dit is de Nederlandse versie van [administration.md](administration.md).
+> Het is dezelfde gids; een wijziging in de een hoort ook in de ander.
+
 De twee andere gidsen zijn voor degene die de server beheert:
 [installatiegids](installatiegids.md) en
 [onderhoud en beveiliging](onderhoud-en-beveiliging.md).
@@ -24,10 +27,11 @@ De twee andere gidsen zijn voor degene die de server beheert:
 10. [Wachtwoorden](#10-wachtwoorden)
 11. [Verbergen versus verwijderen](#11-verbergen-versus-verwijderen)
 12. [De naam, het logo en de homepage](#12-de-naam-het-logo-en-de-homepage)
-13. [Zoeken](#13-zoeken)
-14. [Back-ups](#14-back-ups)
-15. [Je eigen account](#15-je-eigen-account)
-16. [Veelgestelde vragen](#16-veelgestelde-vragen)
+13. [De taal van de site](#13-de-taal-van-de-site)
+14. [Zoeken](#14-zoeken)
+15. [Back-ups](#15-back-ups)
+16. [Je eigen account](#16-je-eigen-account)
+17. [Veelgestelde vragen](#17-veelgestelde-vragen)
 
 ---
 
@@ -54,7 +58,7 @@ favorieten. Ben je ingelogd, dan verschijnt rechtsboven wél een link
 **Beheer** terug naar het beheerscherm.
 
 **Wachtwoord vergeten?** Er is geen "wachtwoord vergeten"-e-mail. Herstel loopt
-via de server — zie [onderhoud en beveiliging](onderhoud-en-beveiliging.md#wachtwoord-kwijt).
+via de server — zie [onderhoud en beveiliging](onderhoud-en-beveiliging.md#5-wachtwoord-kwijt).
 
 ---
 
@@ -428,7 +432,7 @@ Gebruik dan de knop **YouTube-video invoegen**.
 
 Lukt uploaden via de browser niet, dan kan degene die de server beheert het
 bestand er rechtstreeks op zetten; zie
-[onderhoud en beveiliging](onderhoud-en-beveiliging.md#een-groot-bestand-erop-zetten-zonder-de-browser).
+[onderhoud en beveiliging](onderhoud-en-beveiliging.md#6-een-groot-bestand-erop-zetten-zonder-de-browser).
 Het bestand verschijnt daarna gewoon in je mediabibliotheek.
 
 ---
@@ -549,13 +553,53 @@ dan een link naar de pagina waar het staat.
 Kies logo, favicon en banner uit de mediabibliotheek — upload ze dus eerst onder
 **Media**.
 
+Onderaan hetzelfde scherm staat nog één kopje, **Zoeken**, met de taal waarin
+jij schrijft. Dat is iets anders dan de taal van de knoppen; zie
+[hoofdstuk 13](#13-de-taal-van-de-site).
+
 ---
 
-## 13. Zoeken
+## 13. De taal van de site
+
+De site spreekt Nederlands en Engels. Rechtsonder in het menu — en op de
+openbare site naast het zoekveld — staat een keuzelijstje.
+
+**Alleen de knoppen en de teksten van de site veranderen mee.** Alles wat jij
+schrijft blijft staan zoals je het geschreven hebt: titels van onderwerpen en
+pagina's, omschrijvingen, de namen van je niveaus, de naam van de site en de
+tekst op de homepage. Er is dus geen tweede versie van je lesmateriaal die je
+bij moet houden — dat zou het werk verdubbelen, en dat is niet wat dit is.
+
+Een bezoeker die nog nooit gekozen heeft, krijgt de taal die zijn browser
+vraagt, en anders Nederlands. De keuze wordt in een cookie op zijn eigen
+computer bewaard; de site houdt er niets over bij.
+
+### Taal van je lesmateriaal
+
+Onderaan **Instellingen** staat, onder het kopje *Zoeken*, één keuzelijstje:
+**Taal van je lesmateriaal**. Dat is iets anders dan het lijstje hierboven.
+
+Het gaat over de taal waarin **jij** schrijft, en het bepaalt hoe de
+zoekfunctie woorden herkent. In het Nederlands vindt *krachten* dan ook
+*kracht*; in het Engels vindt *forces* ook *force*. Zet je het verkeerd, dan
+werkt zoeken nog steeds, maar minder goed — vervoegingen worden dan niet meer
+herkend.
+
+Als je het wijzigt, wordt de zoekindex meteen opnieuw opgebouwd. Bij een site
+met veel pagina's duurt dat een paar tellen; je hoeft verder niets te doen.
+
+Schrijf je in beide talen door elkaar, kies dan de taal waarin je het meeste
+schrijft. Er kan er maar één tegelijk gelden: de site slaat per pagina één
+zoekversie op, en die wordt gemaakt op het moment dat je de pagina opslaat.
+
+---
+
+## 14. Zoeken
 
 Bovenaan de site staat een zoekveld (`/zoeken`). Er wordt gezocht in de titel,
-de omschrijving en de tekst van pagina's. Nederlandse vervoegingen worden
-meegenomen, dus *bewegingen* vindt ook *beweging*.
+de omschrijving en de tekst van pagina's. Vervoegingen worden meegenomen, dus
+*bewegingen* vindt ook *beweging* — in de taal die je onder **Instellingen**
+hebt gekozen, zie [hoofdstuk 13](#13-de-taal-van-de-site).
 
 Je kunt een woordgroep tussen aanhalingstekens zetten (`"wet van Ohm"`) en een
 woord uitsluiten met een minteken (`energie -kern`).
@@ -585,7 +629,7 @@ naast twee die er al zijn.
 
 ---
 
-## 14. Back-ups
+## 15. Back-ups
 
 Onder **Back-ups** in het menu links maak je met één knop een kopie van de hele
 site: alle onderwerpen en pagina's, alle instellingen, en elk bestand dat je ooit
@@ -627,7 +671,7 @@ niveau opheffen, of een grote opruimactie in de mediabibliotheek.
 
 ---
 
-## 15. Je eigen account
+## 16. Je eigen account
 
 Via je naam linksonder kom je bij:
 
@@ -642,7 +686,7 @@ nog bij kunnen.
 
 ---
 
-## 16. Veelgestelde vragen
+## 17. Veelgestelde vragen
 
 **Kunnen leerlingen een account maken?**
 Nee. Er bestaat geen registratiescherm en geen tweede account.
@@ -666,5 +710,5 @@ de pagina zelf terwijl je uitgelogd bent — of in een privévenster — om te z
 wat de leerling ziet.
 
 **Ik ben mijn wachtwoord kwijt.**
-Zie [onderhoud en beveiliging](onderhoud-en-beveiliging.md#wachtwoord-kwijt).
+Zie [onderhoud en beveiliging](onderhoud-en-beveiliging.md#5-wachtwoord-kwijt).
 Dat kan alleen op de server, niet per e-mail.

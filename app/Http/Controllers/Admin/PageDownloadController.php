@@ -33,7 +33,7 @@ class PageDownloadController extends Controller
             $download->educationLevels()->sync($validated['education_levels'] ?? []);
         });
 
-        return back()->with('status', 'Download toegevoegd.');
+        return back()->with('status', __('admin.downloads.added'));
     }
 
     public function update(UpdatePageDownloadRequest $request, PageDownload $pageDownload): RedirectResponse
@@ -49,7 +49,7 @@ class PageDownloadController extends Controller
             $pageDownload->educationLevels()->sync($validated['education_levels'] ?? []);
         });
 
-        return back()->with('status', 'Download bijgewerkt.');
+        return back()->with('status', __('admin.downloads.updated'));
     }
 
     public function destroy(PageDownload $pageDownload): RedirectResponse
@@ -59,6 +59,6 @@ class PageDownloadController extends Controller
         // the file, it does not delete it.
         $pageDownload->delete();
 
-        return back()->with('status', 'Download verwijderd.');
+        return back()->with('status', __('admin.downloads.deleted'));
     }
 }
