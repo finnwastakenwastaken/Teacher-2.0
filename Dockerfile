@@ -3,7 +3,7 @@
 # =============================================================================
 # base — PHP runtime shared by every other stage.
 # =============================================================================
-FROM php:8.4-fpm-alpine AS base
+FROM php:8.5-fpm-alpine AS base
 
 COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
 
@@ -159,7 +159,7 @@ CMD ["php-fpm"]
 # web — nginx. Serves static assets directly and streams gated media via
 # X-Accel-Redirect so PHP-FPM workers are never held open by a video.
 # =============================================================================
-FROM nginx:1.29-alpine AS web
+FROM nginx:1.31-alpine AS web
 
 # A template rather than a finished config: the official entrypoint runs
 # envsubst over /etc/nginx/templates/*.template at boot and writes the result
