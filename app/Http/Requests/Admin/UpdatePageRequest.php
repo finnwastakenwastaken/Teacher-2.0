@@ -15,15 +15,11 @@ class UpdatePageRequest extends FormRequest
     }
 
     /**
-     * sort_order is NOT NULL in the database (default 0) so it must never
-     * reach validated() as null — an explicit null in the update payload
-     * overrides the column default and throws.
-     *
-     * Order is set by dragging, so the form does not send this field at all.
-     * Defaulting it to 0 would therefore throw the topic's page order away
-     * every time the owner saved an unrelated edit; the current value is kept
-     * instead. A page moved to a different topic joins the end of that
-     * topic's list, because its old number means nothing there.
+     * sort_order is NOT NULL, so an explicit null in the update payload would
+     * throw. Order is set by dragging and the form never sends this field, so
+     * the current value is kept rather than defaulted to 0 (which would
+     * reshuffle the list on every unrelated edit); a page moved to a
+     * different topic joins the end of that topic's list instead.
      */
     protected function prepareForValidation(): void
     {

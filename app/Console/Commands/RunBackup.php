@@ -8,13 +8,10 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Make one archive containing the database and every uploaded file.
- *
- * Deliberately not scheduled by default. There is no queue worker and no cron
- * in this stack, and a backup that silently stopped running months ago is
- * worse than none — the operator knows they have no backups; they do not know
- * their backups are stale. The maintenance guide shows the host cron line to
- * add, so the schedule lives somewhere the operator can see it.
+ * Make one archive containing the database and every uploaded file. Not
+ * scheduled by default — a backup silently stale for months is worse than
+ * none, so the cron line lives in the maintenance guide where the operator
+ * can see it, not hidden in Laravel's scheduler.
  */
 class RunBackup extends Command
 {
@@ -55,10 +52,8 @@ class RunBackup extends Command
     {
         $keep = $this->option('keep');
 
-        // Nothing is deleted unless asked. A cron line that quietly discarded
-        // the only copy of a year's work because a default said seven is not
-        // a trade this application makes — so the flag is what enables it,
-        // and BACKUP_KEEP only says how many to keep once it is.
+        // Nothing is deleted unless asked — the flag enables pruning,
+        // BACKUP_KEEP only says how many to keep once it is enabled.
         if ($keep === null && ! $this->option('prune')) {
             return;
         }

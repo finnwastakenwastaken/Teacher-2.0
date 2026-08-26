@@ -67,6 +67,29 @@
     --color-chart-4: var(--chart-4);
     --color-chart-5: var(--chart-5);
 
+    /* Education-level accents — a categorical rotation for the downloads
+       section, so a student can find their own track by colour instead of
+       reading every heading.
+
+       DECORATIVE ONLY: a rail and a dot, never a fill carrying text. Every
+       group's level is written next to its accent, so nothing is conveyed by
+       colour alone. That is what keeps these out of the twenty pairs the
+       contrast gate measures — give one a foreground and it belongs in that
+       gate instead.
+
+       These were first written as aliases of --chart-*, on the reasoning that
+       it is already a categorical rotation and already tuned per theme. **That
+       was measured and it was wrong**, which is exactly what §5 says happens
+       when a colour is reasoned about instead of measured: the chart rotation
+       is inconsistent (raw --p-blue but --p-green-deep), and raw --p-blue on
+       the light card is 2.61:1 — a rail you cannot see, which is not a
+       colour code. So they are their own per-theme roles below. */
+    --color-level-1: var(--level-1);
+    --color-level-2: var(--level-2);
+    --color-level-3: var(--level-3);
+    --color-level-4: var(--level-4);
+    --color-level-5: var(--level-5);
+
     --color-sidebar: var(--sidebar);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
@@ -132,8 +155,20 @@
    in that dead band (3.2-4.0:1 either way round). So fills are pushed toward
    the surface and text roles are pushed away from it. This is already noted
    for green and yellow; it applies more widely than the first pass assumed.
+
+   `.theme-light` is not a second theme. It is the light block's own selector
+   applied to a subtree, and it exists so the palette editor can measure this
+   theme without switching the page into it. A custom property's value is
+   substituted where the property is *declared*, so redefining --p-blue on a
+   descendant does nothing to a --primary that was resolved up on :root: the
+   roles have to be re-declared somewhere the candidate palette is in scope.
+   .dark already does that for the dark theme, by being a class; this gives
+   the light theme the same handle. Adding the selector rather than copying
+   the block, because two copies of thirty derivations is exactly the drift
+   this file exists to prevent. See resources/js/lib/palette-contrast.ts.
    ========================================================================= */
-:root {
+:root,
+.theme-light {
     --background: var(--p-grey-50);
     --foreground: var(--p-slate-deep);
 
@@ -194,6 +229,31 @@
     --chart-3: var(--p-green-deep);
     --chart-4: var(--p-yellow-deep);
     --chart-5: var(--p-steel);
+
+    /* Level accents, measured against --card (white — the harder of the two
+       surfaces here) rather than against the page:
+       - level-1 blue ..... 4.86:1
+       - level-2 purple ... 5.18:1
+       - level-3 green .... 4.10:1
+       - level-4 yellow ... 3.47:1   ← the worst case, and why 60% not 70%
+       - level-5 red ...... 7.27:1
+
+       One rule rather than five hand-picked values: every hue at 60% toward
+       --p-navy-deep. The bright palette entries are themselves light, so on a
+       white card they sit at 1.6–2.9:1 raw and the shipped -deep variants are
+       no better for green (2.45) or yellow (1.99). At 70% yellow falls to
+       2.82 and fails, so 60% is the threshold the whole set is pinned to.
+
+       Steel is deliberately not in the rotation. Mixed 40% into navy it is
+       hard to tell from blue in the same mix, and a categorical scale whose
+       two ends look alike is not one. Red takes the fifth slot instead; it
+       carries no judgement about a track, and with four levels seeded it is
+       rarely reached at all. */
+    --level-1: color-mix(in srgb, var(--p-blue) 60%, var(--p-navy-deep));
+    --level-2: color-mix(in srgb, var(--p-purple) 60%, var(--p-navy-deep));
+    --level-3: color-mix(in srgb, var(--p-green) 60%, var(--p-navy-deep));
+    --level-4: color-mix(in srgb, var(--p-yellow) 60%, var(--p-navy-deep));
+    --level-5: color-mix(in srgb, var(--p-red) 60%, var(--p-navy-deep));
 
     --sidebar: var(--p-navy);
     --sidebar-foreground: var(--p-grey-50);
@@ -282,6 +342,30 @@
     --chart-3: var(--p-green);
     --chart-4: var(--p-yellow);
     --chart-5: var(--p-steel);
+
+    /* Level accents, measured against --card — which in this theme is
+       *lighter* than the page, and so the harder of the two surfaces:
+       - level-1 blue ..... 4.30:1
+       - level-2 purple ... 3.94:1
+       - level-3 green .... 5.60:1
+       - level-4 yellow ... 7.02:1
+       - level-5 red ...... 3.93:1
+
+       Mostly the raw hues, because the problem inverts here: what was too
+       light to see on a white card is exactly what reads on this one, so the
+       light block's 60%-toward-navy rule would be precisely backwards.
+
+       **Red is the exception and had to be measured to find it.** Raw --p-red
+       is 2.78:1 here — it is a dark colour, so it fails on a dark surface for
+       the same reason the bright ones fail on a light one. Lifted toward
+       --p-grey-50 until it clears, the same move --error makes in this theme
+       and for the same reason. 70% keeps it visibly red rather than pink, and
+       distinct from level-4 beside it. */
+    --level-1: var(--p-blue);
+    --level-2: var(--p-purple);
+    --level-3: var(--p-green);
+    --level-4: var(--p-yellow);
+    --level-5: color-mix(in srgb, var(--p-red) 70%, var(--p-grey-50));
 
     --sidebar: var(--p-navy-deep);
     --sidebar-foreground: var(--p-grey-50);

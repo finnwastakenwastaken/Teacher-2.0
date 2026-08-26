@@ -1,10 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { FileClock } from 'lucide-react';
 import { Icon } from '@/components/icon';
 import type { IconData } from '@/components/icon';
 import PageController from '@/actions/App/Http/Controllers/Admin/PageController';
 import TopicController from '@/actions/App/Http/Controllers/Admin/TopicController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { confirm } from '@/components/ui/confirm-dialog';
 import { SortableList, SortableRow } from '@/components/admin/sortable-list';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { t } from '@/lib/i18n';
@@ -20,10 +22,17 @@ import { t } from '@/lib/i18n';
 
 type PageSummary = {
     id: number;
-    topic_id: number;
     title: string;
     slug: string;
     is_hidden: boolean;
+    /**
+     * An unpublished concept is waiting on this page.
+     *
+     * Derived on the server from `draft_saved_at`, never from the document —
+     * a page the owner emptied and has not published yet has a concept and a
+     * null body, and reading the body would call that no concept at all.
+     */
+    has_draft: boolean;
 };
 
 type TopicNode = {
@@ -42,8 +51,22 @@ type Props = {
     icons: Record<string, IconData>;
 };
 
-function deleteTopic(topic: TopicNode) {
-    if (!confirm(t('ui.content.confirm_delete', { title: topic.title }))) {
+/*
+ * These two stay module-level functions, which is why the confirmation is a
+ * module-level `confirm()` rather than a hook — see components/ui/confirm-dialog.
+ * The `await` is not decoration: the native confirm() these replaced blocked
+ * the thread, and a version that carried on before the answer arrived would
+ * delete without asking while still looking correct on screen.
+ */
+async function deleteTopic(topic: TopicNode) {
+    const confirmed = await confirm({
+        title: t('ui.content.confirm_delete_title'),
+        description: t('ui.content.confirm_delete', { title: topic.title }),
+        confirmLabel: t('ui.actions.delete'),
+        destructive: true,
+    });
+
+    if (!confirmed) {
         return;
     }
 
@@ -52,8 +75,15 @@ function deleteTopic(topic: TopicNode) {
     });
 }
 
-function deletePage(page: PageSummary) {
-    if (!confirm(t('ui.content.confirm_delete', { title: page.title }))) {
+async function deletePage(page: PageSummary) {
+    const confirmed = await confirm({
+        title: t('ui.content.confirm_delete_title'),
+        description: t('ui.content.confirm_delete', { title: page.title }),
+        confirmLabel: t('ui.actions.delete'),
+        destructive: true,
+    });
+
+    if (!confirmed) {
         return;
     }
 
@@ -172,6 +202,18 @@ function TopicRow({
                                     {page.is_hidden && (
                                         <Badge variant="secondary">
                                             {t('ui.content.hidden')}
+                                        </Badge>
+                                    )}
+                                    {/* Beside the hidden badge, and not a
+                                        variant of it: a page can be published
+                                        and still be carrying writing nobody
+                                        has seen. Deliberately not styled as
+                                        an error — a concept is work in
+                                        progress. */}
+                                    {page.has_draft && (
+                                        <Badge variant="warning">
+                                            <FileClock aria-hidden="true" />
+                                            {t('ui.content.has_draft')}
                                         </Badge>
                                     )}
 

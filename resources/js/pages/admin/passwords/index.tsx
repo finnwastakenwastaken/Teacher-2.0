@@ -4,19 +4,17 @@ import AccessPasswordController from '@/actions/App/Http/Controllers/Admin/Acces
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { confirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { t } from '@/lib/i18n';
 
 /*
- * Named, reusable passwords. One record covers a class's worth of material:
- * apply it to a topic and it guards that whole branch, and a student who
- * enters it once can open everything it guards.
- *
- * The password itself is never shown again after it is set — the server only
- * keeps a hash. Forgetting one means changing it, which is also the moment
- * everybody who already entered the old one has to enter the new one.
+ * Named, reusable passwords: applied to a topic, one guards the whole
+ * branch, and entering it once unlocks everything it guards. Never shown
+ * again after it's set (the server keeps only a hash) — changing it also
+ * invalidates every cookie issued under the old one.
  */
 
 type AccessPassword = {
@@ -55,10 +53,17 @@ function PasswordRow({ password }: { password: AccessPassword }) {
 
     const inUse = password.topicsCount > 0 || password.pagesCount > 0;
 
-    function remove() {
-        if (
-            !confirm(t('ui.passwords.confirm_delete', { name: password.name }))
-        ) {
+    async function remove() {
+        const confirmed = await confirm({
+            title: t('ui.passwords.confirm_delete_title'),
+            description: t('ui.passwords.confirm_delete', {
+                name: password.name,
+            }),
+            confirmLabel: t('ui.actions.delete'),
+            destructive: true,
+        });
+
+        if (!confirmed) {
             return;
         }
 

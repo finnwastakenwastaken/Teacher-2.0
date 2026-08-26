@@ -28,6 +28,7 @@ type Settings = {
     home_subheading: string | null;
     home_banner_image_id: number | null;
     home_content: TipTapDoc | null;
+    privacy_content: TipTapDoc | null;
     content_language: string;
 };
 
@@ -65,6 +66,8 @@ export default function SiteSettingsEdit({
     const [content, setContent] = React.useState<TipTapDoc | null>(
         settings.home_content,
     );
+    const [privacyContent, setPrivacyContent] =
+        React.useState<TipTapDoc | null>(settings.privacy_content);
     const [contentLanguage, setContentLanguage] = React.useState(
         settings.content_language,
     );
@@ -84,7 +87,11 @@ export default function SiteSettingsEdit({
                 <Form
                     {...update.form()}
                     options={{ preserveScroll: true }}
-                    transform={(data) => ({ ...data, home_content: content })}
+                    transform={(data) => ({
+                        ...data,
+                        home_content: content,
+                        privacy_content: privacyContent,
+                    })}
                     className="mt-6 max-w-2xl space-y-10"
                 >
                     {({ errors, processing }) => (
@@ -205,6 +212,34 @@ export default function SiteSettingsEdit({
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         {t('ui.site.text_hint')}
+                                    </p>
+                                </div>
+                            </section>
+
+                            {/* An addition to the privacy page, not the page
+                                itself: what the software records is the
+                                application's own statement and is translated.
+                                This is for what only the owner knows — who to
+                                contact, a school's own policy. */}
+                            <section className="space-y-4">
+                                <h2 className="text-base font-medium">
+                                    {t('ui.site.section_privacy')}
+                                </h2>
+
+                                <div className="grid gap-2">
+                                    <span
+                                        id="privacy-content-label"
+                                        className="text-sm leading-none font-medium"
+                                    >
+                                        {t('ui.site.privacy_text')}
+                                    </span>
+                                    <SimpleTextEditor
+                                        content={privacyContent}
+                                        onChange={setPrivacyContent}
+                                        labelledBy="privacy-content-label"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        {t('ui.site.privacy_text_hint')}
                                     </p>
                                 </div>
                             </section>

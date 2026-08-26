@@ -42,17 +42,11 @@ type Props = {
 };
 
 /*
- * Pick an image from the library, by id.
- *
- * By id rather than by ULID because these are relational writes — a page's
- * hero column and the branding settings — while the page *editor* addresses
- * media by ULID and must never learn the id. Same split as downloads, and the
- * reason there are two image-search endpoints rather than one.
- *
- * Searched on the server, like every other picker in the admin panel (the
- * icon catalogue, the two media pickers): three of these render on the
- * settings screen alone, and shipping the library once per screen put a few
- * hundred images into the payload before anyone had opened a dialog.
+ * Picks an image by id (relational writes — hero column, branding), unlike
+ * the page editor which addresses media by ULID and must never learn the
+ * id — hence two image-search endpoints. Searched server-side like every
+ * admin picker; three of these on the settings screen alone made shipping
+ * the library upfront expensive.
  */
 export function ImageField({
     name,

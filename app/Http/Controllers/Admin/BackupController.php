@@ -31,13 +31,9 @@ class BackupController extends Controller
     }
 
     /**
-     * Make one now.
-     *
-     * Runs inline rather than on a queue, because there is no queue worker in
-     * this stack and adding one is explicitly deferred (the technical reference).
-     * That means a large media library holds this request open for a while —
-     * acceptable for a button one person presses occasionally, and the reason
-     * the front end warns that it can take a few minutes.
+     * Make one now. Runs inline rather than on a queue — there is no queue
+     * worker in this stack (the technical reference) — so a large library holds
+     * this request open for a while; the front end warns it can take minutes.
      */
     public function store(BackupArchive $archive): RedirectResponse
     {

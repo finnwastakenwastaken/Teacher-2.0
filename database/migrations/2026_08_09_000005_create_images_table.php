@@ -26,12 +26,10 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Alt text is required on every image (the technical reference). NOT NULL
-        // alone would still accept an empty string, which is exactly as
-        // useless to a screen reader as no attribute at all — so require
-        // actual content. Also enforced in the Form Request and the
-        // TypeScript type; this is the layer that catches a seeder, a
-        // console command or a future bulk import.
+        // Alt text is required. NOT NULL alone still allows an empty string
+        // (as useless to a screen reader as none), so require real content.
+        // Also enforced in the Form Request and TS type; this layer catches
+        // a seeder or console import.
         DB::statement(
             'alter table images add constraint images_alt_text_not_blank check (length(btrim(alt_text)) > 0)'
         );

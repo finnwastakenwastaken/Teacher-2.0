@@ -13,15 +13,10 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The chunked upload endpoints.
- *
- * A browser cannot send a lecture video in one request: Cloudflare's Free and
- * Pro plans reject any body over 100 MB. So the client slices the file with
- * Blob.slice() and posts ~20 MB at a time, and these four endpoints track
- * that: begin, send each chunk, complete, or abandon.
- *
- * These return JSON rather than Inertia responses — the client is a fetch()
- * loop reporting progress, not a form submission.
+ * The chunked upload endpoints: begin, send each chunk, complete, or abandon.
+ * Cloudflare's Free/Pro plans reject any body over 100 MB, so the client
+ * slices the file with Blob.slice() and posts ~20 MB at a time. These return
+ * JSON, not Inertia — the client is a fetch() loop reporting progress.
  */
 class UploadController extends Controller
 {
@@ -91,20 +86,12 @@ class UploadController extends Controller
 
     /**
      * Everything the caller needs to use the new file without a page reload.
-     *
-     * The page editor uploads into an open editing session and then links the
-     * result straight to the page — as a download attachment, or as an embed
-     * in the body. Both need to know what the file turned out to be, and the
-     * server is the only one that knows: the type comes from sniffing the
-     * assembled bytes, not from what the browser claimed.
-     *
-     * The keys match the shapes `PageController::edit` already sends, so a
-     * record from here can be appended to the editor's library as-is.
-     *
-     * The numeric id is here because attaching a download is a relational
-     * write keyed on it. That is not a leak of the "address media by ULID"
-     * rule: this endpoint is behind `auth`, and public routes still resolve
-     * media by ULID only.
+     * The page editor links the result straight to the page (a download
+     * attachment or a body embed), and only the server knows what the file
+     * turned out to be — sniffed from the assembled bytes. Keys match the
+     * shapes `PageController::edit` sends. The numeric id is here because
+     * attaching a download is a relational write keyed on it; public routes
+     * still resolve media by ULID only.
      *
      * @return array<string, mixed>
      */
@@ -143,13 +130,9 @@ class UploadController extends Controller
     }
 
     /**
-     * An upload belongs to the account that started it.
-     *
-     * Not really a privilege boundary — there is one account, and `auth`
-     * already means the only possible caller is the site owner. Scoped to
-     * the user rather than the session on purpose: a multi-gigabyte upload
-     * can outlive a session rotation, and a session check would leave the
-     * owner unable to finish an upload they legitimately started.
+     * An upload belongs to the account that started it. Scoped to the user
+     * rather than the session: a multi-gigabyte upload can outlive a session
+     * rotation, and a session check would strand it mid-upload.
      */
     private function authoriseUpload(Request $request, MediaUpload $upload): void
     {

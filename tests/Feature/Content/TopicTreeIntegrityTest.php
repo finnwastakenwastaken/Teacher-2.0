@@ -10,12 +10,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Covers the two invariants enforced by the Postgres triggers in
- * 2026_08_09_000003_create_topic_tree_integrity_triggers.php: depth is
- * always derived, never trusted, and slugs are unique among siblings across
- * both topics and pages. These are DB-level, not just application-level, so
- * these tests write through Eloquent without going through a Form Request —
- * the whole point is that the database itself refuses to be corrupted.
+ * Covers the invariants enforced by the Postgres triggers in
+ * 2026_08_09_000003_create_topic_tree_integrity_triggers.php: depth is always
+ * derived, never trusted, and slugs are unique among siblings across topics
+ * and pages. These write through Eloquent with no Form Request, since the
+ * point is that the database itself refuses corruption.
  */
 class TopicTreeIntegrityTest extends TestCase
 {
@@ -24,8 +23,7 @@ class TopicTreeIntegrityTest extends TestCase
     public function test_a_root_topic_has_depth_zero()
     {
         // depth is never fillable — the trigger sets it server-side, so the
-        // in-memory model from create() never received it and must be
-        // re-read to observe it.
+        // model must be re-read after create() to observe it.
         $topic = Topic::query()->create(['title' => 'Natuurkunde', 'slug' => 'natuurkunde']);
 
         $this->assertSame(0, $topic->fresh()->depth);
@@ -70,10 +68,8 @@ class TopicTreeIntegrityTest extends TestCase
         $b = Topic::query()->create(['title' => 'B', 'slug' => 'b', 'parent_id' => $a->id]);
         $target = Topic::query()->create(['title' => 'Target', 'slug' => 'target', 'parent_id' => $b->id]);
 
-        // $b is already at depth 1 with a depth-2 child ($target). Moving $b
-        // under $target would make $target's child (itself, transitively)
-        // exceed the cap — more directly: reparenting $a's other child under
-        // $target pushes it to depth 3.
+        // Reparenting $a's other child under $target (already depth 2) would
+        // push it to depth 3, past the cap.
         $other = Topic::query()->create(['title' => 'Other', 'slug' => 'other', 'parent_id' => $a->id]);
 
         $this->expectException(QueryException::class);

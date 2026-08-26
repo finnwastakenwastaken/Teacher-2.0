@@ -12,11 +12,9 @@ use Inertia\Response;
 class SearchController extends Controller
 {
     /**
-     * How many rows to pull before access filtering. Filtering has to happen
-     * in PHP because whether a page is readable depends on the visitor's
-     * unlock cookies and on walking the topic tree, neither of which belongs
-     * in the query. The site is tens to hundreds of pages, so over-fetching
-     * a little and trimming is cheaper than any of the alternatives.
+     * How many rows to pull before access filtering, which has to happen in
+     * PHP — readability depends on unlock cookies and walking the topic
+     * tree, neither of which belongs in the query.
      */
     private const CANDIDATES = 60;
 
@@ -37,16 +35,10 @@ class SearchController extends Controller
      */
     private function search(string $query, Request $request): array
     {
-        // The query has to be parsed with the same configuration the vector
-        // was built with, or the stemmer disagrees with the index and a page
-        // that plainly contains the word does not come back. Read through
-        // content_search_config() — the function the trigger uses — rather
-        // than interpolating a PHP value, so the two cannot drift and no
-        // configuration name is ever built from a string in this file.
-        //
-        // websearch_to_tsquery parses what people actually type — quoted
-        // phrases, OR, a leading minus — and, unlike to_tsquery, never throws
-        // on punctuation. That matters when the input is a search box.
+        // Parsed with content_search_config() — the same function the trigger
+        // uses — or the stemmer disagrees with the index and a page that
+        // plainly contains the word doesn't come back. websearch_to_tsquery,
+        // unlike to_tsquery, never throws on punctuation from a search box.
         $candidates = Page::query()
             ->select('pages.*')
             // StartSel/StopSel are emptied deliberately: ts_headline wraps
@@ -71,22 +63,15 @@ class SearchController extends Controller
         $results = [];
 
         foreach ($candidates as $page) {
-            // Hidden has to cover ancestors, not just the page. The query
-            // above filters pages.is_hidden, which on its own let every page
-            // under a hidden topic stay fully searchable — title and snippet
-            // included — so hiding a retired subject did not retire it. The
-            // sitemap always walked the chain; this is the same rule, now
-            // from the same function so the two cannot drift again.
+            // Hidden must cover ancestors too — a page under a hidden topic
+            // is otherwise still fully searchable. Shared with the sitemap's
+            // rule via the same function, so the two cannot drift.
             if (! ContentVisibility::isDiscoverable($page)) {
                 continue;
             }
 
-            // A protected page must not appear to someone who cannot open
-            // it — the title and snippet would leak exactly what the
-            // password is there to withhold. It does appear once they have
-            // unlocked it, which is the whole reason they entered it. This
-            // is the visitor-dependent question, deliberately not the
-            // sitemap's visitor-independent one.
+            // A protected page must not appear to a visitor who can't open
+            // it — title and snippet would leak what the password withholds.
             if (! AccessControl::allows($page, $request)) {
                 continue;
             }

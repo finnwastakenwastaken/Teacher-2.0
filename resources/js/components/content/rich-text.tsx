@@ -4,7 +4,10 @@ import { FileTypeIcon } from '@/components/file-type-icon';
 import { formatBytes } from '@/lib/format';
 import { isExternalHref } from '@/lib/href';
 import { cn } from '@/lib/utils';
-import { YOUTUBE_REFERRER_POLICY, youTubeEmbedUrl } from '@/lib/youtube';
+import { EMBED_ALLOW, EMBED_REFERRER_POLICY } from '@/lib/embeds';
+import { SocialEmbedFrame } from '@/components/content/social-embed-frame';
+import { ImageLightbox } from '@/components/content/image-lightbox';
+import { youTubeEmbedUrl } from '@/lib/youtube';
 import type {
     PageMedia,
     PageMediaFile,
@@ -19,23 +22,13 @@ import type {
 import { t } from '@/lib/i18n';
 
 /*
- * The public renderer for a stored page body.
+ * THIS FILE MUST NEVER PRODUCE HTML FROM STORED CONTENT: no
+ * dangerouslySetInnerHTML, no generateHTML()/getHTML(). Rendering is a switch
+ * on node type to React elements, which removes stored XSS as a category.
  *
- * THIS FILE MUST NEVER PRODUCE HTML FROM STORED CONTENT.
- *
- * No dangerouslySetInnerHTML, no generateHTML(), no getHTML(). Page bodies
- * are stored as TipTap JSON precisely so that rendering them is a switch on
- * a node type that returns React elements — text is text, and there is no
- * point at which a string could be interpreted as markup. That is what
- * removes stored XSS as a category instead of trying to sanitise it away.
- *
- * The rules:
- *   - a node type with no case renders nothing;
- *   - a mark with no case is ignored;
- *   - a ULID missing from `media` renders nothing, because the file is gone
- *     and a broken image or a dead link is worse than an absence.
- *
- * The set of cases below matches the whitelist in App\Support\PageContent.
+ * A node/mark with no case renders nothing/is ignored; a ULID missing from
+ * `media` renders nothing (the file is gone — an absence beats a broken
+ * link). Cases below match the whitelist in App\Support\PageContent.
  */
 
 type RichTextProps = {
@@ -52,13 +45,9 @@ export function RichText({ doc, media }: RichTextProps) {
         <div
             className={cn(
                 'max-w-none',
-                // A float has to be contained or it runs past the end of the
-                // body and over whatever follows — on a page, the downloads.
-                // `flow-root` is the containment, but it also stops the first
-                // and last child's margins collapsing out of here, so it is
-                // applied only to a document that actually floats something.
-                // Every page written before this feature existed therefore
-                // renders byte-for-byte as it did.
+                // Contains a float so it doesn't run out over the downloads
+                // below; applied only when something actually floats, since
+                // flow-root also affects margin collapsing.
                 containsAside(doc) && 'flow-root',
             )}
         >
@@ -200,6 +189,14 @@ function RichTextNode({ node, media }: { node: TipTapNode; media: PageMedia }) {
         case 'youtubeEmbed':
             return <YouTubeEmbedNode videoId={node.attrs.videoId} />;
 
+        case 'socialEmbed':
+            return (
+                <SocialEmbedFrame
+                    platform={node.attrs.platform}
+                    postId={node.attrs.postId}
+                />
+            );
+
         case 'imageGallery':
             return <ImageGalleryNode ulids={node.attrs.ulids} media={media} />;
 
@@ -219,13 +216,8 @@ function RichTextNode({ node, media }: { node: TipTapNode; media: PageMedia }) {
     }
 }
 
-/**
- * Alignment as a fixed class, never an interpolated style string.
- *
- * The value is whitelisted server-side, but building `text-${value}` would
- * also defeat Tailwind's static extraction and produce a class that is never
- * compiled — so the mapping is explicit in both directions.
- */
+/** Fixed class map, not `text-${value}` — that would defeat Tailwind's
+ * static extraction and produce a class that was never compiled. */
 function alignmentClass(align: TipTapTextAlign | undefined): string {
     switch (align) {
         case 'center':
@@ -256,14 +248,14 @@ function HeadingNode({
     switch (node.attrs?.level) {
         case 4:
             return (
-                <h4 className={cn('mt-6 mb-2 text-base font-semibold', align)}>
+                <h4 className={cn('mt-6 mb-1 text-lg font-semibold', align)}>
                     {children}
                 </h4>
             );
 
         case 3:
             return (
-                <h3 className={cn('mt-8 mb-2 text-lg font-semibold', align)}>
+                <h3 className={cn('mt-8 mb-2 text-xl font-semibold', align)}>
                     {children}
                 </h3>
             );
@@ -272,7 +264,7 @@ function HeadingNode({
             return (
                 <h2
                     className={cn(
-                        'mt-10 mb-3 text-xl font-semibold tracking-tight',
+                        'mt-10 mb-3 text-2xl font-semibold tracking-tight text-balance',
                         align,
                     )}
                 >
@@ -343,21 +335,71 @@ function FileEmbedNode({ ulid, media }: { ulid: string; media: PageMedia }) {
     }
 
     if (item.kind === 'video') {
-        return (
-            <figure className="clear-both my-6">
-                <video
-                    controls
-                    preload="metadata"
-                    src={item.url}
-                    className="max-h-[70vh] w-full rounded-lg bg-muted"
-                >
-                    {t('ui.public.video_unsupported')}
-                </video>
-            </figure>
-        );
+        return <VideoEmbedNode url={item.url} />;
     }
 
     return <DownloadCard file={item} />;
+}
+
+/*
+ * A self-hosted video, shaped by what it actually is.
+ *
+ * Phone footage is portrait, and a lesson increasingly wants it: a reel a
+ * teacher filmed themselves, a clip of a lab demo. Rendered `w-full` with a
+ * height cap — which is what this did before — a 9:16 video becomes a
+ * full-width box with the picture letterboxed into a narrow strip down the
+ * middle and black bars either side. It reads as broken rather than as a
+ * layout.
+ *
+ * The dimensions are not stored: `media_files` has no width or height, and
+ * getting them at upload time would mean ffprobe in the image for something
+ * the browser already knows. So the element is asked. `preload="metadata"`
+ * was already set — that is exactly the request that answers this — and
+ * `videoWidth`/`videoHeight` are populated by the time `loadedmetadata`
+ * fires.
+ *
+ * Two states rather than an aspect ratio computed per file, because §5
+ * forbids an interpolated class and a real ratio cannot be a fixed class map.
+ * Landscape is also the state it starts in, so the common case never reflows;
+ * only a portrait video moves, and it moves from wrong to right.
+ *
+ * This is also the answer to "can a reel play on the site": for video the
+ * owner has the rights to, yes — from our own nginx, with working scrubbing
+ * and no third party involved at all.
+ */
+function VideoEmbedNode({ url }: { url: string }) {
+    const [isPortrait, setIsPortrait] = React.useState(false);
+
+    return (
+        <figure className="clear-both my-6">
+            <video
+                controls
+                preload="metadata"
+                src={url}
+                onLoadedMetadata={(event) => {
+                    const video = event.currentTarget;
+
+                    // A video whose metadata says 0×0 has told us nothing;
+                    // leave it landscape rather than guessing portrait.
+                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                        setIsPortrait(video.videoHeight > video.videoWidth);
+                    }
+                }}
+                className={cn(
+                    'rounded-lg bg-muted',
+                    isPortrait
+                        ? // Height-led: the width follows the real aspect
+                          // ratio, so there are no bars. `max-w-full` keeps it
+                          // inside the column on a phone, where 70vh of a
+                          // 9:16 video is wider than the page.
+                          'mx-auto max-h-[70vh] w-auto max-w-full'
+                        : 'max-h-[70vh] w-full',
+                )}
+            >
+                {t('ui.public.video_unsupported')}
+            </video>
+        </figure>
+    );
 }
 
 function DownloadCard({ file }: { file: PageMediaFile }) {
@@ -401,9 +443,9 @@ function YouTubeEmbedNode({ videoId }: { videoId: string }) {
                 loading="lazy"
                 allowFullScreen
                 // Without this the player answers with error 153 instead of
-                // the video. See YOUTUBE_REFERRER_POLICY.
-                referrerPolicy={YOUTUBE_REFERRER_POLICY}
-                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                // the video. See EMBED_REFERRER_POLICY.
+                referrerPolicy={EMBED_REFERRER_POLICY}
+                allow={EMBED_ALLOW}
                 className="size-full border-0"
             />
         </figure>
@@ -411,41 +453,22 @@ function YouTubeEmbedNode({ videoId }: { videoId: string }) {
 }
 
 /*
- * One image with the running text beside it.
+ * One image with the running text beside it — but only from the `sm`
+ * breakpoint up. Below it the column is about 343px; a third of that for the
+ * image (~114px) leaves the text a measure of roughly 25 characters, too
+ * narrow to be worth a side-by-side layout, so it stacks as a full-width
+ * block instead, always *above* the text (a float only changes paint order,
+ * never document order, so a screen reader already reads the image first).
  *
- * WHAT "BESIDE" MEANS BELOW 640 px: nothing. It stacks.
- *
- * The float only exists from the `sm` breakpoint up. At 375 px the content
- * column is about 343 px wide; a third of that is 114 px, which is too small
- * to read a diagram, and it leaves the text a measure of roughly twenty-five
- * characters, which is too narrow to read a sentence. Both halves would be
- * worse than either one alone, so the image becomes a full-width block and
- * the text follows underneath it.
- *
- * It stacks *above* the text, never below, and that is not arbitrary: a float
- * changes where a box paints and never where it sits in the document, so a
- * screen reader has always been announcing the image before the paragraph it
- * belongs to. Keeping the phone's visual order equal to the document order
- * means the two agree at every width.
- *
- * `sm` is the same breakpoint the gallery and the download grid already
- * change at, so a page reflows once rather than at three different widths.
- *
- * Everything below is a fixed class map. `float-${side}` would defeat
- * Tailwind's static extraction and emit a class that was never compiled —
- * the same trap text alignment hit.
+ * Fixed class map below, not `float-${side}` — that would defeat Tailwind's
+ * static extraction.
  */
 export const ASIDE_BASE = 'my-6 w-full sm:my-4';
 
 /**
- * `clear-both` is what keeps a float from becoming a bug.
- *
- * A picture taller than the paragraph next to it goes on wrapping whatever
- * comes after — the next heading, a table, a download card — which reads as
- * broken rather than as a layout. So paragraphs and lists wrap, because that
- * is the feature, and every other block clears: headings, blockquotes,
- * tables, the embeds, and an aside itself, so two of them stack instead of
- * fighting over one line.
+ * `clear-both`: a picture taller than its paragraph would otherwise keep
+ * wrapping later blocks (headings, tables, downloads). Paragraphs/lists wrap
+ * on purpose; everything else clears.
  */
 export const ASIDE_SIDE_CLASSES: Record<TipTapAsideSide, string> = {
     left: 'clear-both sm:float-left sm:mr-6',
@@ -471,9 +494,7 @@ function ImageAsideNode({
 }) {
     const image = media[ulid];
 
-    // Deleted, or never published: nothing is drawn, and the text simply runs
-    // full width. The same rule as the gallery — an absence beats a broken
-    // picture.
+    // Deleted or never published: render nothing rather than a broken image.
     if (image === undefined || image.type !== 'image') {
         return null;
     }
@@ -486,13 +507,11 @@ function ImageAsideNode({
                 ASIDE_SIZE_CLASSES[size ?? 'medium'],
             )}
         >
-            <img
-                src={image.url}
-                alt={image.alt}
-                width={image.width ?? undefined}
-                height={image.height ?? undefined}
-                loading="lazy"
-                className="h-auto w-full rounded-lg border border-border bg-muted object-contain"
+            {/* A set of one: it enlarges like any other picture on the page,
+                and draws no arrows because there is nowhere to go. */}
+            <ImageLightbox
+                images={[image]}
+                imageClassName="rounded-lg border border-border bg-muted object-contain"
             />
         </figure>
     );
@@ -526,19 +545,14 @@ function ImageGalleryNode({
                     : 'clear-both my-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3'
             }
         >
-            {images.map((image, index) => (
-                <img
-                    key={`${index}-${image.url}`}
-                    src={image.url}
-                    // The stored alt text, never invented and never omitted:
-                    // every image in this system has one by construction.
-                    alt={image.alt}
-                    width={image.width ?? undefined}
-                    height={image.height ?? undefined}
-                    loading="lazy"
-                    className="h-auto w-full rounded-lg border border-border bg-muted object-contain"
-                />
-            ))}
+            {/* The gallery is the set the arrows move through: opening the
+                third picture and pressing → reaches the fourth, rather than
+                making a student close this one and find the next. The alt
+                text is carried into the enlarged view by ImageLightbox. */}
+            <ImageLightbox
+                images={images}
+                imageClassName="rounded-lg border border-border bg-muted object-contain"
+            />
         </figure>
     );
 }

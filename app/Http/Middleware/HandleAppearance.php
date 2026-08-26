@@ -21,21 +21,17 @@ class HandleAppearance
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Dark is the site default, so a visitor with no stored preference is
-        // served dark markup from the very first byte. Keep this in sync with
-        // DEFAULT_APPEARANCE in resources/js/hooks/use-appearance.tsx —
-        // a mismatch shows up as a visible flash on first paint.
+        // Dark is the site default; keep this in sync with
+        // DEFAULT_APPEARANCE in resources/js/hooks/use-appearance.tsx or a
+        // mismatch flashes on first paint.
         //
-        // Validated here rather than trusted at the point of use. This cookie
-        // is set by JavaScript, is in the encryptCookies exception list, and
-        // is therefore neither signed nor encrypted: it is whatever the
-        // browser says it is. It then lands inside a JavaScript string
-        // literal in app.blade.php, where Blade's {{ }} applies *HTML*
-        // escaping — the wrong context. Entities are not decoded inside
-        // <script>, so quote-breakout was blocked, but htmlspecialchars does
-        // not touch a backslash: a value ending in one escaped the closing
-        // quote and turned the whole first-paint script into a parse error.
-        // It is an enum of three values, so treat it as one.
+        // Validated rather than trusted: this cookie is JS-set, unsigned and
+        // unencrypted, then lands inside a JS string literal in
+        // app.blade.php where Blade's {{ }} applies HTML escaping — the
+        // wrong context. htmlspecialchars doesn't touch a backslash, so a
+        // value ending in one broke out of the quote and threw a parse
+        // error in the first-paint script. Treat it as the enum of three
+        // values it is.
         $appearance = $request->cookie('appearance');
 
         View::share('appearance', in_array($appearance, self::APPEARANCES, true)

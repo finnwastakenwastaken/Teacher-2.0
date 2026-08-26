@@ -9,31 +9,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 /**
- * The single authorisation decision for every byte of uploaded media.
- *
- * The technical reference calls this the "no side door" guarantee: a file attached to a
- * hidden or password-protected page must not be fetchable by guessing its
- * URL. Every path that hands out media bytes goes through allows() first —
- * there is deliberately no second route, no public disk, and no signed-URL
- * escape hatch (see the comment on the `local` disk in config/filesystems.php
- * for why Laravel's own /storage/{path} routes are switched off).
- *
- * The default answer is NO.
- *
- * The failure directions are not symmetric. Fail-closed means a forgotten
- * wiring shows up as a student reporting a broken download — visible, and
- * fixed in minutes. Fail-open means material intended for one class is
- * quietly readable by anyone who guesses a URL, and nobody finds out.
+ * The single authorisation decision for every byte of uploaded media — what
+ * The technical reference calls the "no side door" guarantee: a file on a hidden or
+ * password-protected page
+ * must not be fetchable by guessing its URL. Every path that serves media
+ * goes through allows() first; there is no second route, no public disk, no
+ * signed-URL escape hatch (see `local` disk notes in config/filesystems.php).
+ * Default answer is NO — fail-closed, because fail-open means a leak nobody
+ * notices, while fail-closed is just a broken download someone reports.
  */
 class MediaAccess
 {
     public static function allows(Image|MediaFile $file, Request $request): bool
     {
-        // Any authenticated user is the administrator. There is exactly one
-        // account, registration does not exist at any layer, and the account
-        // cannot be deleted (security invariants 1 and 2), so authentication
-        // is sufficient here — the admin must be able to preview everything
-        // in the media library, including files not yet placed on a page.
+        // Any authenticated user is the admin (one account, no registration —
+        // §3.1/§3.2), who must be able to preview unplaced library files too.
         if ($request->user() !== null) {
             return true;
         }
@@ -42,46 +32,27 @@ class MediaAccess
     }
 
     /**
-     * Whether an anonymous visitor may see this file.
+     * Whether an anonymous visitor may see this file: published (some page
+     * embeds it or offers it as a download) AND that page is one this
+     * visitor may open. Until something points at it, a file is private
+     * regardless of its URL.
      *
-     * A file is published exactly when some page shows it — its body embeds
-     * it, or it is offered in its downloads section — *and* that page is one
-     * this visitor may actually open. Until something points at it, a file is
-     * private no matter what its URL is, which is what makes uploading to the
-     * library a safe thing to do.
-     *
-     * The two ways a page can show a file are checked separately on purpose.
-     * Page embeds live in `page_media_references`, derived data rebuilt
-     * wholesale every time a body is saved; download attachments are authored
-     * rows that must survive body edits. Folding downloads into the derived
-     * table would mean the next save of the page body deleted them.
-     *
-     * ANY reachable page is enough. A worksheet used both in a protected
-     * class page and on an open revision page is public — it is already
-     * published, and refusing it via one URL while serving it via another
-     * protects nothing. This is why passwords guard *pages*, not files.
-     *
-     * Hidden pages count as reachable. A hidden page is a draft or retired
-     * page, removed from menus, the homepage grid and search, but it still
-     * renders at its direct URL (the technical reference, "Hidden ≠ deleted"). Excluding
-     * its media would mean the page still loads for anyone holding the link
-     * but with every image broken and every download refused — a preview
-     * that does not show what it will look like. Hidden controls
-     * discoverability, not secrecy. Secrecy is what passwords are for.
+     * Embeds (`page_media_references`, rebuilt on every body save) and
+     * download attachments (authored rows) are checked separately — folding
+     * downloads into the derived table would delete them on the next body
+     * save. ANY reachable page is enough: a file already public via one page
+     * cannot be made private via another, which is why passwords guard
+     * *pages*, not files. Hidden pages count as reachable — hidden means
+     * "not in menus/search", not "secret" (see the technical reference, "Hidden ≠
+     * deleted"); excluding their media would render a broken preview instead
+     * of a working one. Secrecy is what passwords are for.
      */
     private static function isPubliclyReachable(Image|MediaFile $file, Request $request): bool
     {
-        // Branding — the logo, the favicon, the homepage banner. These are
-        // the one category of media that is not reached through a page at
-        // all: the logo renders in the header of every screen including the
-        // login form, and the favicon is fetched by the browser with no
-        // page context whatsoever. Refusing them would break the chrome of
-        // the site for every anonymous visitor.
-        //
-        // This is a deliberate third case, not a loophole. It is as narrow
-        // as the others: an image is public here only while a branding
-        // setting actually points at it, and clearing that setting makes it
-        // private again on the next request. Never widen it to "any image".
+        // Branding (logo/favicon/homepage banner) is the one media category
+        // not reached through a page — the logo renders on the login screen
+        // itself. Deliberate third case, as narrow as the others: public only
+        // while a branding setting points at it. Never widen to "any image".
         if ($file instanceof Image && in_array($file->id, SiteSettings::brandingImageIds(), true)) {
             return true;
         }
@@ -107,10 +78,14 @@ class MediaAccess
     {
         $pageIds = $file->pageReferences()->pluck('page_id');
 
-        // Only media files can be offered as downloads; images are embedded.
-        if ($file instanceof MediaFile) {
-            $pageIds = $pageIds->concat($file->pageDownloads()->pluck('page_id'));
-        }
+        // Either library can be offered in a page's downloads section — a
+        // worksheet as a PDF, a poster or a scanned handout as an image, and
+        // the same picture can legitimately be both embedded and offered.
+        // Both arms land here rather than in a case of their own in
+        // isPubliclyReachable(), so an image handed out on a protected page
+        // inherits that page's password through the same AccessControl walk
+        // as everything else on it, with no second rule to keep in step.
+        $pageIds = $pageIds->concat($file->pageDownloads()->pluck('page_id'));
 
         // A hero image is shown by exactly one page and is subject to that
         // page's password like anything else on it, so it resolves through

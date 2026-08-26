@@ -10,23 +10,16 @@ use Illuminate\Http\Request;
 
 /**
  * Search over the two media libraries, for the pickers on the page editor.
+ * Same shape as App\Http\Controllers\Admin\IconController and for the same
+ * reason: a picker asks for a page of matches rather than holding the whole
+ * library in the Inertia payload. Behind `auth` — metadata only, never the
+ * gated byte stream App\Support\MediaAccess decides.
  *
- * Same shape as App\Http\Controllers\Admin\IconController, for the same
- * reason: at a few hundred files the whole library is hundreds of kilobytes
- * before the owner has typed anything, so a picker asks for a page of
- * matches instead of holding the lot in the Inertia payload. Behind `auth`
- * like every other admin JSON endpoint — this hands back metadata only, never
- * the gated byte stream App\Support\MediaAccess is the single decision for.
- *
- * **`q` is `nullable`, and that is not defensiveness.** A picker fetches once
- * on opening, before anything has been typed, so the browser sends `?q=` —
- * and ConvertEmptyStringsToNull turns that into null before validation runs.
- * `sometimes` does not help: the key is present, it is only its value that is
- * empty, so `string` rejects it and the first search of every dialog answered
- * 422. The failure is silent in exactly the wrong way: the grid renders
- * nothing at all, not even its "no images yet" line, and typing one character
- * fixes it. It survived because every spec typed a term straight away and the
- * 150ms debounce cancelled the empty search before it was ever sent.
+ * **`q` is `nullable`, deliberately.** A picker's first fetch sends `?q=`,
+ * which ConvertEmptyStringsToNull turns into null before validation —
+ * `sometimes` doesn't help since the key is present, only empty. Without
+ * `nullable` the first search of every dialog 422s and the grid renders
+ * nothing, not even "no images yet".
  */
 class MediaSearchController extends Controller
 {
@@ -85,11 +78,20 @@ class MediaSearchController extends Controller
     {
         $request->validate([
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
+            // Same comma-separated shape as files() below, and for the same
+            // caller: the downloads section offers only what is not already
+            // attached to this page, and now an image can be attached too.
+            'exclude' => ['sometimes', 'nullable', 'string', 'regex:/\A[0-9,]*\z/'],
         ]);
 
         $query = trim($request->string('q')->toString());
+        $exclude = self::parseIds($request->string('exclude')->toString());
 
         $builder = Image::query();
+
+        if ($exclude !== []) {
+            $builder->whereNotIn('id', $exclude);
+        }
 
         if ($query !== '') {
             $needle = self::escapeLike($query);

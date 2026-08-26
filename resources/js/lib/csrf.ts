@@ -1,11 +1,8 @@
 /*
- * CSRF for hand-rolled fetch() calls.
- *
- * Inertia's router adds the token itself, but the chunked upload endpoints
- * return JSON rather than an Inertia response, so they are driven by fetch()
- * and have to carry the header on their own. Laravel's VerifyCsrfToken reads
- * X-XSRF-TOKEN and expects the *decrypted* cookie value, so the cookie has to
- * be URL-decoded first — sending it raw yields a 419.
+ * CSRF for hand-rolled fetch() calls (Inertia's router handles its own; the
+ * chunked upload endpoints return JSON, so they use fetch() directly).
+ * VerifyCsrfToken expects the *decrypted* cookie value — sending it raw
+ * yields a 419.
  */
 
 export function csrfToken(): string {

@@ -14,12 +14,9 @@ import { index as iconsIndex } from '@/routes/admin/icons';
 import { t } from '@/lib/i18n';
 
 /*
- * The catalogue is generated from the icon packages' own exported data by
- * scripts/build-icon-catalogue.mjs and searched on the server — never a
- * hand-written list (the technical reference; v1 rendered blank tiles from guessed
- * names). It holds roughly fifteen thousand icons across four libraries, far
- * too many to ship to the browser, so this dialog asks for a page at a time
- * and each result arrives with the geometry needed to draw it.
+ * The catalogue (~15,000 icons, four libraries) is generated and searched
+ * server-side, never a hand-written list (the technical reference) — too many to ship
+ * to the browser, so this dialog fetches a page at a time with geometry.
  */
 
 type IconResult = IconData & {
@@ -60,10 +57,9 @@ export function IconPicker({
     const [response, setResponse] = useState<SearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // Keep the chosen icon drawable after the dialog closes. The server only
-    // supplies geometry for the value the page loaded with, so a fresh pick
-    // has to remember what it saw in the results — derived rather than mirrored
-    // into state, so a later server value cannot be shadowed by a stale pick.
+    // Remembers a fresh pick's geometry (the server only supplies it for the
+    // value the page loaded with); derived so a stale pick can't shadow a
+    // later server value.
     const [picked, setPicked] = useState<{
         key: string | null;
         icon: IconData | null;

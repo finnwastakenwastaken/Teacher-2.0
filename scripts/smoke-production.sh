@@ -7,31 +7,26 @@
 #   SMOKE_PROJECT=teacher     compose project name to inspect
 #   SMOKE_MEDIA_URL=/downloads/…   probe this gated file instead of discovering one
 #
-# There is a category of bug that neither test suite in this project can see,
-# and it has already caused one outage. Both suites run against the
-# *development* target, which runs as root from a bind mount. Production runs
-# as www-data from a baked image with named volumes, and the differences are
-# exactly where things break: a directory missing from the image becomes a
-# root-owned mount point the application cannot write to, a file mode that is
-# fine for the owner is unreadable by nginx, and opcache serves whatever it
-# loaded first. All of that is invisible to a green suite.
+# Neither test suite can see this class of bug — both run the development
+# target (root, bind mount), while production runs as www-data from a baked
+# image with named volumes. That's exactly where things break: a directory
+# missing from the image becomes an unwritable root-owned mount point, a file
+# mode fine for the owner is unreadable by nginx, opcache serves whatever it
+# loaded first. This asks those questions against a real production boot, over
+# HTTP and `docker exec`, and asserts rather than prints. Run it after
+# touching disk config, the web image, the entrypoint, or a volume mount
+# point.
 #
-# So this asks the questions only a production boot can answer, over HTTP and
-# over `docker exec`, and it asserts rather than prints. Run it after touching
-# disk configuration, the web image, the entrypoint, or a volume mount point.
-#
-# It is safe to run against a live site: it writes one backup archive and
-# deletes it again, and otherwise only reads.
+# Safe against a live site: writes one backup archive and deletes it again,
+# otherwise only reads.
 
 set -uo pipefail
 
 readonly BASE_URL="${1:-http://127.0.0.1:8080}"
 readonly PROJECT="${SMOKE_PROJECT:-teacher}"
 
-# Paths the application must be able to write to. Every one of these is a
-# named-volume mount point in compose.yaml, which is what makes them worth
-# checking: a mount point that does not exist in the image is created by
-# Docker as root, and the container does not run as root.
+# Named-volume mount points from compose.yaml: one missing from the image gets
+# created root-owned by Docker, and the container doesn't run as root.
 readonly WRITABLE_PATHS=(
     storage/app/private
     storage/app/backups
@@ -297,13 +292,9 @@ discover_media_url() {
     while read -r page; do
         [[ -n "$page" ]] || continue
 
-        # The link is in the Inertia payload rather than the markup — pages
-        # render client-side — and JSON escapes every slash, so the document
-        # actually contains `downloads\/01ARZ…`. Rather than unescaping, match
-        # the ULID itself: 26 characters of uppercase Crockford base32, which
-        # is how this application addresses media publicly. That shape is also
-        # what keeps `downloads_description` in the shipped dictionary from
-        # matching, which a looser pattern does.
+        # The link lives in the Inertia JSON payload (slashes escaped), so
+        # match the 26-char Crockford-base32 ULID itself rather than
+        # unescaping — also avoids false-matching `downloads_description`.
         match="$(curl -s "$page" \
             | grep -o 'downloads[^0-9A-Za-z]\{1,2\}[0-9A-Z]\{26\}' \
             | head -n1)"

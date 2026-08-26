@@ -7,21 +7,15 @@ return [
     | X-Accel-Redirect
     |--------------------------------------------------------------------------
     |
-    | When true, the gated media controller authorises the request and then
-    | hands the actual byte-pushing to nginx via an X-Accel-Redirect header,
-    | pointing at the `internal` /__media/ location in docker/nginx/app.conf.
-    | This is the whole reason the stack runs nginx + PHP-FPM instead of
-    | FrankenPHP: streaming a 500 MB video through a PHP worker would occupy
-    | that worker for the entire playback, and a class of thirty students
-    | would exhaust the pool.
+    | When true, the controller authorises the request then hands streaming
+    | to nginx via X-Accel-Redirect (the `internal` /__media/ location) — this
+    | is why the stack runs nginx + PHP-FPM rather than FrankenPHP, since
+    | streaming large video through a PHP worker would occupy it for the
+    | whole playback and exhaust the pool.
     |
-    | Turning this off makes PHP stream the file itself. That path exists so
-    | the test suite can assert on real response bodies (there is no nginx in
-    | front of the test runner) and so a bare `artisan serve` is not silently
-    | broken. It is NOT supported in production — see the technical reference.
-    |
-    | Authorisation happens before this branch either way, so the two paths
-    | can never disagree about who is allowed to see a file.
+    | Off, PHP streams the file itself — only for the test suite (no nginx in
+    | front of it) and `artisan serve`; NOT supported in production (the technical reference
+    | section 4). Authorisation happens before this branch either way.
     |
     */
 
@@ -77,10 +71,9 @@ return [
     | Accepted types
     |--------------------------------------------------------------------------
     |
-    | Keyed by the MIME type detected *server-side* from the assembled file's
-    | contents. The client's declared type and the client's filename
-    | extension are both untrusted and never used to choose a storage path —
-    | the extension below is what gets written to disk.
+    | Keyed by the MIME type detected server-side from the assembled file's
+    | contents — the client's declared type/filename are untrusted and never
+    | used to choose a storage path.
     |
     */
 
@@ -122,13 +115,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Extension aliases
+    |--------------------------------------------------------------------------
+    |
+    | Extensions that are accepted but are not the one written to disk, so
+    | they cannot be read off the table above. They matter in two places and
+    | both have to agree: App\Services\MediaLibrary falls back to the filename
+    | when content sniffing is ambiguous, and App\Support\MediaFormats tells
+    | the uploader what a teacher may drop in. Listing `.jpeg` in only one of
+    | those is how the screen ends up under-stating what the server takes.
+    |
+    */
+
+    'extension_aliases' => [
+        'jpeg' => 'image/jpeg',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SVG
     |--------------------------------------------------------------------------
     |
-    | SVG is XML and can carry <script>. These files are only ever served
-    | from the gated controller with Content-Disposition: attachment and a
-    | restrictive CSP, never inlined into a page, so a hostile SVG cannot run
-    | in the site's origin. Set to false to refuse them outright.
+    | SVG is XML and can carry <script>, but these are only ever served with
+    | Content-Disposition: attachment and a restrictive CSP, never inlined —
+    | so a hostile SVG can't run in the site's origin. Set false to refuse.
     |
     */
 
@@ -139,20 +149,12 @@ return [
     | Images: conversion and compression
     |--------------------------------------------------------------------------
     |
-    | Every raster image is re-encoded to WebP as it enters the library, by
-    | App\Services\ImageOptimiser. Two reasons, and the first one is not
-    | optional: a photo off an iPhone is HEIC, which no browser can display,
-    | so a page carrying one would simply show nothing. The second is size —
-    | a teacher uploads what the camera produced, and a 4 MB photo behind a
-    | Cloudflare tunnel is a slow page on a school wifi.
-    |
-    | SVG is left alone (it is vector, and re-encoding it to a raster format
-    | would be a downgrade), and so is an animated GIF, because flattening it
-    | to a single frame would silently destroy it.
-    |
-    | An image larger than `max_bytes` after conversion is downscaled and
-    | re-encoded at stepping quality until it fits or `min_quality` is
-    | reached. Nothing is ever enlarged.
+    | Every raster image is re-encoded to WebP on the way in, by
+    | App\Services\ImageOptimiser. Not optional: an iPhone photo is HEIC,
+    | which no browser displays. Also reduces size for slow school wifi.
+    | SVG (vector) and animated GIF (would flatten to one frame) are left
+    | alone. Oversized images are downscaled/re-encoded at stepping quality
+    | until they fit or `min_quality` is reached; never enlarged.
     |
     */
 
@@ -169,16 +171,12 @@ return [
         'quality' => (int) env('MEDIA_IMAGE_QUALITY', 82),
         'min_quality' => (int) env('MEDIA_IMAGE_MIN_QUALITY', 50),
 
-        // Ceiling for ImageMagick's pixel cache, in bytes. A 48 MP photo
-        // decodes to roughly 200 MB of pixels.
-        //
-        // This is *not* governed by PHP's memory_limit: the cache is
-        // allocated by ImageMagick in C and PHP never counts it. So the
-        // limit is what keeps a large photo from taking the container's RAM
-        // instead — past it, ImageMagick spills to disk and gets slow rather
-        // than failing. Budget it against the number of PHP-FPM workers, not
-        // against memory_limit: two simultaneous uploads can each want this
-        // much, on a box the install guide only asks to have 4 GB.
+        // Ceiling for ImageMagick's pixel cache (a 48 MP photo decodes to
+        // ~200 MB). Not governed by PHP's memory_limit — ImageMagick
+        // allocates this in C — so it's what keeps a large photo from
+        // eating container RAM; past it, ImageMagick spills to disk instead
+        // of failing. Budget against PHP-FPM worker count, not memory_limit:
+        // simultaneous uploads each want this much on a 4 GB box.
         'memory_limit_bytes' => (int) env('MEDIA_IMAGE_MEMORY_BYTES', 512 * 1024 * 1024),
     ],
 

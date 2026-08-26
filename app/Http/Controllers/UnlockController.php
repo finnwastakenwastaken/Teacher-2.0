@@ -41,20 +41,12 @@ class UnlockController extends Controller
             return back();
         }
 
-        // Two buckets, because they bound different things.
-        //
-        // Per IP and per password: one class hammering their own password
-        // must not lock a different class out of theirs. This is the one that
-        // keeps the feature usable. It relies on trustProxies (the technical reference
-        // invariant 5) and on nginx overwriting X-Forwarded-For, or a visitor
-        // supplies their own address and the bucket count is unbounded.
-        //
-        // Per password, whoever is asking: the backstop. A per-IP limit
-        // multiplies linearly with addresses, and addresses are cheap — so on
-        // its own it bounds one attacker's rate rather than the total. This
-        // one caps the search itself. It is set well above what a whole class
-        // getting it wrong looks like, so the only thing it can realistically
-        // stop is a machine.
+        // Two buckets. Per IP+password: one class hammering their own
+        // password must not lock out a different class — relies on
+        // trustProxies (the technical reference), or a visitor forges their own
+        // address and the bucket is unbounded. Per password alone: the
+        // backstop, since a per-IP limit alone scales with cheap addresses.
+        // Set well above what a whole class getting it wrong looks like.
         $perMinute = (int) config('access.attempts_per_minute');
 
         $keys = [

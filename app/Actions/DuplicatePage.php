@@ -29,12 +29,9 @@ class DuplicatePage
                 'description' => $page->description,
                 'hero_image_id' => $page->hero_image_id,
                 'access_password_id' => $page->access_password_id,
-                // A duplicate starts hidden. It is by definition a page that
-                // says exactly what another page already says, so publishing
-                // it the moment it exists puts two identical pages in front of
-                // students — and the reason to duplicate is to then change it.
-                // Hiding is reversible with one checkbox; an accidental
-                // publication has already been seen.
+                // A duplicate starts hidden: publishing it immediately puts
+                // two identical pages in front of students, and the point of
+                // duplicating is to change it first.
                 'is_hidden' => true,
                 'sort_order' => $this->endOfList($page->topic_id),
             ]);
@@ -62,7 +59,11 @@ class DuplicatePage
         foreach ($page->downloads()->with('educationLevels')->get() as $download) {
             /** @var PageDownload $attachment */
             $attachment = $copy->downloads()->create([
+                // Whichever of the two the original named, and only that one:
+                // the CHECK constraint refuses an attachment carrying both,
+                // so copying them as a pair is not merely untidy.
                 'media_file_id' => $download->media_file_id,
+                'image_id' => $download->image_id,
                 'label' => $download->label,
                 'sort_order' => $download->sort_order,
             ]);

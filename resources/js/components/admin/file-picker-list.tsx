@@ -9,22 +9,12 @@ import { files as searchFiles } from '@/routes/admin/media/search';
 import { t } from '@/lib/i18n';
 
 /*
- * The searchable list of documents and videos both file pickers are built on.
- *
- * Shared because recognising a file by name behaves the same everywhere; what
- * happens once one is picked does not. The editor drops an embed at the caret
- * and the downloads section collects a label and creates a row, so each caller
- * keeps its own footer and only the list lives here.
- *
- * Documents and videos are chosen by name, so this is a list rather than the
- * grid the image picker uses — the opposite choice, deliberately.
- *
- * Searched on the server rather than filtered over a prop, the same way the
- * icon picker searches ~15,000 icons instead of holding them in the browser
- * (the technical reference): at a few hundred files the whole library is hundreds of
- * kilobytes before anyone has typed anything, so this asks
- * App\Http\Controllers\Admin\MediaSearchController for a page of matches
- * instead.
+ * The searchable list both file pickers build on — shared because picking a
+ * file by name behaves the same everywhere, but what happens after differs
+ * (embed vs. download row), so each caller keeps its own footer. A list, not
+ * a grid, since documents/videos are chosen by name. Searched server-side
+ * (MediaSearchController) rather than shipped to the browser, the same
+ * reasoning as the icon picker (the technical reference).
  */
 
 /** All a row needs of a file. Both callers hand over rather more than this. */

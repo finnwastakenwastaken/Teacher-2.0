@@ -10,14 +10,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * The columns, for static analysis.
- *
- * Eloquent resolves these at runtime, so nothing here changes behaviour —
- * but without them every `$model->column` is an undefined property to
- * PHPStan, and a genuine typo becomes indistinguishable from a hundred
- * false ones. Keep in step with the migrations: a column added without a
- * line here is invisible to the analyser, and a line here without a column
- * is a lie it will believe.
+ * Columns below are for PHPStan; keep them in step with the migrations or
+ * the analyser misses typos and believes stale ones.
  *
  * @property int $id
  * @property string $ulid
@@ -69,11 +63,9 @@ class MediaUpload extends Model
     }
 
     /**
-     * No null check: `expires_at` is NOT NULL and MediaLibrary::begin() is
-     * the only thing that creates one of these. Guarding against null read as
-     * though an upload without an expiry were a state that exists — and if it
-     * ever became one, treating it as "never expires" is the wrong default
-     * for a row whose whole purpose is to be cleaned up.
+     * No null check: `expires_at` is NOT NULL. A guard would imply "never
+     * expires" as a fallback, the wrong default for a row whose whole
+     * purpose is to be cleaned up.
      */
     public function isExpired(): bool
     {

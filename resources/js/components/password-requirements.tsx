@@ -3,18 +3,12 @@ import { t } from '@/lib/i18n';
 import type { PasswordPolicy } from '@/types';
 
 /*
- * The password rules, shown before they are broken.
- *
- * Without this the owner meets the policy one failed submission at a time:
- * Inertia's shared error bag carries only the first message per field, so a
- * password failing four rules reveals them in four round trips, and nothing
- * on screen ever says what is wanted up front.
- *
- * What is drawn comes from App\Support\PasswordPolicy::describe(), which is
- * also what builds the rule the server enforces — so this cannot claim a
- * requirement that is not enforced, or stay quiet about one that is. That
- * matters more than it looks: the policy is deliberately weaker outside
- * production, and a hard-coded list here would be wrong in one environment.
+ * Shown up front because Inertia's error bag surfaces only the first failed
+ * rule per field, so a password failing four would otherwise take four
+ * round trips to reveal. Requirements come from
+ * App\Support\PasswordPolicy::describe(), the same source the server
+ * enforces from — a hard-coded list here would be wrong in the environments
+ * where the policy is deliberately weaker.
  */
 
 type Props = {
@@ -23,14 +17,8 @@ type Props = {
     id: string;
 };
 
-/*
- * Deliberately mirroring Illuminate\Validation\Rules\Password's own
- * expressions rather than approximating them. A checklist that ticks while
- * the server still refuses is worse than no checklist.
- *
- * Laravel's mixedCase regex requires an upper and a lower in either order,
- * which is the same thing as having both.
- */
+// Mirrors Illuminate\Validation\Rules\Password's own expressions — a
+// checklist that ticks while the server still refuses is worse than none.
 const HAS_LETTER = /\p{L}/u;
 const HAS_UPPER = /\p{Lu}/u;
 const HAS_LOWER = /\p{Ll}/u;

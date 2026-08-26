@@ -8,13 +8,10 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * The Back-ups screen.
- *
- * An archive is the entire database — every password hash, every setting — so
- * the interesting assertions here are all about who cannot reach one. Unlike
- * every other route that serves a private file, this one never consults
- * App\Support\MediaAccess: that class answers "may this visitor see this
- * file", and its answer is yes for anything a public page shows.
+ * An archive holds the entire database, so this is about who cannot reach
+ * one. Unlike other private-file routes, it never consults
+ * App\Support\MediaAccess — that answers "may this visitor see this file",
+ * which is yes for anything a public page shows.
  */
 class BackupScreenTest extends TestCase
 {

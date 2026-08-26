@@ -6,21 +6,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 
 /**
- * Which language the interface is drawn in.
- *
- * Only the interface. What the owner writes — page titles, bodies, download
- * labels, education-level names, the site's own name — is stored once, in
- * whatever language it was written in, and is never translated or duplicated.
- * A visitor switching to English gets English chrome around Dutch lessons,
- * which is the honest thing to show: the alternative is an empty site or a
- * machine translation of somebody's teaching material.
- *
- * The choice is a cookie and nothing else, like the theme and the "mijn
- * niveau" preference. There is no per-visitor record on the server, and no
- * language segment in any URL — content is single-language, so /en/… and /…
- * would serve identical pages under two addresses, at the cost of teaching
- * the catch-all route, the slug redirects, robots.txt and the sitemap about a
- * prefix that carries no information.
+ * Which language the interface is drawn in — interface only. Owner-written
+ * content (page titles, bodies, download labels, level names) is never
+ * translated or duplicated; a visitor switching to English gets English
+ * chrome around Dutch lessons. The choice is a cookie only, like theme and
+ * "mijn niveau" — no server-side record, no URL language segment.
  */
 class Locale
 {
@@ -46,13 +36,9 @@ class Locale
     public const COOKIE_LIFETIME = 60 * 24 * 365;
 
     /**
-     * An explicit choice wins; a browser's advertised preference decides for
-     * anyone who has not made one; Dutch decides for anyone left.
-     *
-     * Validated against the supported list rather than trusted, for the same
-     * reason HandleAppearance validates its cookie: the value ends up inside
-     * a JavaScript string literal in app.blade.php, where Blade's {{ }} is
-     * HTML escaping and therefore the wrong context.
+     * Cookie, then browser preference, then Dutch. Validated against
+     * SUPPORTED rather than trusted — the value lands in a JS string literal
+     * in app.blade.php, where Blade's `{{ }}` is the wrong escaping context.
      */
     public static function resolve(Request $request): string
     {
@@ -72,28 +58,18 @@ class Locale
     }
 
     /**
-     * The only groups the browser is given.
-     *
-     * An allow-list rather than a list of exclusions, because the cost of
-     * getting it wrong runs one way: a group added for the server would
-     * otherwise start riding along on every document silently. `validation`
-     * alone is about 170 lines, and none of it is ever read there —
-     * validation and authentication messages arrive already rendered, as
-     * strings in the error bag.
+     * The only groups the browser is given — an allow-list, so a group added
+     * for the server doesn't silently ride along on every document.
+     * `validation`/`auth` arrive already rendered in the error bag instead.
      */
     private const CLIENT_GROUPS = ['common', 'ui'];
 
     /**
-     * The interface dictionary for one locale, flattened to dotted keys.
-     *
-     * Sent to the browser once per document rather than as an Inertia shared
-     * prop, because a shared prop is re-sent on every visit and this cannot
-     * change without a full page load anyway — switching language sets a
-     * cookie and reloads, since the <html lang> attribute and the document
-     * title are rendered by Blade.
-     *
-     * Only the active locale is included. Shipping both would double it for
-     * nobody's benefit.
+     * The interface dictionary for one locale, flattened to dotted keys. A
+     * Blade global rather than an Inertia shared prop — switching language
+     * already forces a full reload (cookie + Blade-rendered `<html lang>`),
+     * so re-sending it on every visit would be pure waste. Only the active
+     * locale ships.
      *
      * @return array<string, string>
      */

@@ -8,26 +8,15 @@
   stealth NMTOKEN #IMPLIED value CDATA #IMPLIED>
 ]>
 <!--
-  Defence in depth for App\Services\ImageOptimiser.
-
-  The uploader is the site owner and nobody else — uploading sits behind
-  `auth` and there is one account — so this is not guarding against a hostile
-  user. It guards against one specific accident: ImageMagick decides a file's
-  format by reading its *contents*, while MediaLibrary::resolveMime() can fall
-  back to the filename when sniffing is inconclusive. A file that arrives named
-  `.png` therefore still reaches readImage(), which will happily recognise it
-  as something else entirely.
-
-  The coders below are the ones that turn "decode an image" into "follow
-  instructions in a file": MSL and MVG are scripting languages, URL/HTTPS/FTP
-  fetch over the network (an SSRF primitive), TEXT/LABEL read arbitrary paths,
-  and EPHEMERAL deletes. None of them is a format this site accepts, so losing
-  them costs nothing.
-
-  Also note SVG: it is never passed to ImageMagick at all — the optimiser
-  returns early on image/svg+xml before opening the file — but the coder is
-  disabled here too so that a future caller cannot reintroduce the delegate
-  path by accident.
+  Defence in depth for App\Services\ImageOptimiser, against an accident, not
+  a hostile user (uploading is auth-only, one account). ImageMagick sniffs
+  format from content, and MediaLibrary::resolveMime() can fall back to a
+  filename extension, so a mislabelled file could still reach a coder that
+  turns "decode an image" into "follow instructions in a file" — MSL/MVG
+  script, URL/HTTPS/FTP fetch over the network (SSRF), TEXT/LABEL/EPHEMERAL
+  read or delete paths. None is a format this site accepts. SVG is disabled
+  too even though the optimiser never passes it to ImageMagick, so a future
+  caller can't reintroduce that path by accident.
 -->
 <policymap>
   <policy domain="delegate" rights="none" pattern="*"/>

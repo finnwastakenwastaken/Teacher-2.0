@@ -197,6 +197,74 @@ class PageDuplicationTest extends TestCase
         $this->assertDatabaseCount('slug_redirects', 0);
     }
 
+    /**
+     * A duplicate copies the live page, never the unpublished concept.
+     *
+     * The editor opens on the concept, so a page can sit for weeks showing the
+     * owner one body and students another. Duplicating in that state has to
+     * mean "another one of what is on the site" — the copy is a *new* page, and
+     * handing it somebody's half-finished writing, under a notice announcing an
+     * unpublished concept, would describe a history it never had.
+     *
+     * DuplicatePage gets this right by construction rather than by remembering
+     * to: it names the columns it copies, and it writes the body through
+     * writeContent($page->content), which is the published column. This test
+     * exists because both of those are easy to widen later without noticing —
+     * an `...$page->only(...)` or a switch to the draft-aware accessor would
+     * pass every other test in this file.
+     */
+    public function test_duplicating_copies_the_live_version_and_leaves_the_concept_behind()
+    {
+        $page = $this->page();
+        // Published twice, so the original has a version history of its own
+        // for the copy to conspicuously not inherit.
+        $page->writeContent([
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Een eerdere versie']]],
+            ],
+        ]);
+        $page->writeContent([
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Wat er nu op de site staat']]],
+            ],
+        ]);
+        $page->writeDraft([
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Nog niet af']]],
+            ],
+        ]);
+
+        $this->actingAs(User::factory()->create())->post(route('admin.pages.duplicate', $page));
+
+        $copy = Page::query()->where('id', '!=', $page->id)->sole();
+
+        $this->assertSame(
+            'Wat er nu op de site staat',
+            $copy->content['content'][0]['content'][0]['text']
+        );
+        $this->assertStringNotContainsString('Nog niet af', (string) $copy->content_text);
+
+        // The copy carries no concept at all, so the editor opens on the body
+        // and the notice stays down.
+        $this->assertNull($copy->draft_content);
+        $this->assertFalse($copy->hasDraft());
+
+        // And the original still has its own, untouched — duplicating is not a
+        // way to lose the writing you had not finished.
+        $this->assertTrue($page->fresh()->hasDraft());
+
+        // Nor does it copy the original's version history. A copy is a new
+        // page: it has no past, and the first publish of it starts its own.
+        // Falls out of the same construction — DuplicatePage writes the body
+        // into a row whose `content` has never been anything, and
+        // Page::writeContent() only snapshots an outgoing body that exists.
+        $this->assertSame(1, $page->revisions()->count());
+        $this->assertSame(0, $copy->revisions()->count());
+    }
+
     private function image(): Image
     {
         return Image::query()->create([

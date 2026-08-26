@@ -8,11 +8,9 @@
              are already applied on the html element above. --}}
         <script>
             (function() {
-                {{-- @json, not {{ }}. Blade's default escaping is for HTML,
-                     and this is a JavaScript context: entities are not
-                     decoded inside <script>, and htmlspecialchars leaves a
-                     backslash alone, so a cookie ending in one used to escape
-                     the closing quote and break this whole block. --}}
+                {{-- @json, not {{ }} — this is a JS context, and Blade's HTML
+                     escaping leaves a trailing backslash alone, letting it
+                     escape the closing quote. --}}
                 const appearance = @json($appearance ?? 'dark');
 
                 if (appearance === 'system') {
@@ -36,6 +34,26 @@
             }
         </style>
 
+        {{-- The owner's overrides of the raw palette, if there are any.
+
+             Here, before anything else, for the same reason as the two rules
+             above: these are the custom properties the whole document is
+             styled from, so arriving with the document is the difference
+             between a rebranded site and one that paints the shipped colours
+             first and repaints. React cannot do this job at all.
+
+             The value is an Htmlable built by App\Support\ThemePalette, so
+             {{ }} passes it through rather than escaping it — which is right,
+             because HTML entities are not decoded inside <style> and escaping
+             would corrupt CSS rather than protect it. What makes that safe is
+             upstream and threefold: the form request refuses anything that is
+             not an anchored hex colour, SiteSettings::all() refuses it again
+             on the way out of the database, and style() refuses it once more
+             at the point of emission. --}}
+        @if ($themePaletteStyle)
+            <style>{{ $themePaletteStyle }}</style>
+        @endif
+
         {{-- Branding comes from the settings the owner edits, falling back
              to the shipped files. Rendered here rather than from React so the
              tab has the right name and icon before hydration. --}}
@@ -50,16 +68,9 @@
         {{-- Read by resources/js/app.tsx for the document title template. --}}
         <meta name="app-name" content="{{ $siteBranding['title'] }}">
 
-        {{-- The interface dictionary, active locale only.
-
-             Here rather than as an Inertia shared prop for two reasons: a
-             shared prop is re-sent on every visit, and this cannot change
-             without a full page load anyway — switching language sets a
-             cookie and reloads, because the lang attribute above and the
-             title below are rendered by Blade.
-
-             @json for the same reason as the appearance block: this is a
-             JavaScript context, and Blade's {{ }} escapes for HTML. --}}
+        {{-- Interface dictionary, active locale only. A Blade global rather
+             than an Inertia shared prop because it can't change without a
+             full page load anyway (switching sets a cookie and reloads). --}}
         <script>
             window.__translations = @json($translations ?? []);
             window.__locale = @json($locale ?? 'nl');

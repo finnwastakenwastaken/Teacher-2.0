@@ -15,9 +15,8 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * The "no side door" guarantee: material on a protected page must not be
- * reachable by guessing a URL, and that has to hold for the media it shows
- * as much as for the page itself.
+ * Material on a protected page must not be reachable by guessing a URL —
+ * for the media it shows as much as for the page itself.
  */
 class AccessPasswordTest extends TestCase
 {
@@ -236,10 +235,8 @@ class AccessPasswordTest extends TestCase
     }
 
     /**
-     * The per-IP bucket bounds one attacker's rate, not the total: addresses
-     * are cheap, so N of them buy N times the attempts. This second bucket is
-     * what actually caps the search, and it must count attempts arriving from
-     * everywhere rather than from anyone in particular.
+     * A per-IP bucket alone doesn't cap a distributed guesser — addresses are
+     * cheap — so a second bucket counts attempts across all of them.
      */
     public function test_unlock_attempts_are_also_bounded_independently_of_the_ip()
     {

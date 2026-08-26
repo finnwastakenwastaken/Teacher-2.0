@@ -10,34 +10,38 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * One file offered for download on one page, tagged with the tracks it is
  * meant for.
  *
- * The columns, for static analysis.
+ * The file is either a media file or an image, never both and never neither —
+ * a poster or a scanned worksheet is an `images` row, because the library a
+ * file lands in is decided by sniffing its bytes. Two nullable foreign keys
+ * rather than a polymorphic pair, so both still restrict on delete; a database
+ * CHECK (page_downloads_exactly_one_source) is what makes "exactly one" true
+ * rather than hoped for. offeredMedia() is the single place that resolves it.
  *
- * Eloquent resolves these at runtime, so nothing here changes behaviour —
- * but without them every `$model->column` is an undefined property to
- * PHPStan, and a genuine typo becomes indistinguishable from a hundred
- * false ones. Keep in step with the migrations: a column added without a
- * line here is invisible to the analyser, and a line here without a column
- * is a lie it will believe.
+ * Columns below are for PHPStan; keep them in step with the migrations or
+ * the analyser misses typos and believes stale ones.
  *
  * @property int $id
  * @property string $ulid
  * @property int $page_id
- * @property int $media_file_id
+ * @property int|null $media_file_id
+ * @property int|null $image_id
  * @property string|null $label
  * @property int $sort_order
  * @property int $downloads_count
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Page $page
- * @property-read MediaFile $mediaFile
+ * @property-read MediaFile|null $mediaFile
+ * @property-read Image|null $image
  * @property-read Collection<int, EducationLevel> $educationLevels
  */
-#[Fillable(['page_id', 'media_file_id', 'label', 'sort_order'])]
+#[Fillable(['page_id', 'media_file_id', 'image_id', 'label', 'sort_order'])]
 class PageDownload extends Model
 {
     protected function casts(): array
@@ -74,10 +78,39 @@ class PageDownload extends Model
         return $this->belongsTo(MediaFile::class);
     }
 
+    /** @return BelongsTo<Image, $this> */
+    public function image(): BelongsTo
+    {
+        return $this->belongsTo(Image::class);
+    }
+
     /** @return BelongsToMany<EducationLevel, $this> */
     public function educationLevels(): BelongsToMany
     {
         return $this->belongsToMany(EducationLevel::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Whichever library this attachment offers, resolved in one place.
+     *
+     * Every caller wants the same four things — path, mime, filename, size —
+     * and both models carry all four, so the arms only have to be told apart
+     * once. Doing it at each call site instead is how one of them ends up
+     * checking only for a media file and quietly serving nothing.
+     */
+    public function offeredMedia(): Image|MediaFile
+    {
+        $media = $this->mediaFile ?? $this->image;
+
+        if ($media === null) {
+            // Unreachable while the CHECK constraint stands, and a loud
+            // failure rather than a silent null if it ever does not: an
+            // attachment that offers nothing is a broken download card, and
+            // finding that out here beats finding it out in a stream.
+            throw new RuntimeException("Page download {$this->ulid} points at neither library.");
+        }
+
+        return $media;
     }
 
     /**
@@ -86,16 +119,27 @@ class PageDownload extends Model
      */
     public function displayLabel(): string
     {
-        return filled($this->label) ? $this->label : $this->mediaFile->original_filename;
+        return filled($this->label) ? $this->label : $this->offeredMedia()->original_filename;
     }
 
     /**
-     * Bump the tally.
+     * What sort of thing this is, for the icon on the card.
      *
-     * A raw atomic increment rather than a read-modify-write: thirty students
-     * clicking at once must not lose counts to a lost update, and this must
-     * not touch updated_at — the tally changing is not the attachment being
-     * edited.
+     * `images` has no `kind` column and does not need one — the library it
+     * lives in is the answer. The front end's union widens by exactly this
+     * one member (resources/js/types/media.ts).
+     */
+    public function kind(): string
+    {
+        $media = $this->offeredMedia();
+
+        return $media instanceof Image ? 'image' : $media->kind;
+    }
+
+    /**
+     * A raw atomic increment, not read-modify-write: concurrent clicks must
+     * not lose counts, and this must not touch updated_at — the tally
+     * changing is not the attachment being edited.
      */
     public function recordDownload(): void
     {

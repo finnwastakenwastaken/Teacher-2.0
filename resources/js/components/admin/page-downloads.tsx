@@ -1,20 +1,20 @@
 import { router } from '@inertiajs/react';
 import { FolderOpen } from 'lucide-react';
 import * as React from 'react';
-import { toast } from 'sonner';
 import PageDownloadController from '@/actions/App/Http/Controllers/Admin/PageDownloadController';
 import { DownloadPickerDialog } from '@/components/admin/download-picker-dialog';
-import type { AttachableFile } from '@/components/admin/download-picker-dialog';
+import type { AttachableChoice } from '@/components/admin/download-picker-dialog';
 import { MediaUploader } from '@/components/admin/media-uploader';
 import type { UploadedRecord } from '@/components/admin/media-uploader';
 import { FileTypeIcon } from '@/components/file-type-icon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { confirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatBytes } from '@/lib/format';
-import type { MediaFileKind } from '@/types';
+import type { AcceptedFormats, DownloadKind } from '@/types';
 import { t } from '@/lib/i18n';
 
 /*
@@ -37,11 +37,18 @@ export type PageDownload = {
     label: string | null;
     sortOrder: number;
     downloadsCount: number;
-    mediaFileId: number;
+    /** Which library this attachment names. Exactly one, always. */
+    source: 'file' | 'image';
+    /** The id in that library, which is what the picker excludes on. */
+    mediaId: number;
     filename: string;
-    kind: MediaFileKind;
+    kind: DownloadKind;
     mime: string;
     sizeBytes: number;
+    /** A thumbnail, for an offered picture only. Gated like every media URL;
+     *  the owner is authenticated, so it renders here and 403s for a student
+     *  the page does not let in. */
+    previewUrl: string | null;
     educationLevelIds: number[];
 };
 
@@ -50,37 +57,52 @@ type Props = {
     downloads: PageDownload[];
     levels: EducationLevelOption[];
     /**
-     * Whether anything remains to attach — a single boolean sent by
-     * App\Http\Controllers\Admin\PageController::edit instead of the whole
-     * media library, which the dialog now searches for itself (see
-     * resources/js/components/admin/file-picker-list.tsx). Decides only
-     * whether the "choose a file" button appears; the dialog finds out what
-     * that something actually is once it's open.
+     * Whether anything remains to attach, in either library — a single
+     * boolean sent by PageController::edit instead of the whole library,
+     * which the dialog now searches for itself. Decides only whether the
+     * button appears; the dialog finds out what that something is once
+     * it's open.
      */
-    attachableFilesAvailable: boolean;
+    attachableMediaAvailable: boolean;
     maxBytes: number;
+    acceptedFormats: AcceptedFormats;
 };
 
 /**
- * Attaching, as a promise.
- *
- * The uploader awaits each link before starting the next file, and Inertia
- * cancels the visit in flight when a new one starts — so this has to settle
- * only when the visit is really finished. A rejection is what tells the
- * uploader to mark that file as failed rather than done.
- *
- * `preserveState` is load-bearing, not a nicety: without it the page component
- * remounts on the redirect back, taking the uploader — and the rest of the
- * batch it is in the middle of — with it.
+ * The attach payload names exactly one library. Built here rather than in
+ * the dialog so that the two ways of attaching — picking something that
+ * already exists and uploading something new — reach the endpoint through
+ * one shape.
  */
-function attachDownload(
-    pageId: number,
-    payload: {
-        media_file_id: number;
-        label: string | null;
-        education_levels: number[];
-    },
-): Promise<void> {
+type AttachPayload = {
+    media_file_id: number | null;
+    image_id: number | null;
+    label: string | null;
+    education_levels: number[];
+};
+
+/** Exactly one key carries an id; the other is explicitly null. */
+function payloadFor(
+    choice: AttachableChoice,
+    label: string | null,
+    levels: number[],
+): AttachPayload {
+    return {
+        media_file_id: choice.source === 'file' ? choice.file.id : null,
+        image_id: choice.source === 'image' ? choice.image.id : null,
+        label,
+        education_levels: levels,
+    };
+}
+
+/**
+ * Attaching, as a promise the uploader awaits before starting the next file
+ * — Inertia cancels an in-flight visit when a new one starts, so this must
+ * settle only when the visit really finishes; a rejection marks that file
+ * failed. `preserveState` matters: without it the page remounts on the
+ * redirect back, taking the uploader — and the rest of its batch — with it.
+ */
+function attachDownload(pageId: number, payload: AttachPayload): Promise<void> {
     return new Promise((resolve, reject) => {
         let settled = false;
 
@@ -95,11 +117,8 @@ function attachDownload(
                 settled = true;
                 reject(new Error(t('ui.downloads.attach_failed')));
             },
-            // A cancelled visit fires neither of the two above — Inertia
-            // cancels one in flight when another starts, and navigating away
-            // does the same. Without this the promise never settles, the
-            // uploader stays awaiting it, and the rest of the batch silently
-            // never uploads while the row sits on "Bezig" forever.
+            // A cancelled visit fires neither onSuccess nor onError, so
+            // without this the promise never settles and the batch stalls.
             onFinish: () => {
                 if (!settled) {
                     reject(new Error(t('ui.downloads.attach_cancelled')));
@@ -183,14 +202,17 @@ function DownloadRow({
         );
     }
 
-    function remove() {
-        if (
-            !confirm(
-                t('ui.downloads.confirm_remove', {
-                    name: download.label ?? download.filename,
-                }),
-            )
-        ) {
+    async function remove() {
+        const confirmed = await confirm({
+            title: t('ui.downloads.confirm_remove_title'),
+            description: t('ui.downloads.confirm_remove', {
+                name: download.label ?? download.filename,
+            }),
+            confirmLabel: t('ui.actions.remove'),
+            destructive: true,
+        });
+
+        if (!confirmed) {
             return;
         }
 
@@ -206,11 +228,23 @@ function DownloadRow({
     return (
         <li className="space-y-3 p-4">
             <div className="flex flex-wrap items-center gap-2">
-                <FileTypeIcon
-                    mime={download.mime}
-                    kind={download.kind}
-                    className="size-5 shrink-0 text-muted-foreground"
-                />
+                {download.previewUrl === null ? (
+                    <FileTypeIcon
+                        mime={download.mime}
+                        kind={download.kind}
+                        className="size-5 shrink-0 text-muted-foreground"
+                    />
+                ) : (
+                    // A page handing out three posters is unreadable as three
+                    // identical icons, and telling them apart is the whole
+                    // reason images are chosen visually elsewhere.
+                    <img
+                        src={download.previewUrl}
+                        alt=""
+                        loading="lazy"
+                        className="size-8 shrink-0 rounded-sm border border-border object-cover"
+                    />
+                )}
                 <span className="font-medium">
                     {download.label ?? download.filename}
                 </span>
@@ -307,17 +341,23 @@ export function PageDownloads({
     pageId,
     downloads,
     levels,
-    attachableFilesAvailable,
+    attachableMediaAvailable,
     maxBytes,
+    acceptedFormats,
 }: Props) {
     const [picking, setPicking] = React.useState(false);
     const [selected, setSelected] = React.useState<number[]>([]);
 
-    const attachedIds = downloads.map((download) => download.mediaFileId);
+    // Two lists, because the ids come from two tables and excluding an image
+    // by a media file's id would hide the wrong picture.
+    const attachedFileIds = downloads
+        .filter((download) => download.source === 'file')
+        .map((download) => download.mediaId);
+    const attachedImageIds = downloads
+        .filter((download) => download.source === 'image')
+        .map((download) => download.mediaId);
 
-    // An empty library and one whose every file is already here read the same
-    // from here now that neither ships to the browser to tell apart — the
-    // dialog's own search says which, once it's open.
+    // The dialog's own search distinguishes "empty" from "all attached".
     const libraryMessage = t('ui.downloads.library_empty');
 
     function toggle(id: number, checked: boolean) {
@@ -326,50 +366,44 @@ export function PageDownloads({
         );
     }
 
-    /*
-     * The dialog holds the choice until this resolves, so the rejection has
-     * to travel: it is what leaves the dialog open, with the file still
-     * chosen, when the attach failed and the validation message says why.
-     */
-    async function attachChosen(file: AttachableFile, label: string | null) {
-        await attachDownload(pageId, {
-            media_file_id: file.id,
-            label,
-            education_levels: selected,
-        });
+    // The dialog holds the choice until this resolves, so a rejection here
+    // is what leaves it open — with the choice still made — showing why the
+    // attach failed.
+    async function attachChosen(
+        choice: AttachableChoice,
+        label: string | null,
+    ) {
+        await attachDownload(pageId, payloadFor(choice, label, selected));
 
         setPicking(false);
     }
 
     /*
-     * Uploading here attaches the file to this page as well as putting it in
-     * the media library — that is the whole point of the affordance, and what
-     * the owner means by "add this worksheet to this page".
-     *
-     * The ticked levels apply to everything in the batch. The label field does
-     * not: it names one download, and a batch of four would all end up called
-     * the same thing, so an uploaded file keeps its own filename until the
-     * owner edits it.
-     *
-     * An image cannot be a download — the server decides the type by sniffing
-     * the bytes — so it goes to the library and says so rather than failing.
+     * Uploading here attaches the file to the page, not just the library —
+     * the whole point of the affordance. Ticked levels apply to the whole
+     * batch; the label doesn't, so an uploaded file keeps its own filename
+     * until edited. A dropped image attaches like anything else: the server
+     * sniffs the bytes, lands it in `images` and converts it to WebP on the
+     * way in — which is what makes it openable at all on a phone that shot
+     * it as HEIC — and the attachment names that same row.
      */
     async function uploadAndAttach(record: UploadedRecord) {
-        if (record.type === 'image') {
-            toast.info(
-                t('ui.downloads.image_not_a_download', {
-                    name: record.original_filename,
-                }),
-            );
-
-            return;
-        }
-
-        await attachDownload(pageId, {
-            media_file_id: record.id,
-            label: null,
-            education_levels: selected,
-        });
+        await attachDownload(
+            pageId,
+            record.type === 'image'
+                ? {
+                      media_file_id: null,
+                      image_id: record.id,
+                      label: null,
+                      education_levels: selected,
+                  }
+                : {
+                      media_file_id: record.id,
+                      image_id: null,
+                      label: null,
+                      education_levels: selected,
+                  },
+        );
     }
 
     return (
@@ -411,6 +445,7 @@ export function PageDownloads({
                 <MediaUploader
                     compact
                     maxBytes={maxBytes}
+                    acceptedFormats={acceptedFormats}
                     onUploaded={uploadAndAttach}
                     title={t('ui.downloads.upload_title')}
                     description={t('ui.downloads.upload_description', {
@@ -418,7 +453,7 @@ export function PageDownloads({
                     })}
                 />
 
-                {attachableFilesAvailable ? (
+                {attachableMediaAvailable ? (
                     <Button
                         size="sm"
                         variant="outline"
@@ -439,7 +474,8 @@ export function PageDownloads({
                 chosen file and the label start empty every time. */}
             {picking && (
                 <DownloadPickerDialog
-                    exclude={attachedIds}
+                    excludeFiles={attachedFileIds}
+                    excludeImages={attachedImageIds}
                     emptyMessage={libraryMessage}
                     levelNames={levels
                         .filter((level) => selected.includes(level.id))

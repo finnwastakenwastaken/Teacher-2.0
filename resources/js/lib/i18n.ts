@@ -1,16 +1,9 @@
 /*
- * The interface dictionary, client side.
- *
- * Deliberately not i18next or react-intl. What the front end needs is a
- * lookup, ":name" interpolation and a two-form plural, and the messages have
- * to be the same ones the server uses anyway — so the dictionary is Laravel's
- * lang/ directory, flattened to dotted keys by App\Support\Locale and handed
- * over once with the document. A library here would add a second message
- * format, a second place to register a locale, and a bundle, for none of that.
- *
- * The active locale only ever changes with a full page load (switching sets a
- * cookie and reloads, because <html lang> and the title come from Blade), so
- * these can be read once at module scope rather than through a React context.
+ * Deliberately not i18next/react-intl: the dictionary is Laravel's lang/
+ * flattened to dotted keys (App\Support\Locale) and handed over with the
+ * document, so a library would just add a second message format. The active
+ * locale only changes with a full page load, so these are read once at
+ * module scope rather than through a React context.
  */
 
 declare global {
@@ -26,29 +19,18 @@ const messages: Record<string, string> =
 export const locale: string =
     typeof window === 'undefined' ? 'nl' : (window.__locale ?? 'nl');
 
-/**
- * The BCP 47 tag for Intl, as opposed to the locale directory name.
- *
- * Used by everything that formats a date or a number. `nl` alone would give
- * Intl a language with no region, which is not wrong but leaves the choice of
- * conventions to the browser; these are the two this site actually targets.
- */
+/** BCP 47 tag for Intl (date/number formatting) — `nl` alone gives Intl no
+ * region and leaves conventions to the browser. */
 export const intlLocale: string = locale === 'en' ? 'en-GB' : 'nl-NL';
 
 type Replacements = Record<string, string | number>;
 
 /**
- * Look up a key, interpolate `:placeholders`, and pick a plural form.
- *
- * Laravel's own message format, so one dictionary serves both sides:
- *
- *   t('admin.topics.deleted')
- *   t('admin.topics.moved', { title: 'Krachten' })
- *   t('admin.pages.count', { count: pages.length })   // "1 pagina|:count pagina's"
- *
- * A missing key returns the key itself. That is visible without taking the
- * page down, and LocalisationTest makes it unreachable anyway by asserting
- * that every key used here exists in every locale.
+ * Look up a key, interpolate `:placeholders`, and pick a plural form —
+ * Laravel's own message format, e.g. `t('admin.pages.count', { count })` for
+ * `"1 pagina|:count pagina's"`. A missing key returns the key itself
+ * (visible, not a crash); LocalisationTest asserts every key exists in both
+ * locales.
  */
 export function t(key: string, replacements: Replacements = {}): string {
     let message = messages[key] ?? key;

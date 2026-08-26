@@ -1,10 +1,7 @@
 /**
- * YouTube helpers shared by the editor and the public renderer.
- *
- * Only the 11-character video id is ever stored (App\Support\PageContent
- * refuses anything else), and the embed URL is rebuilt from that id. A pasted
- * URL's host, query string and tracking parameters therefore never reach a
- * rendered page — there is nothing for them to ride along in.
+ * Only the 11-character video id is ever stored (PageContent refuses
+ * anything else); the embed URL is rebuilt from it, so a pasted URL's host,
+ * query string and tracking parameters never reach a rendered page.
  */
 
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -71,22 +68,8 @@ export function youTubeEmbedUrl(videoId: string): string {
     return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}`;
 }
 
-/**
- * Every YouTube iframe must carry this, or the player refuses to start.
- *
- * nginx sends `Referrer-Policy: same-origin` for the whole site, which means a
- * cross-origin request carries no `Referer` at all — verified by watching one
- * arrive at our own access log as "-". YouTube's embedded player uses that
- * header to work out which site is embedding it, and without it answers with
- * "Video player configuration error 153" instead of the video.
- *
- * So the policy is relaxed here and **only** here. `strict-origin-when-cross-
- * origin` sends the bare origin — `https://example.school` — and never the
- * path, so YouTube still learns nothing about *which lesson page* a student is
- * reading. That is the part worth protecting; the origin it necessarily knows
- * already, because it is serving the embed.
- *
- * Do not fix this by widening the nginx header: that would leak the path to
- * every other cross-origin destination on the site as well.
+/*
+ * The referrer policy and the allow list an embedded player needs live in
+ * lib/embeds.ts now, because three platforms share them. This file keeps only
+ * what is specific to YouTube.
  */
-export const YOUTUBE_REFERRER_POLICY = 'strict-origin-when-cross-origin';

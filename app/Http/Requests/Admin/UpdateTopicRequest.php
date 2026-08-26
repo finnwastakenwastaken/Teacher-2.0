@@ -16,15 +16,11 @@ class UpdateTopicRequest extends FormRequest
     }
 
     /**
-     * sort_order is NOT NULL in the database (default 0) so it must never
-     * reach validated() as null — an explicit null in the update payload
-     * overrides the column default and throws.
-     *
-     * Order is set by dragging, so the form does not send this field at all.
-     * Defaulting it to 0 would therefore throw the list's order away every
-     * time the owner saved an unrelated edit; the current value is kept
-     * instead. A topic that moves to a different parent joins the end of its
-     * new siblings, because its old number means nothing there.
+     * sort_order is NOT NULL, so an explicit null in the update payload would
+     * throw. Order is set by dragging and the form never sends this field, so
+     * the current value is kept rather than defaulted to 0 (which would
+     * reshuffle the list on every unrelated edit); a topic moved to a
+     * different parent joins the end of its new siblings instead.
      */
     protected function prepareForValidation(): void
     {
@@ -78,16 +74,10 @@ class UpdateTopicRequest extends FormRequest
                         return;
                     }
 
-                    /*
-                     * Moving a topic under one of its own descendants used to
-                     * be caught only by accident: the cascade pushes the
-                     * subtree past the depth cap and the database trigger
-                     * refuses it — with a message about depth, for something
-                     * that is not a depth problem. With a three-level tree
-                     * and a one-level branch there is even a shape where the
-                     * cascade fits, and the branch would then be detached
-                     * from the tree entirely, reachable from nothing.
-                     */
+                    // Without this check, moving a topic under its own
+                    // descendant is only caught by accident (a depth-cap
+                    // trigger error), and in some shapes not caught at all —
+                    // the branch would detach from the tree entirely.
                     if ($this->isDescendant($parent, $topic)) {
                         $fail(__('admin.topics.own_descendant'));
 
@@ -124,13 +114,9 @@ class UpdateTopicRequest extends FormRequest
     }
 
     /**
-     * Whether $candidate sits anywhere below $ancestor.
-     *
-     * Walks upward from the candidate rather than downward from the ancestor:
-     * the tree is capped at three levels, so this is at most two lookups
-     * however wide the branch is. The loop counter is a backstop only — the
-     * data cannot contain a cycle for it to catch — but it is what keeps a
-     * corrupted tree from hanging the request instead of failing it.
+     * Whether $candidate sits anywhere below $ancestor. Walks upward from the
+     * candidate, at most two lookups given the three-level cap. The loop
+     * counter is a backstop against a corrupted tree hanging the request.
      */
     private function isDescendant(Topic $candidate, Topic $ancestor): bool
     {

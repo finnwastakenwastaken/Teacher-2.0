@@ -3,26 +3,19 @@ import { expect, test } from '@playwright/test';
 import { COOKIE_TEST_PASSWORD, useAdminSession } from './support/admin';
 
 /**
- * Changing an access password, at `/admin/passwords`.
- *
- * The security-relevant behaviour is not that the form saves — it is that
- * the unlock cookie carries a fingerprint of the *current* hash
- * (App\Support\AccessControl), so changing the password invalidates every
- * cookie issued under the old one on its next use. That is the only
- * revocation mechanism this system has: there is no session list to sign
- * someone out of, only a hash to change. A feature test can see the cookie
- * gets rejected; it cannot see a real browser hold one, get asked again, and
- * fail to get back in without the new password — which is the failure mode
- * that actually matters to the owner.
+ * Changing an access password, at `/admin/passwords`. The unlock cookie
+ * carries a fingerprint of the *current* hash, so changing the password
+ * invalidates every cookie issued under the old one — the only revocation
+ * mechanism this system has, since there's no session list to sign anyone
+ * out of. A feature test can see the cookie get rejected; only this can show
+ * a real browser holding one get asked again.
  */
 test('changing a password asks a browser holding the old unlock cookie again', async ({
     page,
     browser,
 }) => {
-    // The visitor unlocks the fixture page and the cookie persists for the
-    // rest of the test, in the same browser context throughout — this half
-    // has to stay genuinely the same browser for the assertion to mean
-    // anything, the way `useAdminSession` never touches this page.
+    // Must stay the same browser context throughout for the assertion to
+    // mean anything.
     await page.goto('/e2e/cookie-test');
 
     await expect(page.getByLabel('Wachtwoord')).toBeVisible();
@@ -32,14 +25,12 @@ test('changing a password asks a browser holding the old unlock cookie again', a
     await expect(page.getByText('Inhoud na ontgrendelen.')).toBeVisible();
     await expect(page.getByLabel('Wachtwoord')).toHaveCount(0);
 
-    // A second visit proves the cookie itself is doing the work, not just
-    // the redirect the unlock POST ends with.
+    // Proves the cookie itself works, not just the unlock POST's redirect.
     await page.reload();
     await expect(page.getByText('Inhoud na ontgrendelen.')).toBeVisible();
 
-    // The admin changes the password, in a context of its own — logging in
-    // was already spent once for the whole suite (see auth.setup.ts), and
-    // this must not touch the visitor's own cookies.
+    // A separate context: login is already spent once for the whole suite
+    // (auth.setup.ts), and this must not touch the visitor's own cookies.
     const adminContext = await browser.newContext({
         locale: 'nl-NL',
         extraHTTPHeaders: { 'Accept-Language': 'nl' },
@@ -49,43 +40,35 @@ test('changing a password asks a browser holding the old unlock cookie again', a
 
     await adminPage.goto('/admin/passwords');
 
-    // Scoped to find the right row, but only for the click that opens it:
-    // editing replaces this row's name — the thing the filter matches on —
-    // with an <input> carrying it as a *value*, not as text, so a locator
-    // still filtering on "E2E-Cookie" as visible text would find nothing
-    // and hang waiting for a match that can only stop existing once entered.
+    // Scoped only for the click that opens the row: editing swaps its name
+    // (the filter's match target) for an `<input>` carrying it as a *value*,
+    // not text, so re-filtering on it as visible text afterward would hang.
     const row = adminPage
         .getByRole('listitem')
         .filter({ has: adminPage.getByText('E2E-Cookie', { exact: true }) });
 
     await row.getByRole('button', { name: 'Bewerken' }).click();
 
-    // Unscoped from here: only one password is ever mid-edit at a time, so
-    // "Nieuw wachtwoord" is unique on the page regardless of which row it
-    // belongs to.
+    // Unscoped: only one password is ever mid-edit at a time, so "Nieuw
+    // wachtwoord" is unique on the page regardless of row.
     await adminPage
         .getByLabel('Nieuw wachtwoord')
         .fill('e2e-cookie-changed-2026');
     await adminPage.getByRole('button', { name: 'Opslaan' }).click();
 
-    // Back to view mode — re-querying `row` is safe again now that
-    // "E2E-Cookie" is back in the DOM as text — is the signal the update
-    // round-tripped.
+    // Back to view mode — "E2E-Cookie" is text again, so `row` is safe to
+    // re-query — signals the update round-tripped.
     await expect(row.getByRole('button', { name: 'Bewerken' })).toBeVisible();
 
-    // The consequence: the same browser, holding the same cookie value it
-    // had a moment ago, is asked again — the fingerprint it carries no
-    // longer matches the new hash. Nothing was done to this browser's
-    // cookies directly; only the password changed.
+    // Same browser, same cookie value, but its fingerprint no longer matches
+    // the new hash — nothing touched this browser's cookies directly.
     await page.reload();
     await expect(page.getByLabel('Wachtwoord')).toBeVisible();
     await expect(page.getByText('Inhoud na ontgrendelen.')).toHaveCount(0);
 
-    // Restore the secret to what the fixture promises, through the same
-    // admin context — so this spec, like content-language.spec.ts, does not
-    // depend on a reseed to run twice in a row. `e2e:seed` does the same
-    // reset independently (belt and braces: whichever runs between two
-    // executions of this file, the next run starts from the same secret).
+    // Restores the fixture's secret so this spec, like content-language.spec.ts,
+    // doesn't need a reseed to run twice in a row. `e2e:seed` does the same
+    // reset independently, belt and braces.
     await row.getByRole('button', { name: 'Bewerken' }).click();
     await adminPage.getByLabel('Nieuw wachtwoord').fill(COOKIE_TEST_PASSWORD);
     await adminPage.getByRole('button', { name: 'Opslaan' }).click();

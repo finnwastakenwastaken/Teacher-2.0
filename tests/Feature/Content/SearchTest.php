@@ -135,13 +135,9 @@ class SearchTest extends TestCase
     }
 
     /**
-     * Hiding a topic has to hide what is under it.
-     *
-     * This was the gap: the query filters pages.is_hidden, so a page that is
-     * itself visible stayed fully searchable — title and snippet — while its
-     * topic was hidden from every menu. Hiding a retired subject therefore
-     * did not retire it. The sitemap had always walked the ancestor chain;
-     * search now uses the same function rather than its own rule.
+     * Hiding a topic must hide what's under it too — filtering only
+     * pages.is_hidden left a visible page fully searchable under a hidden
+     * topic. Search now walks the ancestor chain the same way the sitemap does.
      */
     public function test_pages_under_a_hidden_topic_are_never_in_the_results()
     {

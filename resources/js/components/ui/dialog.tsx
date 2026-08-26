@@ -71,6 +71,41 @@ function DialogContent({
   )
 }
 
+/**
+ * The same dialog, without the card.
+ *
+ * DialogContent above is a centred panel with a background, a border, padding
+ * and a width cap. That is right for every form in this application and wrong
+ * for showing a picture at the size it actually is, so this is the same portal
+ * and the same overlay with the surface left to the caller — it fills the
+ * viewport and paints nothing.
+ *
+ * It lives here rather than in the component that uses it so that
+ * @radix-ui imports stay inside components/ui, which is where every other one
+ * in this tree is.
+ */
+function DialogFullScreen({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  return (
+    <DialogPortal data-slot="dialog-portal">
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        data-slot="dialog-content"
+        className={cn(
+          "fixed inset-0 z-50 flex flex-col outline-none",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+}
+
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -126,6 +161,7 @@ export {
   DialogContent,
   DialogDescription,
   DialogFooter,
+  DialogFullScreen,
   DialogHeader,
   DialogOverlay,
   DialogPortal,

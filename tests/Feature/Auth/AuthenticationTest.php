@@ -14,9 +14,8 @@ class AuthenticationTest extends TestCase
 
     public function test_login_screen_can_be_rendered()
     {
-        // The login screen assumes an admin account exists to log into. An
-        // unclaimed install redirects '/login' to the claim screen instead —
-        // see EnsureAdminNotClaimed and ClaimAccountTest.
+        // Unclaimed installs redirect '/login' to the claim screen instead,
+        // via the EnsureAdminNotClaimed middleware (see ClaimAccountTest).
         User::factory()->create();
 
         $response = $this->get(route('login'));

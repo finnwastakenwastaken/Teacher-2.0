@@ -1,17 +1,16 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { Search } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
+import AppearanceToggle from '@/components/appearance-toggle';
 import LocaleSwitcher from '@/components/locale-switcher';
 import { t } from '@/lib/i18n';
 import { Input } from '@/components/ui/input';
-import { dashboard, search } from '@/routes';
+import { dashboard, privacy, search } from '@/routes';
 
 /*
- * Minimal chrome for the public, student-facing site: no sidebar, no auth
- * required. Students never register or log in — see the technical reference — so there
- * is deliberately no login link here. The only person who could use one is
- * the teacher, and they reach /login by typing it. Once logged in, the
- * header carries a shortcut back into the admin panel and nothing else.
+ * No login link here — students never register or log in (the technical reference);
+ * the teacher reaches /login by typing it. Logged in, the header just adds
+ * a shortcut back into the admin panel.
  */
 export default function PublicLayout({ children }: { children: ReactNode }) {
     const { auth, branding } = usePage().props;
@@ -63,7 +62,14 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                         />
                     </form>
 
-                    <LocaleSwitcher />
+                    {/* The two per-visitor interface preferences, kept in one
+                        box so they wrap together and sit closer to each other
+                        than to the rest of the header. Neither is stored on
+                        the server and neither touches what the owner wrote. */}
+                    <div className="flex items-center gap-3">
+                        <AppearanceToggle />
+                        <LocaleSwitcher />
+                    </div>
 
                     {auth.user && (
                         <Link
@@ -79,6 +85,21 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
             <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
                 {children}
             </main>
+
+            {/* The site's only footer, and it exists for one link: a privacy
+                page nobody can find answers nobody's question. `flex-1` on
+                <main> above is what keeps this at the bottom on a short page
+                rather than floating up under the content. */}
+            <footer className="border-t border-border">
+                <div className="mx-auto w-full max-w-5xl px-6 py-6">
+                    <Link
+                        href={privacy()}
+                        className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                        {t('ui.public.privacy.title')}
+                    </Link>
+                </div>
+            </footer>
         </div>
     );
 }

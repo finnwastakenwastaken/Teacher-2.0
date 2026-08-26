@@ -4,6 +4,7 @@ import EducationLevelController from '@/actions/App/Http/Controllers/Admin/Educa
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { confirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -42,8 +43,15 @@ function LevelRow({ level, others }: { level: Level; others: Level[] }) {
 
     const inUse = level.downloadsCount > 0;
 
-    function remove() {
-        if (!confirm(t('ui.levels.confirm_delete', { name: level.name }))) {
+    async function remove() {
+        const confirmed = await confirm({
+            title: t('ui.levels.confirm_delete_title'),
+            description: t('ui.levels.confirm_delete', { name: level.name }),
+            confirmLabel: t('ui.actions.delete'),
+            destructive: true,
+        });
+
+        if (!confirmed) {
             return;
         }
 

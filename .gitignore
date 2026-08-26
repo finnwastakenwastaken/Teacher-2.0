@@ -39,3 +39,9 @@ yarn-error.log
 
 # Local Claude Code settings — machine-specific, never shared.
 /.claude/settings.local.json
+
+# update.sh's own lock, taken in the checkout it is about to pull into.
+# Without this the script reports its own artefact as a local change and
+# asks the operator to confirm carrying on — mid-update, which is exactly
+# when a scary question is least welcome.
+/.update.lock

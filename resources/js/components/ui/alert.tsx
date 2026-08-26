@@ -9,10 +9,8 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-background text-foreground",
-        // No destructive fill behind this, so the label is `error` (the
-        // text role) and not `destructive-foreground` (the label colour
-        // meant to sit ON a destructive fill — near-white, and invisible
-        // here in the light theme).
+        // `error` (the text role), not `destructive-foreground` — that's
+        // meant for text ON a destructive fill and reads near-white here.
         destructive:
           "border-error/40 text-error [&>svg]:text-current *:data-[slot=alert-description]:text-error/90",
       },

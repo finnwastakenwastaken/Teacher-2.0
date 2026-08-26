@@ -12,6 +12,7 @@ use App\Services\MediaLibrary;
 use App\Support\AdminAccount;
 use App\Support\ContentLanguage;
 use App\Support\SiteSettings;
+use App\Support\ThemePalette;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -19,16 +20,11 @@ use Illuminate\Support\Str;
 
 /**
  * The fixtures `tests/e2e` expects, written straight into the running site.
- *
- * Deliberately not reached from DatabaseSeeder: that runs from the container
- * entrypoint on every boot, including on the teacher's real install, and this
- * writes throwaway content and resets the admin password. It is a separate
- * command that refuses outside development for the same reason.
- *
- * Idempotent, and idempotent in the strong sense: it restores the fixture
- * state rather than merely declining to duplicate it. The ordering specs
- * reorder what they find, so a second run has to put it back or the next run
- * starts from wherever the last one finished.
+ * Not reached from DatabaseSeeder — that runs on every boot including a real
+ * install, and this resets the admin password. Refuses outside development.
+ * Idempotent in the strong sense: it *restores* fixture state (rather than
+ * declining to duplicate it), since the ordering specs reorder what they
+ * find and a second run must put it back.
  */
 class SeedBrowserTestFixtures extends Command
 {
@@ -65,26 +61,19 @@ class SeedBrowserTestFixtures extends Command
     public const LEVEL_PROBE_NAME = 'E2E-Nieuw';
 
     /**
-     * A password of its own, separate from ACCESS_PASSWORD above — the
-     * "changing a password invalidates the unlock cookie" spec has to change
-     * this one's secret, and doing that to the password `gated-media.spec.ts`
-     * also relies on would make the two specs order-dependent.
+     * Separate from ACCESS_PASSWORD: the "changing a password invalidates
+     * the unlock cookie" spec changes this one's secret, which would make
+     * specs order-dependent if it shared a password with gated-media.spec.ts.
      */
     public const COOKIE_PASSWORD_NAME = 'E2E-Cookie';
 
     public const COOKIE_PASSWORD_SECRET = 'e2e-cookie-2026';
 
     /**
-     * Root of a *visible* branch, deliberately outside ROOT_SLUG.
-     *
-     * Full-text search asks App\Support\ContentVisibility, which walks every
-     * ancestor and excludes the page if any of them is hidden — so a page
-     * under the hidden `e2e` root can never be a search result, no matter its
-     * own is_hidden value. Testing search therefore needs at least one
-     * fixture that is findable, which means it cannot hide under the same
-     * root as everything else. It stays out of ROOT_SLUG's shadow but is
-     * still named and slugged for what it is, so it reads as a fixture
-     * rather than real content on a dev site.
+     * Root of a *visible* branch, deliberately outside ROOT_SLUG. Search
+     * excludes anything under a hidden ancestor regardless of its own
+     * is_hidden value, so a findable fixture can't live under the hidden
+     * `e2e` root.
      */
     public const SEARCH_ROOT_SLUG = 'e2e-zoekbaar';
 
@@ -98,6 +87,61 @@ class SeedBrowserTestFixtures extends Command
     public const ASIDE_HEADING = 'Kop na de afbeelding';
 
     public const ASIDE_IMAGE_NAME = 'aside-fixture.png';
+
+    /**
+     * A page holding a gallery of three images and a banner of its own.
+     *
+     * Three rather than two because the lightbox wraps at both ends, and a
+     * pair cannot tell "next" apart from "previous". The banner is on the
+     * same page so one spec can cover both a set and a set of one — the
+     * banner must enlarge and must draw no arrows.
+     */
+    public const GALLERY_SLUG = 'gallery';
+
+    /**
+     * Distinct alt texts, because the whole point is that the alt travels
+     * into the enlarged view: three copies of one string would pass whether
+     * it did or not.
+     *
+     * @var list<array{name: string, alt: string, colour: string}>
+     */
+    public const GALLERY_IMAGES = [
+        ['name' => 'gallery-one.png', 'alt' => 'Eerste vlak, rood', 'colour' => '#aa3333'],
+        ['name' => 'gallery-two.png', 'alt' => 'Tweede vlak, groen', 'colour' => '#33aa55'],
+        ['name' => 'gallery-three.png', 'alt' => 'Derde vlak, geel', 'colour' => '#ccaa33'],
+    ];
+
+    public const GALLERY_BANNER_NAME = 'gallery-banner.png';
+
+    public const GALLERY_BANNER_ALT = 'Banner van de galerijpagina';
+
+    /**
+     * A TikTok and an Instagram reel on one page.
+     *
+     * Both ids are syntactically valid and neither has to resolve to a real
+     * post: the spec asserts that nothing is requested from either platform
+     * until a student presses the button, and blocks both hosts outright so
+     * the run stays hermetic. What is under test is the shape of what the
+     * renderer emits, not what TikTok would answer.
+     */
+    public const SOCIAL_SLUG = 'social';
+
+    public const SOCIAL_TIKTOK_ID = '7234567890123456789';
+
+    public const SOCIAL_INSTAGRAM_ID = 'C1a2B3c4D5e';
+
+    /**
+     * A page of its own for the version-history spec to publish over.
+     *
+     * It has to be its own page because that spec replaces the whole body
+     * twice and then restores an older one — done to any page another spec
+     * reads, that would be a body those specs no longer recognise. The
+     * history it accumulates over runs is harmless: the spec writes text
+     * unique to the run and works from the newest entry, so it never depends
+     * on what earlier runs left behind, and the cap of ten keeps the pile
+     * from growing.
+     */
+    public const HISTORY_SLUG = 'geschiedenis';
 
     public function handle(MediaLibrary $library): int
     {
@@ -115,14 +159,21 @@ class SeedBrowserTestFixtures extends Command
         });
 
         $this->components->info('Browser test fixtures are in place.');
-        $this->components->warn('The admin password is now '.self::ADMIN_PASSWORD.' — this is a development site.');
+        $this->components->warn('The admin account is now '.self::ADMIN_EMAIL.' / '.self::ADMIN_PASSWORD.' — this is a development site.');
 
         return self::SUCCESS;
     }
 
     /**
      * There is only ever one admin account and the tests have to log in as it,
-     * so an existing one has its password reset rather than a second created.
+     * so an existing one is rewritten rather than a second created.
+     *
+     * The address is reset as well as the password: the specs log in as a
+     * constant they share with this file, so leaving whatever address the
+     * developer claimed their own instance with means the suite cannot log in
+     * at all — the setup project fails and every spec after it is skipped.
+     * Resetting only half the credential looked tidier and made this command
+     * unable to do the one thing it exists for.
      */
     private function seedAdmin(): void
     {
@@ -138,7 +189,10 @@ class SeedBrowserTestFixtures extends Command
             return;
         }
 
-        $admin->forceFill(['password' => self::ADMIN_PASSWORD])->save();
+        $admin->forceFill([
+            'email' => self::ADMIN_EMAIL,
+            'password' => self::ADMIN_PASSWORD,
+        ])->save();
     }
 
     private function seedContent(MediaLibrary $library): void
@@ -187,45 +241,73 @@ class SeedBrowserTestFixtures extends Command
         $this->attachDownload($library, $open, 'open-handout');
         $this->attachDownload($library, $locked, 'locked-handout');
 
+        // Two embeds that must contact nobody until a student asks. On a page
+        // of its own so the spec can assert "no request to either host" about
+        // the whole document rather than about one element.
+        $this->page($root, self::SOCIAL_SLUG, 'Social', 5, [], [
+            'type' => 'doc',
+            'content' => [
+                [
+                    'type' => 'socialEmbed',
+                    'attrs' => [
+                        'platform' => 'tiktok',
+                        'postId' => self::SOCIAL_TIKTOK_ID,
+                    ],
+                ],
+                [
+                    'type' => 'socialEmbed',
+                    'attrs' => [
+                        'platform' => 'instagram',
+                        'postId' => self::SOCIAL_INSTAGRAM_ID,
+                    ],
+                ],
+            ],
+        ]);
+
+        // Something for the version-history spec to publish over. Seeded with
+        // a body rather than left empty, so the page has been published once
+        // and the spec's own first publish has an outgoing body to record.
+        $this->page($root, self::HISTORY_SLUG, 'Geschiedenis', 6, [], [
+            'type' => 'doc',
+            'content' => [[
+                'type' => 'paragraph',
+                'content' => [['type' => 'text', 'text' => 'De tekst waar de geschiedenistest overheen publiceert.']],
+            ]],
+        ]);
+
         $this->seedAsideFixture($library, $root);
+        $this->seedGalleryFixture($library, $root);
 
         $this->seedLevelsFixture($library, $root);
         $this->seedCookiePasswordFixture($root);
         $this->seedSearchFixture();
 
-        // Authoritative reset for the one setting that is site-wide rather
-        // than scoped under ROOT_SLUG: the content-language spec changes it,
-        // and a second run must not start from whatever the first left
-        // behind. Reindexing here too, for the same reason the controller
-        // does it on every change — a stale vector from a previous run's
-        // 'english' setting would make the next run's baseline search
-        // assertion (no match under 'dutch') fail for a reason that has
-        // nothing to do with the code under test.
+        // Reset the one setting that is site-wide rather than scoped under
+        // ROOT_SLUG: the content-language spec changes it, so a second run
+        // must not inherit the previous run's value. Reindex too, or a
+        // stale vector fails the next run's baseline search assertion.
         if (ContentLanguage::current() !== ContentLanguage::DEFAULT) {
             SiteSettings::put(['content_language' => ContentLanguage::DEFAULT]);
         }
         Artisan::call('search:reindex');
 
-        // A level created and deleted by its own spec cleans itself up; this
-        // only repairs a run that failed before reaching the delete step.
-        // Deleted model-by-model, not with a bulk query, so the `deleting`
-        // guard still runs — this level should never have downloads
-        // attached, and if one somehow does, that is worth failing loudly
-        // for rather than silently orphaning a pivot row.
+        // The palette, for the same reason: the theme spec overrides a colour
+        // and resets it, so a run that stopped early leaves the next run's
+        // baseline colour wrong rather than the code.
+        SiteSettings::forget(ThemePalette::SETTING);
+
+        // Repairs a run that failed before reaching its own delete step.
+        // Deleted model-by-model, not via a bulk query, so the `deleting`
+        // guard still runs if downloads were somehow attached.
         EducationLevel::query()->where('name', self::LEVEL_PROBE_NAME)->get()->each->delete();
     }
 
     /**
      * Two levels and two downloads for the "merging a level retires it"
-     * spec — one download tagged with the source level alone, one already
-     * carrying both. The second is the case the technical reference warns about: merging
-     * must re-tag it to one row, not collide with the pivot's unique pair.
-     *
-     * Re-created by name every run rather than left alone: the merge spec
-     * deletes the source level, so `updateOrCreate` on the name is what
-     * brings it back with a fresh id, and `sync()` below is what puts the
-     * downloads back in their pre-merge state regardless of what the last
-     * run's merge did to them.
+     * spec — one tagged with the source level alone, one already carrying
+     * both (the pivot-collision case merge must handle). Re-created by name
+     * every run: the spec deletes the source level, so `updateOrCreate`
+     * brings it back and `sync()` restores the pre-merge tag state.
      */
     private function seedLevelsFixture(MediaLibrary $library, Topic $root): void
     {
@@ -302,17 +384,11 @@ class SeedBrowserTestFixtures extends Command
     }
 
     /**
-     * A branch the search spec can find. Deliberately not hidden and not
-     * under ROOT_SLUG — see the constant's doc block for why a hidden
-     * ancestor would make it unfindable no matter what.
-     *
-     * The body's word choice is the fixture: 'dutch' and 'english' stem
-     * "running" differently. `to_tsvector('dutch', 'running')` leaves the
-     * token unchanged, so a search for "run" does not match it; switching
-     * `content_language` to English and reindexing reduces it to "run",
-     * which is exactly the consequence the spec exists to prove — that an
-     * *already-stored* page gets re-stemmed by the setting, not just pages
-     * saved after it changes.
+     * A branch the search spec can find (not hidden, not under ROOT_SLUG —
+     * see that constant's doc block). The body's wording is the fixture:
+     * 'dutch' leaves "running" unstemmed but 'english' reduces it to "run",
+     * proving an *already-stored* page gets re-stemmed when the setting
+     * changes, not just pages saved afterward.
      */
     private function seedSearchFixture(): void
     {
@@ -362,11 +438,9 @@ class SeedBrowserTestFixtures extends Command
     }
 
     /**
-     * Find-or-create a named password and pin its secret to $secret either
-     * way, so a run after a spec changed it — that is the whole point of the
-     * password-change spec — still matches what the other specs type. Also
-     * what keeps the fixture correct after somebody changes one by hand on a
-     * shared dev instance.
+     * Find-or-create a named password and pin its secret either way, so a
+     * run after the password-change spec ran still matches what other specs
+     * type.
      */
     private function resetPassword(string $name, string $secret): AccessPassword
     {
@@ -384,52 +458,23 @@ class SeedBrowserTestFixtures extends Command
     }
 
     /**
-     * A page whose body floats an image beside its text, for the spec that
-     * covers what no PHP test can see: whether the text actually wraps, and
-     * whether the float is contained rather than running out over what
-     * follows.
-     *
-     * The image has a **real aspect ratio** on purpose. A 1×1 pixel proves a
-     * float exists and never that anything wraps around it, which is the
-     * thing worth protecting — so this is 400×300, wide enough at every
-     * breakpoint to leave a measurably narrower line beside it.
-     *
-     * Two paragraphs, then a heading. The paragraphs are what wraps; the
-     * heading is what must clear, because a picture taller than its text
-     * otherwise goes on wrapping the next heading and reads as broken.
+     * A page whose body floats an image beside its text, for the spec
+     * covering what no PHP test can see: whether text actually wraps and the
+     * float stays contained. The image is a real 400×300 (not 1×1 — a pixel
+     * proves a float exists but never that anything wraps around it). Two
+     * paragraphs (which wrap) then a heading (which must clear, or a tall
+     * image goes on wrapping it).
      */
     private function seedAsideFixture(MediaLibrary $library, Topic $root): void
     {
-        $image = Image::query()->where('original_filename', self::ASIDE_IMAGE_NAME)->first();
-
-        if ($image === null) {
-            $source = sys_get_temp_dir().'/'.self::ASIDE_IMAGE_NAME;
-
-            // Imagick rather than GD: the image has imagick and its HEIC and
-            // WebP coders (the technical reference), and GD is not installed at all.
-            $canvas = new \Imagick;
-            $canvas->newImage(400, 300, new \ImagickPixel('#3355aa'));
-            $canvas->setImageFormat('png');
-            $canvas->writeImage($source);
-            $canvas->clear();
-
-            $ingested = $library->ingest(
-                $source,
-                self::ASIDE_IMAGE_NAME,
-                // Required — the database, the service and the Form Request
-                // all refuse an image without it.
-                'Een blauw vlak van 400 bij 300',
-                moveSource: true,
-            );
-
-            // ingest() returns Image|MediaFile by signature; a PNG is always
-            // the first, and the seeder should say so rather than assume it.
-            if (! $ingested instanceof Image) {
-                throw new \RuntimeException('The aside fixture ingested as a file rather than an image.');
-            }
-
-            $image = $ingested;
-        }
+        $image = $this->fixtureImage(
+            $library,
+            self::ASIDE_IMAGE_NAME,
+            'Een blauw vlak van 400 bij 300',
+            '#3355aa',
+            400,
+            300,
+        );
 
         $paragraph = fn (string $text) => [
             'type' => 'paragraph',
@@ -456,6 +501,99 @@ class SeedBrowserTestFixtures extends Command
                 ],
             ],
         ]);
+    }
+
+    /**
+     * A page with a gallery of three and a banner of its own.
+     *
+     * The lightbox spec needs both shapes on one page: a set the arrows move
+     * through, and a set of one that must enlarge without drawing any. Three
+     * images rather than two because the arrows wrap at both ends, and with a
+     * pair "next" and "previous" land in the same place.
+     */
+    private function seedGalleryFixture(MediaLibrary $library, Topic $root): void
+    {
+        $ulids = [];
+
+        foreach (self::GALLERY_IMAGES as $index => $fixture) {
+            $ulids[] = $this->fixtureImage(
+                $library,
+                $fixture['name'],
+                $fixture['alt'],
+                $fixture['colour'],
+                // Different sizes, so a spec that means "the enlarged one" is
+                // not accidentally matching the thumbnail's own geometry.
+                320 + ($index * 40),
+                240 + ($index * 30),
+            )->ulid;
+        }
+
+        $banner = $this->fixtureImage(
+            $library,
+            self::GALLERY_BANNER_NAME,
+            self::GALLERY_BANNER_ALT,
+            '#884499',
+            1200,
+            400,
+        );
+
+        $this->page($root, self::GALLERY_SLUG, 'Gallery', 6, [
+            'hero_image_id' => $banner->id,
+        ], [
+            'type' => 'doc',
+            'content' => [[
+                'type' => 'imageGallery',
+                'attrs' => ['ulids' => $ulids],
+            ]],
+        ]);
+    }
+
+    /**
+     * Find-or-create a flat-colour PNG in the library, by filename.
+     *
+     * Imagick rather than GD: the image ships imagick with its HEIC and WebP
+     * coders and GD is not installed at all. The dimensions are real ones
+     * rather than a placeholder pixel — a 1×1 image proves an element exists
+     * and never that anything was laid out around it.
+     */
+    private function fixtureImage(
+        MediaLibrary $library,
+        string $name,
+        string $alt,
+        string $colour,
+        int $width,
+        int $height,
+    ): Image {
+        $existing = Image::query()->where('original_filename', $name)->first();
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $source = sys_get_temp_dir().'/'.$name;
+
+        $canvas = new \Imagick;
+        $canvas->newImage($width, $height, new \ImagickPixel($colour));
+        $canvas->setImageFormat('png');
+        $canvas->writeImage($source);
+        $canvas->clear();
+
+        $ingested = $library->ingest(
+            $source,
+            $name,
+            // Required — the database, the service and the Form Request all
+            // refuse an image without it.
+            $alt,
+            moveSource: true,
+        );
+
+        // ingest() returns Image|MediaFile by signature; a PNG is always the
+        // first, and the seeder should say so rather than assume it.
+        if (! $ingested instanceof Image) {
+            throw new \RuntimeException("The {$name} fixture ingested as a file rather than an image.");
+        }
+
+        return $ingested;
     }
 
     /**

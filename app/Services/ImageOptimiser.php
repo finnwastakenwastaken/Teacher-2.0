@@ -8,43 +8,20 @@ use Imagick;
 use ImagickException;
 
 /**
- * Re-encodes an image on its way into the library.
- *
- * Two jobs, and the first one is not a nicety: a photo taken on any recent
- * iPhone is HEIC, which no browser can display. Stored as it arrives it would
- * render as a broken image on the public page, and the owner would have no way
- * to tell from the admin screen. So every raster image becomes WebP here.
- *
- * The second job is size. The owner uploads whatever the camera produced, and
- * a 4 MB photo served through a Cloudflare tunnel to a phone on school wifi is
- * a slow page for the one audience that matters. Anything over the configured
- * ceiling is downscaled and re-encoded at stepping quality until it fits.
- *
- * Deliberately left alone:
- *
- * - **SVG**, which is vector. Rasterising it would be a downgrade, and it is
- *   already small.
- * - **Animated GIF**, because flattening it to one frame destroys it silently,
- *   which is the worst way for a conversion to fail.
- *
- * Failure is handled by what the browser can do with the original. A JPEG that
- * will not re-encode is still a perfectly good JPEG, so it is kept as it is; a
- * HEIC that will not decode is useless to every visitor, so the upload is
- * refused instead of quietly storing something that can never be displayed.
- *
- * Metadata is dropped in the process. That is a deliberate second effect: a
- * phone photo carries GPS coordinates, and this site records nothing about
- * anybody by design — publishing the coordinates of the teacher's home in an
- * image on a public page would make a mockery of that.
+ * Re-encodes an image on its way into the library: every raster image
+ * becomes WebP (a recent iPhone photo is HEIC, which no browser renders) and
+ * anything over the configured size ceiling is downscaled/re-encoded at
+ * stepping quality until it fits. SVG and animated GIF pass through
+ * untouched — rasterising either would destroy it. A JPEG that fails to
+ * re-encode is kept as-is; a HEIC that fails to decode is refused rather than
+ * stored broken. Metadata (including GPS) is stripped in the process.
  */
 class ImageOptimiser
 {
     /**
-     * How many times the encode loop may try before settling for what it has.
-     *
-     * Four quality steps per dimension, and the dimension shrinks by a quarter
-     * each round, so this is roughly six rounds of shrinking — far past the
-     * point where anything real is still over the ceiling.
+     * How many times the encode loop may try before settling for what it has
+     * — roughly six rounds of shrinking (four quality steps each), far past
+     * where anything real is still over the ceiling.
      */
     private const MAX_ENCODE_ATTEMPTS = 24;
 
@@ -166,17 +143,10 @@ class ImageOptimiser
         $quality = $startingQuality;
 
         try {
-            /*
-             * Bounded, deliberately. Each pass re-encodes the whole image, so
-             * an image that simply cannot be squeezed under the ceiling — a
-             * ceiling set absurdly low, most likely — must not be allowed to
-             * grind through a hundred of them inside a request that PHP will
-             * cut off at max_execution_time anyway.
-             *
-             * A cap is also the only thing that makes this terminate at all:
-             * the shrink is round(n * 0.75), and round(2 * 0.75) is 2, so the
-             * dimension floor sticks at two pixels rather than reaching one.
-             */
+            // Bounded deliberately: an unreachable ceiling must not grind
+            // through re-encodes until max_execution_time kills the request.
+            // Also the only thing that makes this terminate at all, since
+            // round(2 * 0.75) is 2 — the shrink alone never reaches 1px.
             for ($attempt = 0; $attempt < self::MAX_ENCODE_ATTEMPTS; $attempt++) {
                 $image->setImageCompressionQuality($quality);
                 $image->writeImage($target);

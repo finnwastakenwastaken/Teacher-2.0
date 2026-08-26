@@ -4,18 +4,14 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Two invariants from the technical reference's content model that must hold even under
- * concurrent writes, so they are enforced here rather than only in the
- * application layer — the same reasoning as the admin-claim advisory lock:
- * two near-simultaneous requests can each pass an app-level check before
- * either has written its row.
+ * Enforced by DB trigger, not just app code, because two near-simultaneous
+ * requests can each pass an app-level check before either writes its row:
  *
- * 1. A topic's depth is always derived from its parent, never trusted from
- *    client input, and can never exceed 2 (three levels total).
- * 2. A slug is unique among siblings, where "siblings" means every topic and
- *    every page attached directly under the same parent topic (or, for root
- *    topics, every other root topic) — pages and topics share one slug
- *    namespace per parent so a page can never collide with a child topic.
+ * 1. A topic's depth is derived from its parent (never client input) and
+ *    capped at 2 (three levels total).
+ * 2. A slug is unique among siblings — topics and pages under the same
+ *    parent share one slug namespace, so a page can't collide with a
+ *    sibling topic.
  */
 return new class extends Migration
 {
@@ -53,22 +49,16 @@ return new class extends Migration
                 before insert or update of parent_id on topics
                 for each row execute function topics_set_depth();
 
-            -- A topic's depth is recomputed by the trigger above whenever its
-            -- own parent_id changes. When that recompute actually changes the
-            -- depth value, this trigger nudges every direct child's parent_id
-            -- (to itself — a no-op value) purely to make Postgres re-fire
-            -- their own "update of parent_id" trigger, which recomputes
-            -- THEIR depth in turn, cascading down the tree. A move that would
-            -- push any descendant past the depth cap raises inside that
-            -- chain and rolls back the entire move atomically.
+            -- When a topic's depth actually changes, nudge every direct
+            -- child's parent_id to itself (a no-op value) purely to re-fire
+            -- their own "update of parent_id" trigger, cascading the depth
+            -- recompute down the tree; a descendant pushed past the depth cap
+            -- raises and rolls back the whole move atomically.
             --
-            -- This fires on "update of parent_id", not "update of depth":
-            -- Postgres decides whether an "UPDATE OF <column>" trigger fires
-            -- by checking whether that column is named in the SQL UPDATE's
-            -- SET list, not by checking which columns a BEFORE trigger went
-            -- on to change. The depth recompute above only ever happens as a
-            -- side effect of a parent_id update, so that is the column this
-            -- trigger has to watch.
+            -- Fires on "update of parent_id", not "update of depth": Postgres
+            -- decides by the SET list in the triggering UPDATE, not by what a
+            -- BEFORE trigger changed — and depth only ever changes as a side
+            -- effect of a parent_id update.
             create or replace function topics_cascade_depth() returns trigger as $$
             begin
                 if new.depth is distinct from old.depth then

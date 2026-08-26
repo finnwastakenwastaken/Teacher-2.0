@@ -10,16 +10,11 @@ use SplFileInfo;
 use Symfony\Component\Finder\Finder;
 
 /**
- * Register files that are already on the server.
- *
- * The documented escape hatch for material too large to send through the
- * browser at all — Cloudflare rejects request bodies over 100 MB, and while
- * chunked upload works around that, a multi-gigabyte recording is still
- * happier being copied onto the box with scp and registered here.
- *
- * In production the import directory is a bind mount, so the operator can
- * drop a file next to the compose file on the host and have it appear inside
- * the container.
+ * Register files already on the server — the escape hatch for material too
+ * large or awkward for the chunked browser upload (Cloudflare rejects bodies
+ * over 100 MB): copy it onto the box with scp and register it here. The
+ * import directory is a bind mount in production, so a file dropped next to
+ * the compose file on the host appears inside the container.
  */
 class ImportMedia extends Command
 {

@@ -12,14 +12,10 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Deletes that would orphan data block and report what depends on them, they
- * never cascade (the technical reference).
- *
- * Nothing can reference a media file yet — the page editor and the downloads
- * feature are later tasks — so the blocking path is exercised through a
- * subclass that reports dependents. That is deliberately not a workaround:
- * it pins the behaviour now so those later tasks only have to fill in
- * dependents() and inherit a guard that already works.
+ * Deletes that would orphan data block and report what depends on them; they
+ * never cascade (the technical reference). Nothing references a media file yet, so the
+ * blocking path is exercised through a subclass that reports dependents —
+ * pinning the behaviour now so later tasks just fill in dependents().
  */
 class MediaDeletionTest extends TestCase
 {

@@ -5,36 +5,18 @@ namespace App\Support;
 use Illuminate\Validation\Rules\Password;
 
 /**
- * The one declaration of what makes an acceptable password.
- *
- * It exists because the policy has to be stated twice — once as a rule the
- * server enforces, and once as a list the owner can read *before* submitting —
- * and two hand-written copies of the same five requirements drift. Here the
- * list is the source and the rule is built from it, so the checklist on screen
- * cannot claim something the validator does not require, or stay silent about
- * something it does.
- *
- * This site has exactly one account and no recovery by e-mail, so a weak or
- * already-breached password is the single worst thing that can happen to it.
- * That is why the production policy is as strict as it is.
+ * The one declaration of what makes an acceptable password. `describe()` is
+ * the source and `rule()` is built from it, so the on-screen checklist can
+ * never disagree with what the validator actually requires. This site has
+ * one account and no e-mail recovery, hence the strict production policy.
  */
 class PasswordPolicy
 {
     /**
-     * Deliberately weaker outside production.
-     *
-     * uncompromised() calls Have I Been Pwned's range API. It is k-anonymous
-     * (five hash characters go out, never the password) and it fails open, but
-     * it is an outbound HTTPS request on every password change — which in the
-     * test suite means every factory-made user waits on the network.
-     *
-     * The rest is relaxed alongside it so a developer can type "password" into
-     * a scratch install. min(8) and nothing else is exactly what Laravel's own
-     * default is, which is what this environment had before this class existed.
-     *
-     * The divergence is the reason describe() exists rather than a hard-coded
-     * list in the front end: whatever is actually in force is what the screen
-     * shows, in either environment.
+     * Deliberately weaker outside production. `uncompromised()` calls Have I
+     * Been Pwned's range API on every password change — fine in production,
+     * but it would make every factory-made test user wait on the network.
+     * The rest is relaxed alongside it so a developer can type "password".
      *
      * @var array<string, int|bool>
      */

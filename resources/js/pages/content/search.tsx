@@ -83,12 +83,9 @@ export default function ContentSearch({ query, results }: Props) {
                                         {result.topic}
                                     </div>
                                 )}
-                                {/*
-                                 * Rendered as plain text on purpose. ts_headline
-                                 * can wrap matches in markup, and this project
-                                 * never turns stored content into HTML — see
-                                 * the note in components/content/rich-text.tsx.
-                                 */}
+                                {/* Plain text on purpose — ts_headline can
+                                    wrap matches in markup, and this project
+                                    never turns stored content into HTML. */}
                                 {(result.snippet ?? result.description) && (
                                     <p className="mt-1 text-sm text-muted-foreground">
                                         {result.snippet ?? result.description}

@@ -34,45 +34,23 @@ return [
             'driver' => 'local',
             'root' => storage_path('app/private'),
 
-            // Deliberately false. `serve => true` makes Laravel register
-            // GET and PUT routes at /storage/{path} that read and write this
-            // disk directly, gated only by a signed URL. That is a second
-            // way to reach uploaded media, which security invariant 4
-            // forbids: media is served *only* through the gated controller,
-            // which is the single place that checks hidden state and
-            // password access.
-            //
-            // A signature is not a substitute for that check. Any call to
-            // Storage::disk('local')->temporaryUrl() would mint a working,
-            // shareable URL that skips authorisation entirely — a student
-            // could forward it to anyone. With serve disabled the routes do
-            // not exist and temporaryUrl() throws instead of silently
-            // producing a bypass.
-            //
-            // MediaAccessTest asserts both routes stay absent.
+            // Deliberately false. `serve => true` registers GET/PUT routes
+            // at /storage/{path} gated only by a signed URL — a second path
+            // to media that bypasses the gated controller (security
+            // invariant 4). `temporaryUrl()` would mint a shareable link
+            // that skips authorisation entirely; with serve off it throws
+            // instead. MediaAccessTest asserts both routes stay absent.
             'serve' => false,
 
-            // nginx has to be able to read these files.
-            //
-            // Two containers share this volume: PHP-FPM writes as www-data
-            // (uid 82) and nginx reads as nginx (uid 101). Flysystem's
-            // default for a private disk creates directories 0700, which
-            // nginx cannot even traverse — so every X-Accel-Redirect became
-            // a 403 and no image, download or video served at all, while
-            // the test suite stayed green because it runs with
-            // MEDIA_X_ACCEL=false and reads the file as www-data itself.
-            //
-            // These modes are filesystem permissions inside the container,
-            // not web exposure: the disk root sits outside the docroot,
-            // there is no route that maps to it, and the only nginx location
-            // that can reach it is marked `internal`. Aligning uids or
-            // groups across two different base images instead would break
-            // silently the next time either image renumbers its user.
-            //
-            // `visibility` is deliberately left unset (so it stays
-            // "private"). Setting it to "public" would fix the modes too,
-            // but it also makes Laravel's ServeFile skip its signature check
-            // — a trap for anyone who ever flips `serve` back on.
+            // nginx must be able to read these files. PHP-FPM writes as
+            // www-data, nginx reads as a different user — Flysystem's 0700
+            // default for a private disk made nginx unable to traverse in,
+            // so every X-Accel-Redirect 403'd while the test suite (which
+            // reads files itself, as www-data) stayed green. Not a web
+            // exposure risk: the disk root is outside the docroot and only
+            // reachable via an `internal` nginx location. `visibility`
+            // stays unset rather than "public" — that would also make
+            // ServeFile skip its signature check.
             'permissions' => [
                 'file' => ['public' => 0644, 'private' => 0644],
                 'dir' => ['public' => 0755, 'private' => 0755],
@@ -82,20 +60,14 @@ return [
             'report' => false,
         ],
 
-        // Backup archives. Its own volume, outside the private media disk —
-        // see the long note at the top of config/backup.php for why that
-        // separation is load-bearing rather than tidy.
-        //
-        // `serve` is false here for exactly the reason it is false above: a
-        // signed URL to an archive would hand out the entire database,
-        // password hashes included, to anyone the link reached.
+        // Backup archives. Own volume, outside the private media disk — see
+        // config/backup.php. `serve` false for the same reason as above: a
+        // signed URL would hand out the whole database.
         'backups' => [
             'driver' => 'local',
             'root' => storage_path('app/backups'),
             'serve' => false,
-            // nginx reads these to stream a download, as a different user
-            // from a read-only mount — the same reason the private disk
-            // carries an explicit permissions block.
+            // nginx reads these as a different user, same reason as above.
             'permissions' => [
                 'file' => ['public' => 0644, 'private' => 0644],
                 'dir' => ['public' => 0755, 'private' => 0755],

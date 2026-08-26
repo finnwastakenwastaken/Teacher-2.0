@@ -20,12 +20,9 @@ export function normaliseHref(input: string): string | null {
         return null;
     }
 
-    // Protocol-relative: reads like a path but leaves the site. The server
-    // refuses it, so refuse it here rather than silently repairing it into
-    // an off-site link the owner did not think they were typing.
-    //
-    // A backslash counts as the second slash: browsers normalise `/\host` to
-    // `//host`, so it is the same off-site link wearing a disguise.
+    // Protocol-relative (reads like a path but leaves the site) — refused,
+    // matching the server. A backslash counts too: browsers normalise
+    // `/\host` to `//host`, the same off-site link in disguise.
     if (/^\/[/\\]/.test(trimmed)) {
         return null;
     }

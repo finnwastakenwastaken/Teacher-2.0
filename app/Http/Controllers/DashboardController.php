@@ -15,18 +15,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The admin landing page.
- *
- * This is the first screen the owner sees after claiming the account, which
- * is why it carries `nextSteps`: this site deliberately has no setup wizard
- * (every setting has a working default — see App\Support\SiteSettings, and
- * the education levels are seeded on boot), so the checklist is what tells a
- * brand-new install what to do first. It disappears on its own once the site
- * is genuinely in use.
- *
- * Everything here is read-only. Nothing can be changed from this screen that
- * cannot be changed on the screen it links to, so the dashboard never
- * becomes a second place where a rule has to be enforced.
+ * The admin landing page — the first screen after claiming the account.
+ * Carries `nextSteps` because this site has no setup wizard (every setting
+ * already has a working default), so the checklist tells a fresh install
+ * what to do first and disappears once the site is in use. Everything here
+ * is read-only: nothing changes on this screen that can't also be changed on
+ * the screen it links to.
  */
 class DashboardController extends Controller
 {
@@ -37,6 +31,19 @@ class DashboardController extends Controller
         return Inertia::render('dashboard', [
             'stats' => $counts,
             'nextSteps' => $this->nextSteps($counts),
+            /*
+             * Deliberately its own prop rather than a seventh item in
+             * nextSteps.
+             *
+             * That checklist is a first-run affordance: every step is
+             * something done once, and the whole block disappears when they
+             * all are. An outstanding concept is neither — it recurs for the
+             * life of the site, and folding it in would resurrect a
+             * finished checklist (with its six ticks) every time the owner
+             * left a page half-written. "Done" would also have to mean two
+             * different things in one list.
+             */
+            'draftPages' => $this->draftPages(),
             'recentPages' => $this->recentPages(),
             'popularDownloads' => $this->popularDownloads(),
         ]);
@@ -47,15 +54,8 @@ class DashboardController extends Controller
      */
     private function counts(): array
     {
-        /*
-         * One query per table rather than one per number. This used to run
-         * fifteen round trips to build a card of counters — every one of them
-         * a full scan of the same table the previous one had just scanned.
-         *
-         * `count(*) filter (where …)` is standard SQL and Postgres computes
-         * every column in a single pass. The two tables that carry no
-         * variants keep their plain count().
-         */
+        // One query per table, not one per number: `count(*) filter (where …)`
+        // lets Postgres compute every column in a single pass.
         $topics = $this->aggregate(Topic::query()->toBase(), [
             'topics' => 'count(*)',
             'hiddenTopics' => 'count(*) filter (where is_hidden)',
@@ -100,12 +100,9 @@ class DashboardController extends Controller
     }
 
     /**
-     * Run several aggregates over one table in one query.
-     *
-     * The expressions are literals written above, never anything that came
-     * from a request — the only interpolated values are two class constants —
-     * so selectRaw is safe here and there is no bindable form of a `filter`
-     * clause anyway.
+     * Run several aggregates over one table in one query. The expressions
+     * are literals written above, never request input, so selectRaw is safe
+     * here — there is no bindable form of a `filter` clause anyway.
      *
      * @param  array<string, string>  $expressions
      * @return array<string, int>
@@ -127,11 +124,9 @@ class DashboardController extends Controller
     }
 
     /**
-     * The first-run checklist, in the order the work naturally happens.
-     *
-     * Each step is shown with its state rather than hidden once done, so the
-     * owner can see what is left instead of watching items vanish. The whole
-     * block is hidden by the page once every step is done.
+     * The first-run checklist, in the order the work naturally happens. Each
+     * step is shown with its state rather than hidden once done, so the
+     * owner sees what is left rather than watching items vanish.
      *
      * @param  array<string, int|bool>  $counts
      * @return array<int, array<string, mixed>>
@@ -185,6 +180,36 @@ class DashboardController extends Controller
     }
 
     /**
+     * Pages carrying writing the site is not showing.
+     *
+     * The editor opens on the concept and keeps saving it, which is right for
+     * writing and leaves one thing nothing else surfaces: a page can sit for
+     * weeks showing the owner one body and students another, discoverable
+     * only by opening that page. This is the answer, and it links to the
+     * screen that can act on it.
+     *
+     * `draft_saved_at` is the question, not `draft_content` — see
+     * Page::hasDraft(). Selecting the columns explicitly keeps a jsonb body
+     * per row out of a list that only needs a title, and the concept stays
+     * out of the response for the same reason it is in Page::$hidden.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function draftPages(): array
+    {
+        return Page::query()
+            ->whereNotNull('draft_saved_at')
+            ->orderByDesc('draft_saved_at')
+            ->get(['id', 'title', 'draft_saved_at'])
+            ->map(fn (Page $page) => [
+                'id' => $page->id,
+                'title' => $page->title,
+                'savedAt' => $page->draft_saved_at?->diffForHumans(),
+            ])
+            ->all();
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function recentPages(): array
@@ -200,6 +225,10 @@ class DashboardController extends Controller
                 'path' => '/'.$page->fullPath(),
                 'isHidden' => $page->is_hidden,
                 'isEmpty' => $page->content === null,
+                // Free here — these are whole models — and the list already
+                // reports a page's state in badges, so leaving this one state
+                // out would be the odd omission rather than the tidy one.
+                'hasDraft' => $page->hasDraft(),
                 'updatedAt' => $page->updated_at?->diffForHumans(),
             ])
             ->all();
@@ -211,7 +240,10 @@ class DashboardController extends Controller
     private function popularDownloads(): array
     {
         return PageDownload::query()
-            ->with(['page', 'mediaFile'])
+            // Both arms: displayLabel() falls back to the file's own name, and
+            // an image-backed attachment would otherwise load it one row at a
+            // time.
+            ->with(['page', 'mediaFile', 'image'])
             ->where('downloads_count', '>', 0)
             ->orderByDesc('downloads_count')
             ->take(5)

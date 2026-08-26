@@ -8,22 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Site-wide settings the owner edits in the browser: the site title,
-        // the logo and favicon, and the editable part of the homepage.
-        //
-        // Key/value rather than a one-row table with a column per setting.
-        // Adding a setting is then a code change and a default, not a
-        // migration, which matters because these are exactly the things that
-        // get added one at a time over the life of the site.
-        //
-        // A missing row is not an error — App\Support\SiteSettings owns the
-        // defaults, so a fresh install renders correctly with an empty table
-        // and nothing has to be seeded.
+        // Site-wide settings (title, logo, favicon, homepage copy). Key/value
+        // rather than a column per setting, so adding one is a code change
+        // and a default, not a migration. A missing row isn't an error —
+        // App\Support\SiteSettings owns the defaults.
         Schema::create('settings', function (Blueprint $table) {
             $table->string('key')->primary();
-            // jsonb, so a value can be a string, a number, an image id or a
-            // whole TipTap document without a second column or a serialised
-            // blob that only PHP can read.
+            // jsonb so a value can be a string, number, image id or a whole
+            // TipTap document without a second column.
             $table->jsonb('value')->nullable();
             $table->timestamps();
         });

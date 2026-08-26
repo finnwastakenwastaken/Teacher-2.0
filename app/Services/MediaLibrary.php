@@ -9,28 +9,18 @@ use App\Models\MediaUpload;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
  * Everything that puts bytes into the media libraries: the chunked browser
- * upload, and `php artisan media:import` for files too large to send through
- * the tunnel at all.
- *
- * On trust: the only person who can reach any of this is the site owner —
- * uploading sits behind `auth`, there is one account, and students never
- * authenticate. So the checks here are not defending against a hostile
- * uploader. They exist to
- *
- *   - serve every file back with a correct Content-Type later, which is what
- *     makes a PDF open as a PDF and a video seekable;
- *   - keep a file that renders as a document in this origin (SVG) from doing
- *     so for *visitors*;
- *   - keep the owner's own mistakes cheap — a half-finished upload should
- *     never produce a half-valid library row.
- *
- * Where a file's type is ambiguous the resolution deliberately favours doing
- * what the owner obviously meant over refusing the file.
+ * upload, and `media:import` for files too large for the tunnel. Uploading
+ * sits behind `auth` with one account, so these checks aren't defending
+ * against a hostile uploader — they exist to serve back a correct
+ * Content-Type, keep SVG from rendering as a document for visitors, and keep
+ * a half-finished upload from producing a half-valid library row. Where a
+ * file's type is ambiguous, resolution favours what the owner meant.
  */
 class MediaLibrary
 {
@@ -109,20 +99,14 @@ class MediaLibrary
         $disk = $this->disk();
         $disk->makeDirectory($upload->chunkDirectory());
 
-        // The library directories are deliberately readable by the nginx
-        // user (see config/filesystems.php); half-assembled uploads have no
-        // reason to be. nginx can never reach them anyway — the location is
-        // `internal` and MediaController refuses any path outside the two
-        // library directories — so this is only a extra layer, and a
-        // best-effort one: losing it breaks nothing.
+        // Library directories are readable by nginx (config/filesystems.php);
+        // half-assembled uploads have no reason to be. Belt-and-braces only —
+        // nginx can't reach these anyway (internal location, path-restricted).
         @chmod($disk->path($upload->chunkDirectory()), 0700);
 
-        // putFileAs streams from the temporary upload file rather than
-        // reading it into a string first. At a 20 MB chunk size against a
-        // 256M memory_limit the difference is not academic.
-        //
-        // The filename is the integer index and nothing else — no part of a
-        // filesystem path here comes from the client.
+        // putFileAs streams rather than reading into memory (20 MB chunks vs
+        // 256M memory_limit). Filename is the integer index only — no
+        // client-supplied value ever becomes part of a filesystem path.
         $disk->putFileAs($upload->chunkDirectory(), $chunk, (string) $index);
     }
 
@@ -181,7 +165,12 @@ class MediaLibrary
 
         try {
             $record = $this->ingest($assembledPath, $upload->original_filename, $altText, moveSource: true);
-        } catch (MediaUploadException $e) {
+        } catch (\Throwable $e) {
+            // Throwable, not MediaUploadException: anything thrown here leaves
+            // the chunk directory, the assembled file and the media_uploads
+            // row behind — on the volume every backup copies — until the TTL
+            // clears them at the next boot. The narrower catch meant an
+            // unexpected failure was the one that leaked most.
             $this->abort($upload);
 
             throw $e;
@@ -213,13 +202,9 @@ class MediaLibrary
             throw new MediaUploadException(__('media.upload.svg_disabled'));
         }
 
-        /*
-         * Images are re-encoded before anything else looks at them, so every
-         * value below — the size, the extension on disk, the MIME served back
-         * later — describes the bytes that are actually stored rather than the
-         * ones that arrived. HEIC in particular *has* to change: no browser
-         * renders it. See App\Services\ImageOptimiser.
-         */
+        // Re-encoded before anything else looks at it, so size/extension/MIME
+        // below describe the stored bytes, not the ones that arrived. See
+        // ImageOptimiser — HEIC in particular has to change; no browser renders it.
         $optimised = $type['kind'] === 'image'
             ? $this->images->process($absoluteSourcePath, $mime)
             : null;
@@ -273,11 +258,27 @@ class MediaLibrary
         // A converted image lives in a temporary file this class owns, so it
         // is always moved; the caller's own source is then disposed of exactly
         // as it asked, which is what keeps `media:import --prune` honest.
+        //
+        // Silenced deliberately, and this is the only reason the block below
+        // runs at all: rename() and copy() report failure by *warning*, and
+        // Laravel's error handler turns a warning into an ErrorException
+        // before $placed is ever assigned. Without the @, every storage
+        // failure here — a full disk, a directory the web user cannot write
+        // — escaped as an HTTP 500 carrying a raw PHP message, the handling
+        // written for it never ran, and the converted file was left in /tmp,
+        // which nothing sweeps. The reason is captured rather than discarded,
+        // because "could not store the file" alone does not tell an operator
+        // whether the disk is full or the permissions are wrong.
         $placed = ($moveSource || $optimised !== null)
-            ? rename($source, $destination)
-            : copy($source, $destination);
+            ? @rename($source, $destination)
+            : @copy($source, $destination);
 
         if (! $placed) {
+            Log::error('Storing an uploaded file failed.', [
+                'destination' => $destination,
+                'reason' => error_get_last()['message'] ?? 'unknown',
+            ]);
+
             // The converted file is ours and nothing else will come back for
             // it; the caller's own source is deliberately left alone, because
             // nothing was stored and `media:import --prune` deleting it here
@@ -419,12 +420,13 @@ class MediaLibrary
         }
 
         // Accept the common aliases that do not round-trip through the
-        // extension table.
-        return match ($extension) {
-            'jpeg' => 'image/jpeg',
-            'htm', 'html' => null,
-            default => null,
-        };
+        // extension table. They live in config beside that table rather than
+        // here, because App\Support\MediaFormats has to state the same set on
+        // the uploader and a second copy is a second thing to drift.
+        // Defaulted, not assumed: a stale `config:cache` from before this key
+        // existed would otherwise make every ambiguous upload a warning
+        // instead of a filename lookup.
+        return config('media.extension_aliases', [])[$extension] ?? null;
     }
 
     private function disk(): Filesystem

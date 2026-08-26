@@ -3,13 +3,10 @@ import { expect, test } from '@playwright/test';
 import { useAdminSession } from './support/admin';
 
 /**
- * Education levels, driven through the admin screen at `/admin/levels`.
- *
- * These write paths were covered at the HTTP layer only until now. What a
- * feature test cannot see is the merge flow's UI state machine — a level
- * "in use" swaps its delete button for a target picker instead of firing a
- * request straight away — and the consequence of a merge on the *public*
- * page a student actually reads, which is what these specs check.
+ * Education levels via `/admin/levels`. Covers what an HTTP-layer test
+ * can't: the merge flow's UI state machine (a level "in use" swaps its
+ * delete button for a target picker instead of firing straight away) and the
+ * consequence of a merge on the *public* page a student reads.
  */
 test.describe('education levels', () => {
     test.beforeEach(async ({ page }) => {
@@ -27,48 +24,51 @@ test.describe('education levels', () => {
         });
         await expect(handle).toBeVisible();
 
-        // Clean up through the UI rather than leaving it for the seeder: the
-        // level was never attached to a download, so the plain delete path
-        // applies (see the merge spec below for the other one). A confirm()
-        // dialog guards it, which Playwright auto-dismisses unless told
-        // otherwise.
-        page.once('dialog', (dialog) => dialog.accept());
+        // Never attached to a download, so the plain delete path applies (see
+        // the merge spec below for the other one).
+        //
+        // The guard is a real dialog, not the browser's. This used to accept a
+        // native confirm() via page.once('dialog'); when the dialog became a
+        // React one that handler simply never fired — the level was never
+        // deleted, yet the spec still passed, because Radix marks the rest of
+        // the page aria-hidden while a modal is open, so getByRole found no
+        // handle and toHaveCount(0) was satisfied by the dialog being *open*.
+        // Asserting the row is gone is therefore not enough on its own; the
+        // confirming click has to be scoped to the dialog, because the row's
+        // own button carries the same label.
+        const confirmation = page.getByRole('alertdialog');
+
         await page
             .getByRole('listitem')
             .filter({ has: handle })
             .getByRole('button', { name: 'Verwijderen' })
             .click();
 
+        await expect(confirmation).toBeVisible();
+        await confirmation.getByRole('button', { name: 'Verwijderen' }).click();
+
+        await expect(confirmation).toHaveCount(0);
         await expect(handle).toHaveCount(0);
     });
 
     /**
-     * Retiring a level that is in use, via merge — the only way to delete
-     * one, because a plain delete would strip the tag off every download
-     * carrying it. The fixture (`SeedBrowserTestFixtures::seedLevelsFixture`)
-     * carries the case the technical reference specifically calls out: one download tagged
-     * with the source level alone, and one that already carries *both* the
-     * source and the target. Merging the second must land on one tag, not
-     * collide with the pivot's unique `[page_download_id, education_level_id]`
-     * pair — a bug there would either 500 mid-transaction (leaving the level
-     * undeleted, which the first assertion below would catch) or silently
-     * drop the tag (which the last one would).
+     * Merging is the only way to retire a level in use — a plain delete would
+     * strip the tag off every download carrying it. The fixture includes a
+     * download already tagged with *both* source and target — the case
+     * The technical reference specifically calls out; merging it must land on one tag
+     * rather than collide with the pivot's unique
+     * `[page_download_id, education_level_id]` pair (a bug there either 500s
+     * mid-transaction or silently drops the tag).
      *
-     * Not self-restoring, unlike passwords.spec.ts and content-language.spec.ts:
-     * the merge deletes E2E-Bron outright, and rebuilding it plus both
-     * downloads' exact tag combinations through the UI would mostly just
-     * re-implement `SeedBrowserTestFixtures::seedLevelsFixture`. Same
-     * exception ordering.spec.ts already relies on for the same reason — a
-     * second run in a row needs `e2e:seed` between the two, which is what
-     * makes the level and its downloads exist again.
+     * Not self-restoring: the merge deletes E2E-Bron outright, so a second
+     * run needs `e2e:seed` in between, same as ordering.spec.ts.
      */
     test('merging a level retires it and re-tags its downloads, including one that already carried both', async ({
         page,
     }) => {
-        // Baseline, read off the public page rather than the admin one: a
-        // download tagged for two tracks is listed under both headings, by
-        // design (the technical reference, "page_downloads") — so "Both doc" appears twice
-        // before the merge and "Solo doc" once.
+        // Read off the public page: a download tagged for two tracks lists
+        // under both headings by design (the technical reference, "page_downloads"), so
+        // "Both doc" appears twice.
         await page.goto('/e2e/levels/merge');
 
         await expect(
@@ -90,8 +90,8 @@ test.describe('education levels', () => {
             has: page.getByRole('button', { name: 'Verplaatsen: E2E-Bron' }),
         });
 
-        // In use, so this swaps the row into the merge picker rather than
-        // deleting straight away — no confirm() dialog on this path.
+        // In use, so this swaps into the merge picker instead of deleting
+        // straight away — no confirm() dialog on this path.
         await bronRow.getByRole('button', { name: 'Verwijderen' }).click();
 
         // The select's content is portalled to the document body, so the
@@ -107,9 +107,7 @@ test.describe('education levels', () => {
             page.getByRole('button', { name: 'Verplaatsen: E2E-Bron' }),
         ).toHaveCount(0);
 
-        // The consequence: E2E-Bron's heading is gone from the public page,
-        // and E2E-Doel now carries both downloads — each exactly once, not
-        // duplicated and not dropped.
+        // E2E-Doel now carries both downloads, each exactly once.
         await page.goto('/e2e/levels/merge');
 
         await expect(

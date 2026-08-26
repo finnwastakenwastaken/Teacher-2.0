@@ -7,17 +7,12 @@ return [
     | Where archives live
     |--------------------------------------------------------------------------
     |
-    | Its own disk, on its own Docker volume, deliberately *not* inside the
-    | private media disk. Two reasons, and both bite:
-    |
-    |  - the media volume is one of the things an archive contains, so keeping
-    |    archives inside it means every backup contains the previous ones and
-    |    the volume grows geometrically;
-    |  - App\Support\MediaStream aliases the private disk root and serves
-    |    anything under the two library directories. An archive holds the
-    |    whole database, password hashes included, and must never be reachable
-    |    by that path. It has its own internal nginx location and its own
-    |    auth-gated controller.
+    | Its own disk and volume, deliberately not inside the private media
+    | disk: nesting would make every backup contain previous ones, and
+    | MediaStream serves anything under the media disk's library
+    | directories — an archive (whole DB, password hashes) must never be
+    | reachable that way. Its own internal nginx location and auth-gated
+    | controller instead.
     |
     */
 
@@ -28,10 +23,8 @@ return [
     | Retention
     |--------------------------------------------------------------------------
     |
-    | How many archives `backup:run --prune` keeps. Nothing is pruned unless
-    | that flag asks for it: silently deleting the only copy of a year's work
-    | because a default said seven is not a trade this application makes.
-    | `--keep=N` overrides the number for one run.
+    | How many archives `backup:run --prune` keeps. Nothing is pruned without
+    | that flag. `--keep=N` overrides the number for one run.
     |
     */
 
@@ -84,12 +77,9 @@ return [
 
     'x_accel_prefix' => '/__backup/',
 
-    // Whether to hand the bytes to nginx or stream them from PHP. Defaulted
-    // from the media setting so a deployment that turns X-Accel off gets both,
-    // but a *separate* key: MediaStream used to read config('media.x_accel')
-    // for archives too, which made how a backup is transported a property of
-    // the media library. Turning one off for a reason that has nothing to do
-    // with the other is the accident a shared switch invites.
+    // Whether to hand bytes to nginx or stream from PHP. Defaults from the
+    // media setting but is a separate key — previously shared, which meant
+    // toggling media's X-Accel also silently changed backup transport.
     'x_accel' => env('BACKUP_X_ACCEL', env('MEDIA_X_ACCEL', true)),
 
 ];

@@ -65,12 +65,9 @@ return [
     |
     */
 
-    // Read from the environment rather than hardcoded, because .env.example
-    // has always shipped an APP_TIMEZONE line and it did nothing at all — the
-    // hardcoded value here won, so an operator who set Europe/Amsterdam got
-    // UTC and no indication otherwise. The example now ships UTC with a note
-    // about why changing it after the site has content mixes zones in stored
-    // timestamps.
+    // Read from the environment: previously hardcoded, so .env.example's
+    // APP_TIMEZONE line silently did nothing. Changing it after the site has
+    // content mixes timezones in stored timestamps.
     'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*

@@ -13,15 +13,18 @@ import {
     AlignRight,
     Bold,
     Columns3,
+    FileClock,
     Heading2,
     Heading3,
     Images,
     Italic,
+    Instagram,
     Link2,
     List,
     ListOrdered,
     Paperclip,
     Quote,
+    Music2,
     Rows3,
     Save,
     Subscript as SubscriptIcon,
@@ -38,40 +41,51 @@ import type { UploadedRecord } from '@/components/admin/media-uploader';
 import { FileEmbed } from '@/components/editor/extensions/file-embed';
 import { ImageAside } from '@/components/editor/extensions/image-aside';
 import { ImageGallery } from '@/components/editor/extensions/image-gallery';
+import { SocialEmbed } from '@/components/editor/extensions/social-embed';
 import { YouTubeEmbed } from '@/components/editor/extensions/youtube-embed';
+import { DraftNotice } from '@/components/editor/draft-notice';
+import { VersionHistory } from '@/components/editor/version-history';
+import type { PageRevisionSummary } from '@/components/editor/version-history';
 import { FilePickerDialog } from '@/components/editor/file-picker-dialog';
 import { ImagePickerDialog } from '@/components/editor/image-picker-dialog';
 import { LinkDialog } from '@/components/editor/link-dialog';
+import { SocialDialog } from '@/components/editor/social-dialog';
 import { YouTubeDialog } from '@/components/editor/youtube-dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
+import { confirm } from '@/components/ui/confirm-dialog';
+import { useDraftAutosave } from '@/hooks/use-draft-autosave';
+import type { DraftStatus } from '@/hooks/use-draft-autosave';
 import { normaliseHref } from '@/lib/href';
+import { intlLocale } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { update as updateContent } from '@/routes/admin/pages/content';
+import { destroy as destroyDraft } from '@/routes/admin/pages/draft';
 import { GrowingEditorLibrary } from '@/components/editor/media-library';
 import type { EditorMediaLibrary } from '@/components/editor/media-library';
+import type { AcceptedFormats } from '@/types';
 import type { TipTapDoc } from '@/types/tiptap';
 import { t } from '@/lib/i18n';
 
 /*
- * The page body editor.
+ * The extensions below are configured to match the server whitelist in
+ * App\Support\PageContent; a node/mark added here must be added there too or
+ * it silently stops saving (also update the case in
+ * components/content/rich-text.tsx).
  *
- * Everything it can produce is on the whitelist in App\Support\PageContent —
- * the extensions below are configured to match it, so the editor cannot
- * create a node the server would silently drop. StarterKit therefore has
- * code, code blocks, strikethrough, underline and horizontal rules switched
- * off, and headings are limited to the three levels below the page title.
+ * StarterKit has code, code blocks, strikethrough, underline and horizontal
+ * rules switched off, and headings limited to the three levels below the
+ * page title, so the editor cannot create a node the server would drop.
  *
- * The reverse is the rule that bites: a node type or mark added here must be
- * added to PageContent as well, or it silently stops saving. Subscript,
- * superscript, text alignment and the four table nodes all have entries
- * there, and a case in components/content/rich-text.tsx.
- *
- * Saving is explicit. There is no autosave in this version: the teacher may
- * legitimately want to abandon an edit, and an autosave would republish
- * media references (which is what makes a file publicly reachable) on every
- * keystroke.
+ * There are two saves, and the difference between them is the point.
+ * "Concept opslaan" — and the autosave behind it — writes the body to
+ * `pages.draft_content`, which publishes nothing. "Opslaan en publiceren"
+ * promotes that concept through Page::writeContent(), which is where
+ * `page_media_references` (what makes an embedded file fetchable by an
+ * anonymous visitor) and `content_text` (the search vector) are rebuilt. An
+ * autosave that went through writeContent() would publish every image in a
+ * half-written body and put an unfinished page in the public search box.
  */
 
 const PROSE_CLASSES = [
@@ -84,9 +98,7 @@ const PROSE_CLASSES = [
     '[&_li]:my-1',
     '[&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground',
     '[&_a]:text-link [&_a]:underline [&_a]:underline-offset-4',
-    // Tables. `table-fixed` is what makes the column resizer's widths mean
-    // anything; without it the browser re-negotiates every column on each
-    // keystroke and the handles drift away from the borders they belong to.
+    // table-fixed keeps the resize handles aligned with the column borders.
     '[&_table]:my-4 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse',
     '[&_th]:border [&_th]:border-border [&_th]:bg-card [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:align-top [&_th]:font-semibold',
     '[&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top',
@@ -97,49 +109,104 @@ const PROSE_CLASSES = [
     '[&_.column-resize-handle]:absolute [&_.column-resize-handle]:top-0 [&_.column-resize-handle]:bottom-0 [&_.column-resize-handle]:-right-0.5 [&_.column-resize-handle]:w-1 [&_.column-resize-handle]:bg-primary',
     '[&_.tableWrapper]:overflow-x-auto',
     '[&.resize-cursor]:cursor-col-resize',
-    // Everything that must not sit in the gutter beside a floated image (see
-    // the imageAside notes in components/content/rich-text.tsx). Paragraphs
-    // and lists are deliberately absent: wrapping is the feature. A `clear`
-    // does nothing at all when nothing is floating, so this changes no page
-    // that has no imageAside on it.
+    // These clear a floated imageAside (see rich-text.tsx); paragraphs/lists
+    // are deliberately absent since wrapping around it is the feature.
     '[&_h2]:clear-both [&_h3]:clear-both [&_h4]:clear-both',
     '[&_blockquote]:clear-both [&_table]:clear-both [&_.tableWrapper]:clear-both',
 ].join(' ');
 
+/**
+ * What to hand TipTap for a stored document that may be empty or absent.
+ *
+ * An empty stored document has no blocks and ProseMirror's schema refuses it;
+ * the empty string gives it the one paragraph it wants. Shared by the initial
+ * load and by reverting, because the two must agree — a guard applied in one
+ * place and forgotten in the other throws only for a page nobody has written
+ * yet, which is exactly the page nobody tests with.
+ */
+function initialDocument(document: TipTapDoc | null): TipTapDoc | string {
+    return (document?.content?.length ?? 0) > 0 ? (document as TipTapDoc) : '';
+}
+
+export type PageDraft = {
+    content: TipTapDoc | null;
+    savedAt: string | null;
+};
+
 type PageEditorProps = {
     pageId: number;
     content: TipTapDoc | null;
+    /** An unpublished concept, if this page has one. */
+    draft: PageDraft | null;
+    /**
+     * When each previously published body was replaced, newest first. Just
+     * the timestamps — the bodies are fetched one at a time, when the owner
+     * opens one. See components/editor/version-history.tsx.
+     */
+    revisions: PageRevisionSummary[];
     mediaLibrary: EditorMediaLibrary;
     maxBytes: number;
+    acceptedFormats: AcceptedFormats;
 };
 
 export function PageEditor({
     pageId,
     content,
+    draft,
+    revisions,
     mediaLibrary,
     maxBytes,
+    acceptedFormats,
 }: PageEditorProps) {
     const [isDirty, setIsDirty] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
+    const [isReverting, setIsReverting] = React.useState(false);
     const [dialog, setDialog] = React.useState<
-        'file' | 'image' | 'imageAside' | 'youtube' | 'link' | null
+        | 'file'
+        | 'image'
+        | 'imageAside'
+        | 'youtube'
+        | 'tiktok'
+        | 'instagram'
+        | 'link'
+        | null
     >(null);
 
     /*
-     * The library the node views resolve an embed's geometry from.
+     * Bumped on every document change; the autosave debounces on it. A
+     * counter, not the document: the hook needs to know *that* something
+     * changed and then went quiet, and diffing two ProseMirror documents on
+     * each keystroke would cost more than the save it is deciding about.
+     */
+    const [revision, setRevision] = React.useState(0);
+
+    /*
+     * When the editor is holding an unpublished concept rather than what the
+     * site is serving, this is when that concept was last written.
      *
-     * `useEditor` builds the extension list once, and rebuilding it to hand
-     * the node views a new object would tear the editor down and take the
-     * caret and the undo history with it. So the extensions get this one
-     * object for the editor's whole life (GrowingEditorLibrary), and it is
-     * mutated in place — never replaced — by uploads and by picking an
-     * existing file or image out of the picker dialogs' own search results.
+     * The editor **opens on the concept**, so the owner carries on from where
+     * they stopped and their most recent writing is never the thing at risk —
+     * which is why autosave is not suspended: there is no second version on
+     * screen that could overwrite a first. What it costs is that the editor
+     * shows something the public page does not, so it may never be silent
+     * about it: DraftNotice says so for as long as this is set, and only
+     * publishing or reverting clears it.
+     */
+    const [editingDraft, setEditingDraft] = React.useState(
+        draft?.savedAt ?? null,
+    );
+
+    /*
+     * The library the node views resolve an embed's geometry from. `useEditor`
+     * builds the extension list once, so this object (GrowingEditorLibrary)
+     * lives for the editor's whole life and is mutated in place, never
+     * replaced, by uploads and by picking an existing file or image out of
+     * the picker dialogs' own search results — replacing it would tear down
+     * the editor and lose the caret/undo history.
      *
-     * It starts holding only what the page's body already shows (see
-     * App\Http\Controllers\Admin\PageController::embeddedMedia): the picker
-     * dialogs ask the server for anything else themselves, a page of matches
-     * at a time, rather than this screen shipping the whole media library up
-     * front. Nothing here needs a React re-render to take
+     * It starts holding only what the body already embeds (see
+     * PageController::embeddedMedia); the picker dialogs ask the server for
+     * anything else themselves. Nothing here needs a React re-render to take
      * effect — inserting a node is itself a transaction, and by the time it
      * happens the holder already has whatever that node is about to embed.
      */
@@ -196,31 +263,37 @@ export function PageEditor({
                 defaultProtocol: 'https',
                 isAllowedUri: (url) => normaliseHref(url) !== null,
             }),
-            // Both get the holder, not the prop: see the comment on it
-            // above. A value that were replaced on upload would mean
-            // rebuilding the editor to make a new embed renderable.
-            // H₂O and m/s². Not a formatting nicety in physics and chemistry
-            // material — without them a lot of it simply cannot be written.
+            // H₂O and m/s² are unwritable without these.
             Subscript,
             Superscript,
             TextAlign.configure({
                 types: ['heading', 'paragraph'],
-                // Null rather than 'left', so an unaligned paragraph carries
-                // no attribute at all and existing documents do not all grow
-                // one the next time they are saved.
+                // null (not 'left') so an unaligned paragraph carries no
+                // attribute and existing documents don't all grow one on save.
                 defaultAlignment: null,
             }),
             TableKit.configure({
                 table: { resizable: true },
             }),
+            // These get the holder object, not the mediaLibrary prop — see
+            // the comment on `holder` above.
             FileEmbed.configure({ library: holder }),
             ImageGallery.configure({ library: holder }),
             ImageAside.configure({ library: holder }),
             YouTubeEmbed,
+            SocialEmbed,
         ],
-        // An empty stored document has no blocks, which ProseMirror's schema
-        // refuses; the empty string gives it the paragraph it wants.
-        content: (content?.content?.length ?? 0) > 0 ? content : '',
+        /*
+         * The concept if there is one, otherwise what is published.
+         *
+         * This is the whole of "open on the concept": a document already sent
+         * with the page, so there is no round trip and no moment where the
+         * editor shows one version and then swaps to another.
+         *
+         * The empty-string guard is not cosmetic — an empty stored document
+         * has no blocks and ProseMirror's schema refuses it.
+         */
+        content: initialDocument(draft?.content ?? content),
         editorProps: {
             attributes: {
                 // `flow-root` contains a floated imageAside inside the
@@ -238,7 +311,17 @@ export function PageEditor({
                 'aria-label': t('ui.editor.aria_label'),
             },
         },
-        onUpdate: () => setIsDirty(true),
+        onUpdate: () => {
+            setIsDirty(true);
+            setRevision((count) => count + 1);
+        },
+    });
+
+    const autosave = useDraftAutosave({
+        pageId,
+        revision,
+        getDocument: () => editor.getJSON() as TipTapDoc,
+        isPublishing: isSaving,
     });
 
     const state = useEditorState({
@@ -277,14 +360,86 @@ export function PageEditor({
                 // Without this the component remounts on the redirect back
                 // and the editor loses its caret and undo history.
                 preserveState: true,
-                onSuccess: () => setIsDirty(false),
+                onSuccess: () => {
+                    setIsDirty(false);
+                    // The server clears the concept as part of publishing
+                    // (Page::writeContent), so the status line must stop
+                    // saying there is one.
+                    autosave.forget();
+                    setEditingDraft(null);
+                },
                 onFinish: () => setIsSaving(false),
             },
         );
     };
 
+    /*
+     * Throw the concept away and go back to what the site is serving.
+     *
+     * The published body is already here in the `content` prop, so this is a
+     * delete plus a local swap rather than a reload — the owner keeps their
+     * scroll position and the screen never blanks. See showPublished() below
+     * for the swap and for why it cannot be left to the prop.
+     */
+    const revertToPublished = async () => {
+        const answered = await confirm({
+            title: t('ui.editor.draft.revert_title'),
+            description: t('ui.editor.draft.revert_description'),
+            confirmLabel: t('ui.editor.draft.revert_confirm'),
+            destructive: true,
+        });
+
+        if (!answered) {
+            return;
+        }
+
+        setIsReverting(true);
+
+        router.delete(destroyDraft(pageId).url, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => showPublished(content),
+            onFinish: () => setIsReverting(false),
+        });
+    };
+
+    /**
+     * Put a body the server has just published into the editor.
+     *
+     * Shared by the draft revert above and by restoring a version, because
+     * both end the same way: something other than this editor decided what
+     * the published body is, and the editor has to be showing that rather
+     * than what it happened to be holding. `useEditor` reads its document
+     * once, when it is built, so a changed prop does nothing on its own.
+     *
+     * `emitUpdate: false` is load-bearing in both cases. Setting the content
+     * normally fires onUpdate, which bumps `revision`, which is exactly what
+     * the autosave debounces on — so the body just published would be written
+     * straight back as a concept, and the owner would be told they have
+     * unpublished work a moment after publishing.
+     */
+    const showPublished = (document: TipTapDoc | null) => {
+        editor
+            .chain()
+            .setContent(initialDocument(document), { emitUpdate: false })
+            .focus()
+            .run();
+
+        setEditingDraft(null);
+        setIsDirty(false);
+        autosave.forget();
+    };
+
     return (
         <div className="grid gap-3">
+            {editingDraft !== null && (
+                <DraftNotice
+                    savedAt={editingDraft}
+                    onRevert={revertToPublished}
+                    isReverting={isReverting}
+                />
+            )}
+
             {/* The contenteditable itself drops its outline (an outline
                 around a whole document body reads as an error state), so the
                 frame takes the focus ring instead — the editor must still
@@ -445,6 +600,16 @@ export function PageEditor({
                         onClick={() => setDialog('youtube')}
                     />
                     <ToolbarButton
+                        icon={Music2}
+                        label={t('ui.editor.insert_tiktok')}
+                        onClick={() => setDialog('tiktok')}
+                    />
+                    <ToolbarButton
+                        icon={Instagram}
+                        label={t('ui.editor.insert_instagram')}
+                        onClick={() => setDialog('instagram')}
+                    />
+                    <ToolbarButton
                         icon={TableIcon}
                         label={t('ui.editor.insert_table')}
                         onClick={() =>
@@ -551,9 +716,38 @@ export function PageEditor({
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3">
+                {/* Two lines, because they answer two different questions:
+                    whether the body on screen is on the site, and whether it
+                    has at least been kept somewhere. A concept that is safely
+                    stored is still not published, and saying only "saved"
+                    would be the more comforting of the two lies. */}
+                <p
+                    aria-live="polite"
+                    className="mr-auto text-sm text-muted-foreground"
+                >
+                    {draftLine(autosave.status, autosave.savedAt)}
+                </p>
+
                 <p className="text-sm text-muted-foreground">
                     {isDirty ? t('ui.editor.unsaved') : t('ui.editor.saved')}
                 </p>
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void autosave.saveNow()}
+                    disabled={
+                        !isDirty || isSaving || autosave.status === 'saving'
+                    }
+                >
+                    {autosave.status === 'saving' ? (
+                        <Spinner aria-hidden="true" />
+                    ) : (
+                        <FileClock aria-hidden="true" />
+                    )}
+                    {t('ui.editor.draft.save')}
+                </Button>
+
                 <Button
                     type="button"
                     onClick={save}
@@ -568,11 +762,31 @@ export function PageEditor({
                 </Button>
             </div>
 
+            {/* Both halves of "is there a concept": one this screen opened
+                with, and one the autosave has written since. Restoring is a
+                publish and a publish ends the concept, so the confirmation
+                has to say so — and it would be wrong in exactly the session
+                where the owner had been typing. */}
+            <VersionHistory
+                pageId={pageId}
+                revisions={revisions}
+                hasDraft={editingDraft !== null || autosave.savedAt !== null}
+                onRestored={(document, library) => {
+                    // Before the document, not after: setContent remounts the
+                    // node views, and they resolve their embed against the
+                    // holder at that moment. The other order draws "these
+                    // images no longer exist" over a gallery that is intact.
+                    holder.merge(library);
+                    showPublished(document);
+                }}
+            />
+
             {/* Each dialog is mounted only while it is open, so it always
                 starts from a clean slate — no effect to reset its state. */}
             {dialog === 'file' && (
                 <FilePickerDialog
                     maxBytes={maxBytes}
+                    acceptedFormats={acceptedFormats}
                     uploadedCount={uploadedCount}
                     onUploaded={(record) => {
                         addToLibrary(record);
@@ -591,10 +805,8 @@ export function PageEditor({
                             return;
                         }
 
-                        // Inserted straight away: uploading from inside the
-                        // editor means "put this on the page", and leaving it
-                        // in the library would be the same two-step dance
-                        // this affordance exists to remove.
+                        // Inserted immediately — uploading from the editor
+                        // means "put this on the page", not "add to library".
                         editor
                             .chain()
                             .focus()
@@ -633,6 +845,7 @@ export function PageEditor({
             {dialog === 'image' && (
                 <ImagePickerDialog
                     maxBytes={maxBytes}
+                    acceptedFormats={acceptedFormats}
                     onUploaded={addToLibrary}
                     onPicked={(image) => holder.addImage(image)}
                     onClose={closeDialog}
@@ -653,15 +866,14 @@ export function PageEditor({
             {dialog === 'imageAside' && (
                 <ImagePickerDialog
                     maxBytes={maxBytes}
+                    acceptedFormats={acceptedFormats}
                     multiple={false}
                     onUploaded={addToLibrary}
                     onPicked={(image) => holder.addImage(image)}
                     onClose={closeDialog}
                     onSelect={(ulids) => {
-                        // Side and size are left to the node's own defaults
-                        // and changed on the block afterwards, where the owner
-                        // can see the result. Asking for them in the dialog
-                        // would be asking about a layout they cannot see yet.
+                        // Side/size default and are adjusted on the block
+                        // afterwards, once the owner can see the result.
                         if (ulids[0] !== undefined) {
                             editor
                                 .chain()
@@ -688,6 +900,24 @@ export function PageEditor({
                             .insertContent({
                                 type: 'youtubeEmbed',
                                 attrs: { videoId },
+                            })
+                            .run();
+                        closeDialog();
+                    }}
+                />
+            )}
+
+            {(dialog === 'tiktok' || dialog === 'instagram') && (
+                <SocialDialog
+                    platform={dialog}
+                    onClose={closeDialog}
+                    onSelect={(postId) => {
+                        editor
+                            .chain()
+                            .focus()
+                            .insertContent({
+                                type: 'socialEmbed',
+                                attrs: { platform: dialog, postId },
                             })
                             .run();
                         closeDialog();
@@ -723,6 +953,34 @@ export function PageEditor({
     );
 }
 
+/**
+ * The concept's own status line.
+ *
+ * Built from a fixed set of branches rather than by interpolating the status
+ * into a key: a key assembled from a variable is one LocalisationTest cannot
+ * check, and a missing one puts a dotted path on screen.
+ */
+function draftLine(status: DraftStatus, savedAt: string | null): string {
+    if (status === 'saving') {
+        return t('ui.editor.draft.saving');
+    }
+
+    if (status === 'failed') {
+        return t('ui.editor.draft.failed');
+    }
+
+    if (savedAt === null) {
+        return '';
+    }
+
+    const time = new Date(savedAt).toLocaleTimeString(intlLocale, {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+
+    return `${t('ui.editor.draft.saved_at', { time })} ${t('ui.editor.draft.unpublished')}`;
+}
+
 function ToolbarButton({
     icon: Icon,
     label,
@@ -756,13 +1014,8 @@ function ToolbarSeparator() {
     return <Separator orientation="vertical" className="mx-1 !h-6" />;
 }
 
-/**
- * A table command, as a word rather than an icon.
- *
- * There are eight of these and no icon set distinguishes "row above" from
- * "row below" at 16px. They only appear while the caret is inside a table, so
- * the space is affordable and the words are unambiguous.
- */
+/** A table command as a word, not an icon — no icon set distinguishes "row
+ * above" from "row below" at 16px, and these only show while in a table. */
 function TableButton({
     label,
     onClick,

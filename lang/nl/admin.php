@@ -31,6 +31,11 @@ return [
         'duplicated' => 'Pagina gekopieerd. De kopie staat op verborgen tot je hem publiceert.',
         'content_saved' => 'Pagina-inhoud opgeslagen.',
         'content_unreadable' => 'De inhoud van deze pagina kon niet worden gelezen.',
+        'draft_discarded' => 'Het concept is weggegooid. De gepubliceerde pagina is niet gewijzigd.',
+        // Herstellen is zelf een publicatie: de versie die op de site stond
+        // gaat als nieuwste versie de geschiedenis in, dus de stap is terug
+        // te draaien.
+        'revision_restored' => 'De oude versie staat weer op de site. De versie die er stond is bewaard in de geschiedenis.',
         'save_failed' => 'Deze wijziging kon niet worden opgeslagen.',
         'topic_required' => 'Kies een onderwerp voor deze pagina.',
     ],
@@ -40,6 +45,9 @@ return [
         'updated' => 'Download bijgewerkt.',
         'deleted' => 'Download verwijderd.',
         'file_required' => 'Kies een bestand.',
+        // An attachment names one library or the other, never both — the same
+        // rule the CHECK constraint on page_downloads enforces.
+        'one_source_only' => 'Kies één bestand: een document of video, óf een afbeelding.',
         'file_missing' => 'Het gekozen bestand bestaat niet.',
         'already_attached' => 'Dit bestand staat al bij de downloads van deze pagina.',
         // The heading over the list of pages blocking a file's deletion.
@@ -83,6 +91,16 @@ return [
         'image_missing' => 'Die afbeelding bestaat niet.',
         'saved_and_reindexed' => 'Instellingen opgeslagen. De zoekindex is opnieuw opgebouwd voor de nieuwe taal.',
         'content_language_unknown' => 'Kies een taal uit de lijst.',
+    ],
+
+    'theme' => [
+        'saved' => 'De kleuren zijn opgeslagen.',
+        'reset' => 'De kleuren staan weer op de standaardinstelling.',
+        // The contrast gate runs in the browser; this is the other check, and
+        // it is the one that matters for safety: the value ends up inside a
+        // <style> block, so anything that is not plainly a colour is refused
+        // rather than repaired.
+        'not_a_colour' => 'Dat is geen kleur. Gebruik een hexcode zoals #00a8ff.',
     ],
 
     'backups' => [

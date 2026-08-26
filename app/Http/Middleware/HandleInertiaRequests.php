@@ -65,18 +65,11 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Every validation message per field, not just the first.
-     *
-     * Inertia's own `errors` prop keeps one message per key — see
-     * Middleware::resolveValidationErrors — which is right for a field with a
-     * single rule and wrong for a password, where four requirements can fail
-     * at once and the owner would otherwise meet them one submission at a
-     * time.
-     *
-     * Shared alongside `errors` rather than by flipping Inertia's
-     * `withAllErrors`, which would turn every `errors.title` in the front end
-     * into an array and break the twenty-odd screens typed against a string.
-     * Screens that want the full list opt in; nothing else changes.
+     * Every validation message per field, not just the first. Inertia's own
+     * `errors` prop keeps one message per key, which is wrong for a password
+     * where several requirements can fail at once. Shared alongside `errors`
+     * rather than via Inertia's `withAllErrors`, which would turn every
+     * `errors.title` into an array and break screens typed against a string.
      *
      * @return array<string, list<string>>
      */

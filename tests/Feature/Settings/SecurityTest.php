@@ -118,26 +118,18 @@ class SecurityTest extends TestCase
     }
 
     /**
-     * Changing the password has to end the sessions opened under the old one.
-     *
-     * The commonest reason to change a password is believing someone else has
-     * it. Before this, the new hash changed nothing for them — their cookie
-     * kept working until SESSION_LIFETIME expired it, and any activity
-     * renewed that.
+     * Changing a password must end sessions opened under the old one — otherwise
+     * a stolen session keeps working after the owner "fixes" it.
      */
     public function test_changing_the_password_signs_out_other_sessions()
     {
-        // The suite forces SESSION_DRIVER=array (phpunit.xml), and the
-        // controller deliberately does nothing on a driver whose sessions it
-        // cannot reach — so this test has to ask for the driver the
-        // application actually ships with, or it would assert on the branch
-        // that is skipped rather than the one that matters.
+        // Suite defaults to SESSION_DRIVER=array, on which the controller can't reach
+        // other sessions at all; force the database driver the app actually ships with.
         config(['session.driver' => 'database']);
 
         $user = User::factory()->create(['password' => 'oud-wachtwoord']);
 
-        // A second session for the same account, as a row in the table the
-        // database session driver reads.
+        // A second session row, as the database session driver reads it.
         DB::table('sessions')->insert([
             'id' => 'een-andere-sessie',
             'user_id' => $user->id,

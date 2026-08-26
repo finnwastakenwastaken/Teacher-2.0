@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import { ContentSummaryCard } from '@/components/content-summary-card';
 import type { IconData } from '@/components/icon';
 import type { ContentSummary } from '@/components/content-summary-card';
+import { ImageLightbox } from '@/components/content/image-lightbox';
 import { RichText } from '@/components/content/rich-text';
 import PublicLayout from '@/layouts/public-layout';
 import type { TipTapDoc } from '@/types/tiptap';
@@ -28,18 +29,19 @@ type Props = {
 export default function Welcome({ home, topics, icons }: Props) {
     return (
         <PublicLayout>
-            {/* Deliberately empty: the title resolver in app.tsx falls back
-                to the site's own name, so the homepage tab reads "Natuurkunde
-                bij De Vries" rather than repeating the heading beside it. It
-                still has to be set, or a client-side navigation back here
-                would leave the previous page's title in the tab. */}
+            {/* Empty on purpose so app.tsx's title resolver falls back to the
+                site name; still needs setting, or a client-side nav back here
+                would keep the previous page's title. */}
             <Head title="" />
 
             {home.banner && (
-                <img
-                    src={home.banner.url}
-                    alt={home.banner.alt}
-                    className="mb-8 max-h-72 w-full rounded-lg object-cover"
+                // Cropped to a band here, whole in the overlay — see the
+                // page banner, which is the same trade.
+                <ImageLightbox
+                    images={[home.banner]}
+                    eager
+                    className="mb-8"
+                    imageClassName="max-h-72 rounded-lg object-cover"
                 />
             )}
 

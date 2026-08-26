@@ -13,14 +13,8 @@ use Illuminate\Support\Facades\Hash;
 /**
  * A named, reusable password guarding a topic branch or a single page.
  *
- * The columns, for static analysis.
- *
- * Eloquent resolves these at runtime, so nothing here changes behaviour —
- * but without them every `$model->column` is an undefined property to
- * PHPStan, and a genuine typo becomes indistinguishable from a hundred
- * false ones. Keep in step with the migrations: a column added without a
- * line here is invisible to the analyser, and a line here without a column
- * is a lie it will believe.
+ * Columns below are for PHPStan; keep them in step with the migrations or
+ * the analyser misses typos and believes stale ones.
  *
  * @property int $id
  * @property string $name
@@ -40,12 +34,8 @@ class AccessPassword extends Model
     protected $hidden = ['password_hash'];
 
     /**
-     * The only two ways the hash is ever written.
-     *
-     * `password_hash` is deliberately not fillable, and creating the record
-     * before hashing would hit the NOT NULL constraint anyway — so there is
-     * no path that accidentally stores a row without a secret, or stores a
-     * plaintext one.
+     * `password_hash` is deliberately not fillable, so this and
+     * changePassword() are the only ways it is ever written.
      */
     public static function createWithPassword(string $name, string $plain): self
     {

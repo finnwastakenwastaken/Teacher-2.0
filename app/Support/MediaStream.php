@@ -7,17 +7,9 @@ use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * How authorised bytes leave the application.
- *
- * Deliberately separate from the decision of *whether* they may leave, which
- * belongs to App\Support\MediaAccess and to it alone. Two routes now need to
- * send a private file — the media route and the counted download route — and
- * a second hand-written copy of the X-Accel handling is exactly how the two
- * would drift apart. Callers authorise, then call send().
- *
- * This class must never make an access decision. If a caller reaches it, the
- * request has already been allowed.
- *
+ * How authorised bytes leave the application — deliberately separate from
+ * *whether* they may, which belongs to MediaAccess alone. This class must
+ * never make an access decision; callers authorise first, then call send().
  * See the technical reference for why nginx does the streaming.
  */
 class MediaStream
@@ -52,18 +44,13 @@ class MediaStream
     }
 
     /**
-     * A backup archive, on its own disk and through its own internal nginx
-     * location.
-     *
-     * Here for the reason this class exists: the X-Accel handling is subtle
-     * (empty body, per-segment encoding, no Accept-Ranges, a PHP fallback for
-     * the test suite) and a second hand-written copy would drift. What is
-     * emphatically *not* shared is the decision — an archive holds the whole
-     * database, so its caller is behind `auth` and never consults
-     * App\Support\MediaAccess.
-     *
-     * The name is validated by App\Services\BackupArchive::resolve() before
-     * it gets here; there is no path component to traverse.
+     * A backup archive, on its own disk and its own internal nginx location.
+     * Shares the subtle parts of `emit()` this class exists for — the empty
+     * body, the per-segment URL encoding, omitting Accept-Ranges, and the
+     * PHP-streaming fallback for the test suite — but does NOT share the
+     * access decision: an archive holds the whole database, so its caller is
+     * behind `auth` and never consults MediaAccess. The name is validated by
+     * BackupArchive::resolve() before it gets here.
      */
     public static function sendArchive(string $name): Response
     {

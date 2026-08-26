@@ -4,28 +4,13 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Let PHP recognise these two refusals by a code rather than by their prose.
- *
- * Both triggers raise a message written in Dutch, and the controller decided
- * which friendly error to show the owner by searching the raw Postgres error
- * text for the substring 'niveaus diep'. That works until someone rewords the
- * message — at which point the branch stops matching, forever, with no test
- * failing and the owner getting "this change could not be saved" for a depth
- * violation that has a perfectly good explanation.
- *
- * Branching on the text of an error message across a language boundary is the
- * actual defect; the wording is not an API. plpgsql lets `raise` carry an
- * SQLSTATE, so each one gets a code that PHP can switch on and nobody will
- * ever be tempted to translate.
- *
- * TD001 / TS001: classes TD and TS are not used by PostgreSQL itself (it
- * reserves 00–42, 44, 53–58, 72, F0, HV, P0 and XX), so they cannot collide
- * with a built-in condition.
- *
- * The messages are unchanged. Only the codes are new, and the function bodies
- * are otherwise reproduced verbatim from
- * 2026_08_09_000003_create_topic_tree_integrity_triggers — `create or replace`
- * rather than editing that migration, which has already run everywhere.
+ * Gives PHP a stable error code instead of matching Dutch error prose (the
+ * controller was substring-matching 'niveaus diep', which silently breaks the
+ * moment the message is reworded). SQLSTATE codes TD001-3/TS001 use the TD/TS
+ * classes, unused by PostgreSQL itself, so they can't collide with a
+ * built-in condition. Messages are unchanged; function bodies are otherwise
+ * reproduced verbatim from 2026_08_09_000003 via `create or replace` rather
+ * than editing that already-run migration.
  */
 return new class extends Migration
 {

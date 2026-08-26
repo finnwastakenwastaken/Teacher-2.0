@@ -6,14 +6,9 @@ use App\Support\PageContent;
 use Tests\TestCase;
 
 /**
- * The editor's second wave of node types: tables, subscript/superscript and
- * text alignment.
- *
- * Each of these is a whitelist entry in App\Support\PageContent, a case in
- * components/content/rich-text.tsx and a toolbar button. The whitelist is
- * what these tests pin — a node type the editor can make but the whitelist
- * does not know about silently stops saving, which is the safe direction to
- * fail and an unpleasant one to debug.
+ * Tables, subscript/superscript and text alignment: each is a whitelist entry
+ * in PageContent, a case in rich-text.tsx and a toolbar button. A node the
+ * editor can make but the whitelist doesn't know silently stops saving.
  */
 class RichContentTest extends TestCase
 {

@@ -16,14 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The columns, for static analysis.
- *
- * Eloquent resolves these at runtime, so nothing here changes behaviour —
- * but without them every `$model->column` is an undefined property to
- * PHPStan, and a genuine typo becomes indistinguishable from a hundred
- * false ones. Keep in step with the migrations: a column added without a
- * line here is invisible to the analyser, and a line here without a column
- * is a lie it will believe.
+ * Columns below are for PHPStan; keep them in step with the migrations or
+ * the analyser misses typos and believes stale ones.
  *
  * @property int $id
  * @property int|null $parent_id
@@ -47,13 +41,10 @@ use Illuminate\Support\Facades\DB;
 class Topic extends Model
 {
     /**
-     * The deepest a topic may sit: three levels, numbered from zero.
-     *
-     * The value that actually enforces this is in the Postgres trigger
-     * (2026_08_09_000003_create_topic_tree_integrity_triggers.php) — the
-     * application cannot close the race on its own. This constant is for the
-     * checks that turn the trigger's refusal into a form error before the
-     * owner ever meets it.
+     * The deepest a topic may sit: three levels, numbered from zero. The
+     * Postgres trigger (2026_08_09_000003_create_topic_tree_integrity_triggers.php)
+     * is what actually enforces this; this constant only lets form checks
+     * turn its refusal into a friendly error first.
      */
     public const MAX_DEPTH = 2;
 
@@ -72,24 +63,19 @@ class Topic extends Model
      *
      * `content` is deliberately absent from #[Fillable]: this is the only
      * writer, so no future `update($request->validated())` can put an
-     * unwhitelisted document in the column by adding one validation rule.
+     * unwhitelisted document in the column.
      *
-     * Embeds are stripped rather than allowed. A file becomes publicly
+     * Embeds are stripped rather than allowed: a file becomes publicly
      * reachable by walking from it to the *pages* showing it
-     * (App\Support\MediaAccess) and a topic is not a page row, so an embed
-     * here would render for the owner and 403 for every student — the exact
-     * trap the homepage introduction has. Text, links and lists are what an
-     * introduction needs; a lesson belongs on a page.
+     * (App\Support\MediaAccess), and a topic is not a page row — an embed
+     * here would render for the owner and 403 for every student.
      *
      * @param  array<string, mixed>|null  $document
      */
     public function writeContent(?array $document): void
     {
-        // Both callers already wrap this, so the transaction is nested and
-        // costs nothing. It is here anyway because Page::writeContent() has
-        // one and this did not: an asymmetry between two methods of the same
-        // name is a trap for whoever writes the third caller, and the version
-        // without the guarantee is the one they will copy.
+        // Wrapped in a transaction for symmetry with Page::writeContent(),
+        // even though both callers already wrap this too.
         DB::transaction(function () use ($document): void {
             $this->forceFill([
                 'content' => PageContent::sanitiseWithoutEmbeds($document),

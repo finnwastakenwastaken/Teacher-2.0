@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Support\PasswordPolicy;
 use App\Support\SiteSettings;
+use App\Support\ThemePalette;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\View\View as ViewContract;
@@ -17,46 +18,36 @@ use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         $this->configureDefaults();
         $this->configureRateLimiting();
-        $this->shareBranding();
+        $this->shareSiteChrome();
     }
 
     /**
-     * The site's title and favicon, for the root Blade template.
-     *
-     * Inertia shares the same values with React, but the <title> and the
-     * favicon have to be right in the server-rendered HTML — before any
-     * JavaScript runs — or the tab flickers from the default to the real
-     * name on every first load.
-     *
-     * A composer rather than View::share, so the query runs only when the
-     * root template actually renders — never during migrations, console
-     * commands or asset requests, where the table may not even exist yet.
+     * The site's title, favicon and colours, for the root Blade template —
+     * must be right in the server-rendered HTML, before any JavaScript runs,
+     * or the tab flickers from the default and a rebranded site paints the
+     * shipped palette before repainting itself. The palette especially can't
+     * come from React: it's custom properties the whole document is styled
+     * from. A composer rather than View::share, so the query runs only when
+     * the root template actually renders, never during migrations, console
+     * commands or asset requests where the table may not exist yet.
      */
-    protected function shareBranding(): void
+    protected function shareSiteChrome(): void
     {
         View::composer('app', function (ViewContract $view): void {
             $view->with('siteBranding', SiteSettings::forInertia());
+            $view->with('themePaletteStyle', ThemePalette::style());
         });
     }
 
-    /**
-     * Configure default behaviors for production-ready applications.
-     */
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);
@@ -65,12 +56,8 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        /*
-         * The requirements themselves live in PasswordPolicy, because they
-         * are also rendered on screen as a checklist and two copies of the
-         * same five rules drift. See that class for why production is strict
-         * and why development is not.
-         */
+        // Requirements live in PasswordPolicy, which also renders the
+        // on-screen checklist, so the two cannot drift apart.
         Password::defaults(fn (): Password => PasswordPolicy::rule());
     }
 

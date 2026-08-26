@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { jsonRequestHeaders } from '@/lib/csrf';
 import { formatBytes } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { MediaFileKind } from '@/types';
+import type { AcceptedFormats, MediaFileKind, MediaKind } from '@/types';
 import {
     chunk as chunkRoute,
     complete as completeRoute,
@@ -27,37 +27,20 @@ import {
 import { t } from '@/lib/i18n';
 
 /*
- * Chunked upload, by hand.
- *
- * Cloudflare Free/Pro rejects any request body over 100 MB, so a lecture
- * video can never be one POST. The server hands back a chunk size and a chunk
- * count, and this walks the file with Blob.slice(). No upload library is
- * involved on purpose (the technical reference: the stack stays small).
- *
- * Two things the server is strict about and this must match exactly:
- *
- *   - every chunk but the last is *exactly* chunkBytes. Slicing at
- *     i * chunkBytes .. (i + 1) * chunkBytes gives that for free, including
- *     the short remainder at the end.
- *   - alt_text is mandatory once the assembled file turns out to be an image.
- *     The server sniffs content and only finds out at complete() — far too
- *     late to prompt. So the prompt happens up front for anything the browser
- *     calls an image, and the answer is carried through the whole upload.
- *
- * Uploads run one at a time. Parallelism would buy little against a home-lab
- * uplink and makes progress, cancellation and error reporting much harder to
- * reason about.
+ * Chunked upload, by hand (no library — the technical reference: keep the stack small).
+ * Cloudflare rejects request bodies over 100 MB, so the server hands back a
+ * chunk size/count and this walks the file with Blob.slice(); slicing at
+ * i*chunkBytes..(i+1)*chunkBytes keeps every chunk but the last exactly
+ * chunkBytes, which the server requires. Alt text is asked up front for
+ * anything the browser calls an image, since the server only learns the
+ * real type (by sniffing) at complete() — too late to prompt. Uploads run
+ * one at a time for simpler progress/cancellation/error handling.
  */
 
 type UploadStatus = 'waiting' | 'uploading' | 'done' | 'failed' | 'cancelled';
 
-/**
- * What the server made of the assembled bytes, from the complete endpoint.
- *
- * The type is decided by sniffing, not by what the browser claimed, so the
- * caller finds out here and nowhere earlier. The keys match the shapes the
- * page editor is already given, so a record can be used as-is.
- */
+/** What the server made of the assembled bytes (sniffed, not the browser's
+ * claim). Keys match the shapes the page editor already uses. */
 export type UploadedRecord =
     | {
           type: 'image';
@@ -113,17 +96,10 @@ const STATUS_CLASSES: Record<UploadStatus, string> = {
     cancelled: 'bg-muted text-muted-foreground',
 };
 
-/*
- * Whether to ask for alt text before this file is sent.
- *
- * The server decides what a file really is by sniffing the assembled bytes,
- * far too late to prompt for anything — so this has to guess, and guessing low
- * costs the owner a rejected upload after the bytes have already gone up.
- *
- * The extension list is why: Windows has no MIME registration for HEIC, so a
- * photo dragged off an iPhone arrives with an empty `type` there and would
- * sail past a check on `type` alone.
- */
+// Whether to ask for alt text before sending: a guess, since the server only
+// knows for sure after sniffing. Extensions are checked too because Windows
+// has no MIME registration for HEIC, so an iPhone photo arrives with an
+// empty `type` and would slip past a check on `type` alone.
 const IMAGE_EXTENSIONS = [
     'jpg',
     'jpeg',
@@ -135,6 +111,61 @@ const IMAGE_EXTENSIONS = [
     'heic',
     'heif',
 ];
+
+/*
+ * What the server accepts, said before a file is chosen.
+ *
+ * A teacher used to find out which video formats work by uploading one and
+ * waiting — behind a tunnel, that is a multi-gigabyte wait ending in a
+ * rejection. The list itself comes from App\Support\MediaFormats, which reads
+ * the same table the server judges the assembled bytes against, so nothing
+ * here can drift out of step with what is actually taken.
+ *
+ * Video leads, because it is the group where a wrong guess is expensive; the
+ * order is the server's, not this file's. The key per kind is built from a
+ * fixed map rather than interpolated, so LocalisationTest can see it —
+ * see the technical reference, "a key built from a variable cannot be checked".
+ */
+const FORMAT_KIND_KEYS: Record<MediaKind, string> = {
+    video: 'ui.uploader.formats.video',
+    document: 'ui.uploader.formats.document',
+    image: 'ui.uploader.formats.image',
+};
+
+function AcceptedFormatList({ formats }: { formats: AcceptedFormats }) {
+    // Object.entries, not a list of the three names: the server decides the
+    // order and which groups exist, and repeating either here would be the
+    // second list this feature exists to remove.
+    const groups = Object.entries(formats).filter(
+        ([kind, extensions]) =>
+            kind in FORMAT_KIND_KEYS && extensions.length > 0,
+    );
+
+    if (groups.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="grid gap-0.5 text-xs text-muted-foreground">
+            <p>{t('ui.uploader.formats.heading')}</p>
+            <ul className="grid gap-0.5">
+                {groups.map(([kind, extensions]) => (
+                    <li key={kind}>
+                        {/* Wrapping, not scrolling: ten document extensions
+                            do not fit on one line at 375 px, and a sideways
+                            scrollbar inside a drop zone is worse than two
+                            lines of text. */}
+                        <span className="break-words">
+                            {t(FORMAT_KIND_KEYS[kind as MediaKind], {
+                                list: extensions.join(', '),
+                            })}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
 function isImageFile(file: File): boolean {
     if (file.type.startsWith('image/')) {
@@ -185,16 +216,19 @@ function ProgressBar({ value }: { value: number }) {
 type MediaUploaderProps = {
     maxBytes: number;
     /**
-     * Called once per finished file, awaited before the next one starts.
-     *
+     * Accepted extensions per kind, from the server's own type table. Every
+     * uploader gets the whole set rather than the one its surroundings are
+     * about, because the type is decided by sniffing the assembled bytes —
+     * narrowing this per caller would put a rule on the screen the server
+     * does not enforce.
+     */
+    acceptedFormats: AcceptedFormats;
+    /**
+     * Called once per finished file, awaited before the next one starts —
+     * firing these in parallel would drop all but the last Inertia visit.
      * Providing it also takes over what happens afterwards: the media screen
      * reloads to show the new rows, but the page editor links the file to the
-     * page instead, and a reload there would throw away an unsaved body. So
-     * `router.reload()` only runs when nobody is listening.
-     *
-     * Awaiting matters: linking is an Inertia visit, and Inertia cancels the
-     * visit in flight when a new one starts. Firing these off in parallel
-     * would silently drop all but the last file.
+     * page instead, and a reload there would discard an unsaved body.
      */
     onUploaded?: (record: UploadedRecord) => void | Promise<void>;
     /** Drops the drop-zone to a single row, for use inside a section. */
@@ -207,6 +241,7 @@ type MediaUploaderProps = {
 
 export function MediaUploader({
     maxBytes,
+    acceptedFormats,
     onUploaded,
     compact = false,
     title,
@@ -595,6 +630,9 @@ export function MediaUploader({
                                 size: formatBytes(maxBytes),
                             })}
                     </p>
+                    {/* Inside the text column so it inherits its min-w-0 and
+                        wraps rather than widening the drop zone. */}
+                    <AcceptedFormatList formats={acceptedFormats} />
                 </div>
 
                 {/* The visible button below is the control; this input only

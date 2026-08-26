@@ -8,24 +8,18 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Choosing the interface language.
+ * Resolution order: cookie, then Accept-Language, then Dutch.
  *
- * The rule is: an explicit choice wins, a browser's advertised preference
- * decides for anyone who has not made one, and Dutch decides for anyone left.
- *
- * Asserted on the rendered `<html lang>` rather than on app()->getLocale(),
- * because the failure that matters is a visible one — the attribute a screen
- * reader picks its pronunciation from, written by Blade before hydration.
+ * Asserted on rendered `<html lang>`, not app()->getLocale() — it's the attribute
+ * a screen reader uses, written by Blade before hydration.
  */
 class LocaleTest extends TestCase
 {
     use RefreshDatabase;
 
     /**
-     * The header is cleared explicitly, because Symfony's Request::create()
-     * — which the test client goes through — injects a default
-     * `Accept-Language: en-us,en;q=0.5` of its own. Without this the test
-     * would be asserting the opposite of what it says.
+     * Header cleared explicitly: Symfony's Request::create() (used by the test
+     * client) injects its own default `Accept-Language`, which would defeat this test.
      */
     public function test_dutch_is_served_when_nothing_is_asked_for()
     {
@@ -49,9 +43,8 @@ class LocaleTest extends TestCase
     }
 
     /**
-     * The whole point of storing a choice: it has to beat what the browser
-     * advertises, or a Dutch-speaking visitor on an English phone can never
-     * make the site stay Dutch.
+     * The stored cookie must beat the browser's Accept-Language, or a visitor can
+     * never make the site stay in their chosen language.
      */
     public function test_the_cookie_beats_the_browser_preference()
     {
@@ -63,9 +56,8 @@ class LocaleTest extends TestCase
 
     public function test_a_tampered_cookie_is_ignored_rather_than_trusted()
     {
-        // The value reaches a JavaScript string literal in app.blade.php,
-        // where Blade's escaping is for HTML and therefore the wrong context.
-        // It is an enum, so it is treated as one.
+        // The value reaches a JS string literal in app.blade.php, where Blade's
+        // HTML-escaping is the wrong context — so it's validated as an enum instead.
         $this->withHeader('Accept-Language', '')
             ->withCookie(Locale::COOKIE, '../../etc/passwd')
             ->get('/')
@@ -88,9 +80,8 @@ class LocaleTest extends TestCase
     }
 
     /**
-     * The dictionary is handed over with the document rather than as an
-     * Inertia shared prop, so that switching — which is a full page load —
-     * cannot leave the chrome one language behind.
+     * The dictionary rides with the document, not as an Inertia shared prop, since
+     * switching languages is a full page load anyway.
      */
     public function test_the_active_dictionary_is_sent_with_the_document()
     {
@@ -101,9 +92,8 @@ class LocaleTest extends TestCase
     }
 
     /**
-     * Validation and authentication messages reach the browser already
-     * rendered, in the error bag. Shipping the rule table as well would be
-     * about 170 lines of dictionary on every document for nobody to read.
+     * Validation/auth messages arrive already rendered in the error bag; shipping
+     * their rule tables too would be ~170 unused lines per document.
      */
     public function test_server_only_messages_are_not_shipped_to_the_browser()
     {
@@ -114,9 +104,8 @@ class LocaleTest extends TestCase
     }
 
     /**
-     * Content is never translated — that is the boundary this whole feature
-     * sits behind. A page keeps its title in whichever language it was
-     * written in, whoever is looking at it.
+     * Content is never translated — a page keeps its title in whichever language it
+     * was written in, regardless of interface locale.
      */
     public function test_content_is_not_translated()
     {

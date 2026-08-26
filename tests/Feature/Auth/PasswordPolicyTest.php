@@ -12,13 +12,8 @@ use Illuminate\Validation\Rules\Password;
 use Tests\TestCase;
 
 /**
- * The password policy, and the messages that report breaking it.
- *
- * The whole point of PasswordPolicy is that the checklist on screen and the
- * rule the server enforces come from one declaration. These tests pin that
- * they cannot drift apart, and that the resulting messages are Dutch rather
- * than the framework's English — which is what they were until lang/nl
- * existed, on a site whose interface is Dutch.
+ * Pins that PasswordPolicy's checklist and its enforced rule cannot drift apart,
+ * and that rejection messages are Dutch rather than the framework's English default.
  */
 class PasswordPolicyTest extends TestCase
 {
@@ -32,18 +27,14 @@ class PasswordPolicyTest extends TestCase
     }
 
     /**
-     * describe() is what the front end draws; rule() is what the server
-     * enforces. If a requirement is described it must be enforced, and the
-     * other way round — a checklist that ticks while the server refuses is
-     * worse than no checklist at all.
+     * describe() (front end) and rule() (server) must agree on every requirement.
      */
     public function test_every_described_requirement_is_actually_enforced()
     {
         $policy = PasswordPolicy::describe();
         $rule = PasswordPolicy::rule();
 
-        // A password that satisfies everything the policy could ask for,
-        // then one weakened in exactly one way per requirement.
+        // A fully-compliant password, then one weakened in exactly one way per requirement.
         $strong = str_repeat('Aa1!', 8);
 
         $this->assertTrue(
@@ -77,9 +68,7 @@ class PasswordPolicyTest extends TestCase
 
     public function test_the_registered_default_is_the_policy()
     {
-        // Anything asking for Password::default() — both Form Requests and
-        // both Artisan commands — has to get the same rule, or the checklist
-        // describes something no screen actually applies.
+        // Everything asking for Password::default() must get the same rule as the policy.
         $this->assertSame(
             (string) PasswordPolicy::rule()->toPasswordRulesString(),
             (string) Password::defaults()->toPasswordRulesString(),
@@ -103,7 +92,7 @@ class PasswordPolicyTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)
-            // The route sits behind RequirePassword.
+            // Route sits behind RequirePassword.
             ->withSession(['auth.password_confirmed_at' => time()])
             ->get(route('security.edit'));
 
@@ -116,9 +105,7 @@ class PasswordPolicyTest extends TestCase
     }
 
     /**
-     * The bug this was reported as: the message was English, on a screen that
-     * is otherwise entirely Dutch, because no lang/nl existed and the
-     * fallback locale is also `nl`.
+     * Regression: without lang/nl, the message fell back to English on an otherwise Dutch screen.
      */
     public function test_a_rejected_password_is_reported_in_the_visitor_s_language()
     {
@@ -149,18 +136,13 @@ class PasswordPolicyTest extends TestCase
     }
 
     /**
-     * Inertia's own `errors` prop keeps one message per field, which is how
-     * the owner ended up meeting a five-part policy one submission at a time.
-     * `errorList` carries the rest — see
-     * HandleInertiaRequests::allValidationErrors().
+     * Inertia's `errors` prop keeps only one message per field; `errorList` carries
+     * the rest (see HandleInertiaRequests::allValidationErrors()).
      */
     public function test_all_password_failures_are_reported_at_once()
     {
-        // Too short *and* not matching its confirmation. Deliberately not a
-        // password that breaks several policy rules: the policy is weaker
-        // outside production, so such a case would prove one message here
-        // and four on the deployed site — which is the wrong way round for a
-        // regression test. These two rules are in force in every environment.
+        // Too short *and* mismatched confirmation — both rules are enforced in every
+        // environment, unlike the policy's stricter-in-production rules.
         $response = $this->followingRedirects()
             ->from(route('admin.claim.create'))
             ->post(route('admin.claim.store'), [
@@ -170,13 +152,11 @@ class PasswordPolicyTest extends TestCase
                 'password_confirmation' => 'bbb',
             ]);
 
-        // Asserted on the props the screen actually receives rather than on
-        // the session, because that is the thing that was broken: every
-        // message existed, and only the first ever reached the browser.
+        // Asserted on the props the screen receives, not the session — only the first
+        // message ever reached the browser was the actual bug.
         $response->assertInertia(
             fn ($page) => $page
-                // Inertia's own prop: still one string, so the twenty screens
-                // typed against `errors.foo: string` keep working.
+                // Stays a single string so `errors.foo: string` screens keep working.
                 ->where('errors.password', fn ($first) => is_string($first))
                 ->has('errorList.password', 2)
         );

@@ -6,6 +6,7 @@ use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\PrivacyController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\UnlockController;
@@ -13,9 +14,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'show'])->name('home');
 
-// Gated media. Public routes by URL, but every request is authorised by
-// App\Support\MediaAccess before a single byte is released — this is the only
-// way uploaded files are ever served. See the technical reference.
+// Gated media: public URLs, but every request is authorised by
+// App\Support\MediaAccess before any byte is released.
 Route::get('images/{image}', [MediaController::class, 'image'])->name('images.show');
 Route::get('media/{mediaFile}', [MediaController::class, 'file'])->name('media.show');
 
@@ -27,17 +27,19 @@ Route::get('downloads/{pageDownload}', [DownloadController::class, 'show'])->nam
 // Dutch public URL, like the rest of the visitor-facing site.
 Route::get('zoeken', [SearchController::class, 'show'])->name('search');
 
-// What crawlers are told. Both are generated rather than static files: the
-// Sitemap: line needs an absolute URL, and behind the tunnel the domain is
-// whatever Cloudflare forwards. English names because they are protocol,
-// not copy — a crawler looks for these exact paths.
+// Spelled the same in both languages, so it needs no Dutch counterpart. Like
+// `zoeken`, it is declared ahead of the catch-all and therefore reserves the
+// slug: no topic can be called `privacy`.
+Route::get('privacy', [PrivacyController::class, 'show'])->name('privacy');
+
+// Generated, not static files: the Sitemap: line needs an absolute URL, and
+// behind the tunnel the domain is whatever Cloudflare forwards.
 Route::get('robots.txt', [SitemapController::class, 'robots'])->name('robots');
 Route::get('sitemap.xml', [SitemapController::class, 'show'])->name('sitemap');
 
-// Switching the interface language. A POST because it writes a cookie, and a
-// redirect because the switch has to be a full page load — <html lang> and
-// the document title are rendered by Blade. Content is never translated; only
-// the interface is. Dutch URL, like the rest of the visitor-facing site.
+// Switching the interface language. POST because it writes a cookie; the
+// switch needs a full page load since <html lang> and the title render in
+// Blade.
 Route::post('taal', [LocaleController::class, 'store'])->name('locale.store');
 
 // Entering a password for protected content. Takes the path the visitor was
@@ -45,10 +47,9 @@ Route::post('taal', [LocaleController::class, 'store'])->name('locale.store');
 // which password guards what. Rate limited per IP per password inside.
 Route::post('unlock', [UnlockController::class, 'store'])->name('unlock.store');
 
-// No 'verified' middleware anywhere in this application. Email verification is
-// disabled (see config/fortify.php), so the single admin account never has a
-// verified_at timestamp — gating on it would lock the only user out of the
-// only account.
+// No 'verified' middleware anywhere: email verification is disabled, so the
+// single admin account never has a verified_at — gating on it would lock the
+// owner out of their own site.
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show'])->name('dashboard');
 });

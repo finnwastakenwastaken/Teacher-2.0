@@ -6,14 +6,12 @@
 #
 # Pulls, builds, migrates, restarts.
 #
-# The order matters and is the whole design of this script. Building comes
-# before anything is recreated, so a failed build leaves the old containers
-# serving. Migrating comes before that too, run from the *new* image against
-# the still-running old one, because a migration is the only step here that
-# cannot be undone by starting the old containers again — and if it is going
-# to fail, it should fail while the site is still up rather than from inside
-# an entrypoint that then exits, restarts, and fails again with the site
-# answering 502 throughout.
+# The order is the whole design: build before anything is recreated, so a
+# failed build leaves the old containers serving; then migrate from the *new*
+# image against the still-running old one, because a migration can't be undone
+# by restarting the old containers and should fail while the site is still up
+# — not from inside an entrypoint that exits, restarts and fails again with
+# the site answering 502 throughout.
 #
 # Safe to re-run, and a no-op beyond a rebuild when there is nothing to pull.
 #
@@ -72,11 +70,9 @@ confirm() {
     [[ "$answer" =~ ^([jJ](a|A)?|[yY](es|ES)?)$ ]]
 }
 
-# What to do with the dump this script writes. Printed wherever the update
-# stops badly, because the dump is only useful to someone holding the command
-# that reads it — `restore.sh` takes a full backup archive (manifest, media
-# and all) and refuses a bare SQL stream, which is exactly the moment nobody
-# wants to discover that.
+# Printed wherever the update stops badly. This is a plain SQL dump, not a
+# backup archive — `restore.sh` takes only a full archive (manifest, media and
+# all) and refuses a bare SQL stream, so the recovery command has to be here.
 restore_hint() {
     [[ -n "$DUMP_PATH" ]] || return 0
 
@@ -100,9 +96,9 @@ preflight() {
 
     docker compose version >/dev/null 2>&1 || fail 'docker compose is not available.'
 
-    # One update at a time. Two of these overlapping — or one overlapping the
-    # nightly backup:run from cron — means a container being destroyed under
-    # a command that is still using it.
+    # One update at a time — two overlapping (or one overlapping cron's
+    # nightly backup:run) means a container destroyed under a command still
+    # using it.
     if command -v flock >/dev/null 2>&1; then
         exec 9>"${TEACHER_DIR}/.update.lock"
         flock -n 9 || fail 'Another update is already running in this directory.'
@@ -110,9 +106,8 @@ preflight() {
         note 'flock is not installed, so concurrent runs are not prevented'
     fi
 
-    # The build runs on this machine, and at update time it competes with a
-    # running Postgres, PHP-FPM and nginx — so the headroom is strictly worse
-    # than it was at install time, when this was last checked.
+    # The build competes with a running Postgres, PHP-FPM and nginx, so
+    # headroom is worse than at install time.
     local ram_mb disk_gb
     ram_mb=$(awk '/^MemTotal:/ { printf "%d", $2 / 1024 }' /proc/meminfo)
     disk_gb=$(df -BG --output=avail "$TEACHER_DIR" | tail -1 | tr -dc '0-9')
@@ -129,9 +124,8 @@ preflight() {
         confirm 'Continue anyway?' || fail 'Stopped.'
     fi
 
-    # Only start the tunnel if this installation uses one. Reading it back from
-    # .env rather than asking again keeps a re-run from quietly changing the
-    # shape of the running stack.
+    # Read back from .env rather than asking again, so a re-run can't quietly
+    # change the shape of the running stack.
     if grep -qE '^CLOUDFLARE_TUNNEL_TOKEN=.+' .env; then
         COMPOSE_PROFILE_ARGS=(--profile tunnel)
         info 'This installation uses a Cloudflare Tunnel'
@@ -160,14 +154,11 @@ backup_database() {
     local target
     target="${TEACHER_BACKUP_DIR}/teacher-db-pre-update-$(date +%F-%H%M).sql.gz"
 
-    # 0600 before a byte is written, not after: this holds the admin's
-    # password hash, every access-password hash and every session, and
-    # /var/backups is world-readable on Debian. The umask is set in a
-    # subshell so the rest of the script keeps the operator's own.
-    #
-    # The credentials come from the container's own environment, so this keeps
-    # working if the operator changes DB_USERNAME or DB_DATABASE, and no
-    # password is ever passed as an argument.
+    # 0600 before a byte is written, not after: /var/backups is world-readable
+    # on Debian and this dump holds every password hash and session. The umask
+    # is set in a subshell so the rest of the script keeps the operator's own.
+    # Credentials come from the container's own environment — never passed as
+    # an argument — so this survives DB_USERNAME/DB_DATABASE changes too.
     if ( umask 077; docker compose exec -T database sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip >"$target" ); then
         DUMP_PATH="$target"
         info "Wrote ${target} ($(du -h "$target" | cut -f1))"
@@ -180,11 +171,9 @@ backup_database() {
     prune_dumps
 }
 
-# Every run writes one of these and nothing ever removed them, so a site
-# updated monthly for two years kept twenty-four full database dumps on the
-# same disk the media lives on. Same default as BACKUP_KEEP, and the same
-# rule: never prune what was not asked for — only this script's own dumps,
-# matched by the name this script gives them.
+# Every run writes one dump, so without pruning they accumulate indefinitely.
+# Same default and rule as BACKUP_KEEP: only ever prune this script's own
+# dumps, matched by the name it gives them.
 prune_dumps() {
     [[ "$TEACHER_KEEP_DUMPS" =~ ^[0-9]+$ ]] || return 0
     (( TEACHER_KEEP_DUMPS > 0 )) || return 0
@@ -212,32 +201,36 @@ pull_changes() {
         return
     fi
 
-    # An error rather than a warning. A site unpacked from a tarball or
-    # rsync'd from an old machine would otherwise rebuild the same code and
-    # report "Bijgewerkt." forever, and the operator would believe they were
-    # current. TEACHER_SKIP_PULL is how you say you meant it.
+    # An error, not a warning: a tarball or rsync'd checkout would otherwise
+    # silently rebuild the same code and report "Bijgewerkt." forever.
     [[ -e .git ]] || fail 'This is not a git checkout, so there is nothing to pull. Set TEACHER_SKIP_PULL=1 to rebuild what is here.'
 
-    # git refuses to work in a repository owned by another user, and this
-    # script runs as root while the clone may not have. That refusal arrives
-    # as a raw error two commands later, after the dirty-check has silently
-    # returned nothing.
+    # git refuses a repo owned by another user, and this script runs as root
+    # while the clone may not have — set this first or the dirty-check below
+    # silently returns nothing and the refusal surfaces as a raw error later.
     if ! git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$TEACHER_DIR"; then
         git config --global --add safe.directory "$TEACHER_DIR"
     fi
 
-    if [[ -n "$(git status --porcelain)" ]]; then
+    # `.update.lock` is excluded explicitly, not left to .gitignore. This
+    # script creates it seconds earlier, and the .gitignore entry that hides it
+    # only arrives with the version being pulled — so upgrading *from* a release
+    # older than that entry stops to ask the operator about a file the script
+    # itself just made, mid-update, with a prompt that defaults to no.
+    local dirty
+    dirty="$(git status --porcelain | grep -v '[[:space:]]\.update\.lock$' || true)"
+
+    if [[ -n "$dirty" ]]; then
         warn 'There are local changes in this checkout:'
-        git status --short >&2
+        printf '%s\n' "$dirty" >&2
         confirm 'Continue? A fast-forward pull will refuse to discard them.' || fail 'Stopped.'
     fi
 
     local before after
     before="$(git rev-parse --short HEAD)"
 
-    # Wrapped, because git's own wording here ("Not possible to fast-forward",
-    # "dubious ownership") says nothing about what state the site is in — and
-    # at this point the answer is a reassuring one.
+    # Wrapped because git's own error wording says nothing about the site's
+    # state — which at this point is the reassuring part.
     git pull --ff-only || {
         warn 'Could not fast-forward. Nothing has been changed and the site is still running.'
         restore_hint
@@ -254,19 +247,13 @@ pull_changes() {
     fi
 }
 
-# Keys install.sh writes that an .env from an earlier version does not have.
-#
-# There is no general mechanism for this and there deliberately is not one:
-# every other key the application reads has a default in its config file, so a
-# new one arriving in an update degrades to that default rather than to null.
-# This one cannot, because its fallback is a *plausible* value —
-# config/fortify.php uses APP_KEY when it is unset, so rotating APP_KEY (a
-# supported operation; APP_PREVIOUS_KEYS exists for it) silently unenrols
-# every passkey with no way back.
-#
-# Pinned to the current APP_KEY rather than to something random, exactly as
-# install.sh does for an existing site: that is the value the handles were
-# derived from, so it keeps the enrolments that already exist working.
+# Keys install.sh writes that an older .env lacks. No general backfill
+# mechanism exists: every other key has a config-file default, so a missing
+# one just degrades gracefully. This one can't — config/fortify.php falls back
+# to APP_KEY when unset, so rotating APP_KEY (supported, via
+# APP_PREVIOUS_KEYS) would silently unenrol every passkey. Pinned to the
+# current APP_KEY, as install.sh does, since that's the value existing
+# passkey handles were derived from.
 backfill_env() {
     step 'Checking .env for keys this version needs'
 
@@ -278,9 +265,8 @@ backfill_env() {
     fi
 
     local app_key
-    # A literal prefix match, not a regular expression: the value is a
-    # generated secret and must never be re-interpreted. Same rule as
-    # install.sh's set_env, and 9 is one past "APP_KEY=".
+    # Literal prefix match, not a regex — same rule as install.sh's set_env,
+    # since this value is a generated secret. 9 is one past "APP_KEY=".
     app_key="$(awk 'index($0, "APP_KEY=") == 1 { print substr($0, 9); exit }' .env)"
 
     if [[ -z "$app_key" ]]; then
@@ -300,15 +286,14 @@ backfill_env() {
     info "Pinned ${key} so a future APP_KEY rotation cannot unenrol passkeys"
 }
 
-# Built before anything is recreated, so a build that fails — an npm OOM on a
-# small machine is the usual way — leaves the site serving the old version.
+# Built before anything is recreated, so a failed build (usually an npm OOM on
+# a small machine) leaves the site serving the old version.
 #
-# `--pull` and the `pull` beside it are what actually patch the containers.
-# Without them a rebuild reuses the cached php:8.4-fpm-alpine and
-# nginx:1.29-alpine forever, the apk layer never re-executes, and postgres and
-# cloudflared are never re-pulled at all — so a site can be a year behind on
-# every base image while `apt upgrade` reports everything up to date. The
-# maintenance guides say so now.
+# `--pull` and the `pull` beside it are what actually patch the containers:
+# without them a rebuild reuses the cached base images forever (their apk
+# layer never re-executes) and postgres/cloudflared are never re-pulled at
+# all — a site can be a year behind on base images while `apt upgrade` reports
+# everything current.
 build_images() {
     step 'Pulling base images'
 
@@ -319,10 +304,8 @@ build_images() {
     step 'Tagging the current images as the way back'
 
     # `docker image prune -f` at the end removes untagged images, and after a
-    # rebuild the *previous* ones are exactly that: their tags have moved and
-    # the containers that referenced them have been recreated. So the step
-    # that claimed to protect the way back was the only thing deleting it.
-    # Tagging first is what makes the claim true.
+    # rebuild the *previous* images are exactly that — so without tagging them
+    # first, the cleanup step would delete the only way back.
     local image
     for image in teacher-app teacher-web; do
         if docker image inspect "$image" >/dev/null 2>&1; then
@@ -335,17 +318,12 @@ build_images() {
     docker compose "${COMPOSE_PROFILE_ARGS[@]}" build --pull
 }
 
-# Run from the new image against the still-running old stack.
-#
-# The entrypoint also migrates, so on a good day this is what makes that a
-# no-op. On a bad day it is the whole point: a migration that fails inside the
-# entrypoint takes the container's `set -eu` with it, the container exits,
-# `restart: unless-stopped` starts it again, it fails again — and nginx
-# answers 502 to every visitor for as long as that goes on. Both maintenance
-# guides used to say the site keeps running on the old version until a build
-# succeeds, which is true of a *build* failure and was never true of this one.
-#
-# Failing here instead stops the update with every container still serving.
+# Run from the new image against the still-running old stack. The entrypoint
+# also migrates, so on a good day this makes that a no-op; on a bad day it's
+# the point — a migration failing inside the entrypoint takes `set -eu` with
+# it, the container exits, `restart: unless-stopped` retries it, and nginx
+# answers 502 for as long as that goes on. Failing here instead stops the
+# update with every container still serving.
 migrate() {
     step 'Migrating the database'
 
@@ -361,17 +339,13 @@ restart() {
     step 'Restarting'
     docker compose "${COMPOSE_PROFILE_ARGS[@]}" up -d
 
-    # nginx resolves `app` once, when it loads its configuration, and caches
-    # that address for the life of the process — there is no `resolver` and no
-    # upstream block, deliberately, because in this stack the name is stable.
-    # It is stable only if nginx starts *after* whatever it points at: an
-    # update that changes PHP but leaves the built assets byte-identical
-    # produces an unchanged `web` image, which Compose then has no reason to
-    # recreate, and nginx would hold the address of a container that no longer
-    # exists. The symptom is every request 502ing while `logs app` ends in a
-    # perfectly healthy "[entrypoint] Ready."
-    #
-    # Cheap insurance, scoped with --no-deps so it recreates nothing else.
+    # nginx resolves `app` once at config load and caches it for the process's
+    # life (no `resolver`, no upstream block — deliberate, since the name is
+    # stable). That's only true if nginx starts *after* app: a PHP-only update
+    # that leaves the built assets unchanged produces an unchanged `web` image,
+    # which Compose then has no reason to recreate, so nginx keeps a dead
+    # address and every request 502s while `logs app` looks perfectly healthy.
+    # Cheap insurance, scoped with --no-deps so nothing else is recreated.
     docker compose "${COMPOSE_PROFILE_ARGS[@]}" up -d --force-recreate --no-deps web
 }
 
@@ -391,10 +365,9 @@ verify() {
     done
     info "Healthy after ${waited}s"
 
-    # 127.0.0.1:8080 is loopback-only by design, so answering there says
-    # nothing about whether anyone on the internet can reach the site. When a
-    # tunnel is what carries the traffic, a restart-looping cloudflared is a
-    # dark site reported as a successful update.
+    # Loopback answering says nothing about internet reachability — a
+    # restart-looping cloudflared would otherwise be a dark site reported as
+    # a successful update.
     if (( ${#COMPOSE_PROFILE_ARGS[@]} > 0 )); then
         if docker compose "${COMPOSE_PROFILE_ARGS[@]}" ps --status running --services 2>/dev/null | grep -qx tunnel; then
             info 'The Cloudflare Tunnel is running'
@@ -404,12 +377,10 @@ verify() {
         fi
     fi
 
-    # Opt-in, not automatic. It asks the questions only a production boot can
-    # answer — that every named-volume mount point is writable by the user
-    # that has to write to it, most of all — but it writes a real backup
-    # archive to prove it, which on a site with gigabytes of video is minutes
-    # of work and a large temporary file on every update. Its output is also
-    # English, and this script is Dutch for a reason.
+    # Opt-in: it answers questions only a production boot can (mount points
+    # writable by the right user, most of all) but proves it with a real
+    # backup archive — minutes of work and a large temp file on a site with
+    # gigabytes of video. Its output is also English; this script is Dutch.
     if [[ "$TEACHER_SMOKE" == '1' && -x ./scripts/smoke-production.sh ]]; then
         step 'Running the production smoke test'
         ./scripts/smoke-production.sh http://127.0.0.1:8080 || warn 'The smoke test reported a problem. The site is up; read its output above.'
@@ -418,9 +389,8 @@ verify() {
 
 cleanup() {
     step 'Cleaning up old images'
-    # Dangling layers only, and the previous version is no longer among them:
-    # it was tagged `:previous` before the build. `prune -a` would take that
-    # tag's images too.
+    # Dangling layers only — the previous version is tagged `:previous` and
+    # so exempt. `prune -a` would take that tag's images too.
     docker image prune -f >/dev/null
     info 'Removed dangling images'
 }
@@ -450,20 +420,13 @@ main() {
     summary
 }
 
-# `exit` on the same line as the call, and that is not a flourish.
-#
-# This script replaces itself: `git pull` rewrites update.sh while bash is
-# still executing it. bash reads a script incrementally, remembering a byte
-# offset rather than holding the whole file, so once `main` returns it can
-# read the *new* file from the offset the *old* one had reached — near the end
-# of one file and the middle of another — and execute whatever text begins
-# there.
-#
-# It has not bitten yet, and the reason is not reassuring: the previous
-# version of this script was small enough to be buffered whole before the pull
-# replaced it. This one is twice that size. Both commands sit on one line, so
-# bash parses them together before running either and `exit` is already in
-# memory when `main` finishes; the file is never read again.
+# `exit` on the same line as the call is not a flourish: this script replaces
+# itself, since `git pull` rewrites update.sh while bash is still executing
+# it. bash reads scripts incrementally by byte offset rather than buffering
+# the whole file, so after `main` returns it could otherwise read the *new*
+# file from the *old* offset and execute whatever text lands there. Both
+# commands on one line means bash parses them together before running either,
+# so `exit` is already in memory and the file is never read again.
 #
 # Nothing may be added below this line.
 main "$@"; exit $?

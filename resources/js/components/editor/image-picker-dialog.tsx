@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { images as searchImages } from '@/routes/admin/media/search';
+import type { AcceptedFormats } from '@/types';
 import { t } from '@/lib/i18n';
 
 type SearchResponse = {
@@ -27,6 +28,7 @@ type SearchResponse = {
 
 type Props = {
     maxBytes: number;
+    acceptedFormats: AcceptedFormats;
     /**
      * How many pictures the block being built can hold. A gallery is a batch;
      * an image beside text is one picture, so ticking a second one replaces
@@ -36,14 +38,10 @@ type Props = {
     /** Registers the new image with the editor's library. */
     onUploaded: (record: UploadedRecord) => void;
     /**
-     * Called once for every already-existing image the owner ticks — never
-     * for an upload, which reaches the library through `onUploaded` instead.
-     * The editor's node views resolve an embed from their own copy of the
-     * library (GrowingEditorLibrary), which only ever held what a page's body
-     * already showed once this dialog stopped receiving the whole library in
-     * its props; picking an image found by search has to register it there
-     * too; or the block just inserted would render as missing until the page
-     * reloads.
+     * Called for an already-existing image the owner ticks (uploads use
+     * `onUploaded` instead). Must register it in GrowingEditorLibrary, which
+     * only holds what the body already showed — otherwise the inserted block
+     * renders as missing until the page reloads.
      */
     onPicked: (image: EditorLibraryImage) => void;
     onSelect: (ulids: string[]) => void;
@@ -51,28 +49,16 @@ type Props = {
 };
 
 /**
- * Images are chosen by eye, so this is a grid.
- *
- * Mounted only while open (see page-editor.tsx), so its state starts fresh
- * every time without an effect to reset it.
- *
- * Uploading here does not insert anything: a new image is ticked and joins
- * whatever else is already selected. Nothing reaches the page until
- * "Invoegen".
- *
- * `multiple` is one component rather than two, unlike the downloads picker,
- * because nothing on either side of the click differs: the same grid, the
- * same uploader, and the same insert-and-close afterwards. Only how many
- * tiles may be ticked at once changes, and the block that results.
- *
- * Searched on the server, the same way resources/js/components/admin/file-picker-list.tsx
- * searches documents and videos — see the comment there for why. A freshly
- * uploaded image is prepended to the results locally rather than waiting on
- * a fresh search: it was just created, so query results that predate it
- * cannot know about it yet.
+ * A grid, chosen by eye. Mounted only while open, so state starts fresh
+ * without needing a reset effect. Uploading here only ticks the image;
+ * nothing reaches the page until "Invoegen". `multiple` toggles tile-count
+ * only, since the grid/uploader/insert flow is otherwise identical. Searched
+ * server-side like file-picker-list.tsx; a fresh upload is prepended locally
+ * since a search made before it exists can't know about it yet.
  */
 export function ImagePickerDialog({
     maxBytes,
+    acceptedFormats,
     multiple = true,
     onUploaded,
     onPicked,
@@ -172,6 +158,7 @@ export function ImagePickerDialog({
                 <MediaUploader
                     compact
                     maxBytes={maxBytes}
+                    acceptedFormats={acceptedFormats}
                     title={t('ui.editor.image_dialog.upload_title')}
                     description={t('ui.editor.image_dialog.upload_description')}
                     onUploaded={(record) => {

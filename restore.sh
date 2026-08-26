@@ -4,15 +4,14 @@
 #
 #   sudo ./restore.sh /pad/naar/teacher-backup-2026-08-20-134500.tar.gz
 #
-# This is the other half of `backup:run`, and the way a site moves to a new
-# machine: run install.sh on the new box, then this. The admin account comes
-# back with the database, so there is no claim screen to race and no setup
-# token to find.
+# The other half of `backup:run`, and how a site moves to a new machine: run
+# install.sh on the new box, then this. The admin account comes back with the
+# database, so there's no claim screen to race.
 #
-# It replaces the database and every uploaded file. There is deliberately no
-# merge mode — reconciling two sites' content needs decisions a script cannot
-# make. It takes a safety archive of what is there now before it starts, so a
-# restore of the wrong file is recoverable.
+# Replaces the database and every uploaded file — deliberately no merge mode,
+# since reconciling two sites' content needs decisions a script can't make. It
+# takes a safety archive of what's here first, so restoring the wrong file is
+# recoverable.
 #
 # Overrides:
 #   TEACHER_DIR           where the site is installed (default: this directory)
@@ -81,9 +80,8 @@ preflight() {
 start_stack() {
     step 'Making sure the site is running'
 
-    # A restore needs the database up and the schema present: the dump is
-    # --clean --if-exists, so it drops and recreates its own objects, but the
-    # container has to be there to receive it.
+    # The dump is --clean --if-exists and drops/recreates its own objects, but
+    # the container has to be there to receive it.
     docker compose up -d
     info 'Containers are up'
 }
@@ -135,12 +133,17 @@ restore() {
     warn 'This replaces the database and every uploaded file on this site.'
     confirm 'Continue?' || fail 'Stopped. Nothing was changed.'
 
-    # --force because the command is running without a terminal here; the
-    # confirmation above is the one a person answered.
+    # --force because this runs without a terminal; the confirmation above is
+    # the one a person answered.
     docker compose exec -T app php artisan backup:restore "$ARCHIVE_IN_CONTAINER" --force \
         || fail 'The restore failed. The site may be half-restored — do not put it back online until a good archive has gone in.'
 
-    docker compose exec -T app rm -f -- "$ARCHIVE_IN_CONTAINER" || true
+    # As root, deliberately: `docker cp` writes the file root-owned, /tmp
+    # carries the sticky bit, and the production image runs as www-data, which
+    # can't unlink it — leaving an archive holding every password hash on the
+    # site. (Development runs as root throughout, so it never showed this.)
+    docker compose exec -T -u root app rm -f -- "$ARCHIVE_IN_CONTAINER" \
+        || warn "Could not remove ${ARCHIVE_IN_CONTAINER} from the app container. It holds every password hash on the site — delete it by hand."
 }
 
 restart() {

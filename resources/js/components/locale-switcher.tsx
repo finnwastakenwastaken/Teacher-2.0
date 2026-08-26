@@ -4,16 +4,10 @@ import { locale as active, t } from '@/lib/i18n';
 import { store } from '@/routes/locale';
 
 /*
- * Switching the interface language.
- *
- * Only the interface. Everything the teacher writes stays in the language
- * they wrote it in, which is why the control says so out loud rather than
- * flying a flag and implying the whole site translates.
- *
- * The visit is a full page load on purpose. <html lang> and the document
- * title are rendered by Blade, and an Inertia visit would leave both saying
- * the previous language — including the attribute a screen reader picks its
- * pronunciation from.
+ * Switches only the interface — content stays in the language it was
+ * written in. A full page load, not an Inertia visit, because `<html lang>`
+ * and the title are rendered by Blade and would otherwise still say the
+ * previous language.
  */
 
 const LOCALES = ['nl', 'en'] as const;

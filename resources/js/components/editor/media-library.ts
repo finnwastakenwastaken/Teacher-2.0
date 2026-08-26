@@ -40,17 +40,10 @@ export const EMPTY_MEDIA_LIBRARY: EditorMediaLibrary = {
 };
 
 /**
- * A library the node views can hold on to while it grows.
- *
- * The editor builds its extension list once and the node views keep whatever
- * object they were given, so the library cannot be *replaced* mid-edit —
- * replacing it would mean recreating the editor, which throws away the caret
- * and the undo history. Since the page editor can now upload, one object has
- * to outlive every change to its contents: this is that object, and the
- * arrays inside it are what get swapped.
- *
- * The arrays are replaced rather than pushed into so that a React copy of
- * them can be compared by identity like any other state.
+ * The library node views hold onto while it grows. It can never be
+ * *replaced* mid-edit — that would recreate the editor and lose the caret
+ * and undo history — so this one object outlives every content change; its
+ * arrays are swapped (not mutated) so identity comparisons still work.
  */
 export class GrowingEditorLibrary implements EditorMediaLibrary {
     images: EditorLibraryImage[];
@@ -74,6 +67,34 @@ export class GrowingEditorLibrary implements EditorMediaLibrary {
         return this.snapshot();
     }
 
+    /**
+     * Take in a set of entries, keeping whatever is already known.
+     *
+     * Restoring an old version is the case this exists for: the holder was
+     * filled with what the *current* body embeds, and the body arriving is
+     * very likely to show something that body does not. Without this the node
+     * views resolve nothing and draw "these images no longer exist" over a
+     * gallery that is perfectly intact — a message that invites the owner to
+     * delete the block.
+     *
+     * Merged rather than replaced, because an upload made earlier in this
+     * session is in here and in no payload the server has sent since.
+     */
+    merge(library: EditorMediaLibrary): void {
+        const knownImages = new Set(this.images.map((image) => image.ulid));
+        const knownFiles = new Set(this.files.map((file) => file.ulid));
+
+        this.images = [
+            ...library.images.filter((image) => !knownImages.has(image.ulid)),
+            ...this.images,
+        ];
+
+        this.files = [
+            ...library.files.filter((file) => !knownFiles.has(file.ulid)),
+            ...this.files,
+        ];
+    }
+
     /** A plain object for React to render from. */
     snapshot(): EditorMediaLibrary {
         return { images: this.images, files: this.files };
@@ -81,13 +102,11 @@ export class GrowingEditorLibrary implements EditorMediaLibrary {
 }
 
 /**
- * The embed extensions carry the library as their only option.
- *
- * It is a snapshot, taken when the editor is created and deliberately not
- * refreshed: the extension list is built once, and rebuilding it to pick up
- * a new prop identity would tear the editor down and throw away the caret
- * and the undo history. Uploading happens on a different screen, so the
- * library cannot change while this editor is open.
+ * The embed extensions' only option. Its object identity is fixed, taken at
+ * editor creation and never replaced — the extension list is built once, and
+ * a new object would tear down the editor and lose the caret/undo history.
+ * Its *contents* do change while the editor is open (an upload, a search
+ * pick, a restored version), which is what GrowingEditorLibrary above is for.
  */
 export type MediaEmbedOptions = {
     library: EditorMediaLibrary;

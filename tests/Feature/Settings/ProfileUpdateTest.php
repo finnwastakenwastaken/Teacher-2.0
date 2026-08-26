@@ -45,9 +45,8 @@ class ProfileUpdateTest extends TestCase
     }
 
     /**
-     * The single admin account must be undeletable. These two tests replace the
-     * starter kit's "user can delete their account" tests, which asserted the
-     * exact behaviour this application must never have.
+     * The single admin account must be undeletable — replaces the starter kit's
+     * "user can delete their account" tests, which asserted the opposite.
      */
     public function test_there_is_no_account_deletion_route()
     {

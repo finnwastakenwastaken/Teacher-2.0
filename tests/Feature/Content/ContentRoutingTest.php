@@ -152,11 +152,9 @@ class ContentRoutingTest extends TestCase
     }
 
     /**
-     * A 301 is cached by browsers until the profile is cleared, so a slug
-     * typo corrected an hour later would otherwise stay broken for everyone
-     * who visited in between — and the owner has no way to reach into their
-     * browsers. The status stays 301 for crawlers; the max-age bounds how
-     * long a person is stuck with it.
+     * A 301 caches indefinitely in browsers, so a corrected typo would stay
+     * broken for anyone who already visited. Stays 301 for crawlers; the
+     * max-age bounds how long a person is stuck with a stale redirect.
      */
     public function test_a_slug_redirect_is_permanent_but_not_cached_forever()
     {
@@ -169,10 +167,8 @@ class ContentRoutingTest extends TestCase
     }
 
     /**
-     * A vacated path can be claimed again. firstOrCreate kept the first
-     * claimant's row forever, so the second rename recorded nothing and the
-     * old address went on pointing at a page that had not lived there for a
-     * year.
+     * A vacated path can be claimed again — `firstOrCreate` would keep the
+     * first claimant's row forever and never record the second rename.
      */
     public function test_a_reused_path_redirects_to_whoever_had_it_last()
     {

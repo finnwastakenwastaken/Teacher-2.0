@@ -86,11 +86,8 @@ class TopicManagementTest extends TestCase
     }
 
     /**
-     * Moving a topic under its own child used to be refused only by accident:
-     * the depth cascade pushed the subtree past the cap and the database
-     * trigger raised a message about depth — for something that is not a
-     * depth problem. The owner read "maximaal 3 niveaus diep" about a move
-     * between two levels, which explains nothing.
+     * A move under one's own descendant must be refused directly, not left to
+     * the depth-cascade trigger — which would misreport it as a depth problem.
      */
     public function test_a_topic_cannot_be_moved_under_its_own_descendant()
     {
@@ -105,9 +102,8 @@ class TopicManagementTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors('parent_id');
-        // Asserted through the key rather than against a Dutch literal: the
-        // interface has two languages, and the test client advertises
-        // English, so a hard-coded string here would pin the wrong one.
+        // Asserted via the translation key, not a literal — the test client
+        // advertises English, so a hard-coded Dutch string would pin the wrong one.
         $this->assertSame(
             __('admin.topics.own_descendant'),
             session('errors')->first('parent_id')
@@ -230,10 +226,9 @@ class TopicManagementTest extends TestCase
     }
 
     /**
-     * The reason a topic body uses the without-embeds whitelist: a file is
-     * published by walking from it to the *pages* showing it, and a topic is
-     * not a page row. An embed here would render for the owner and 403 for
-     * every student.
+     * Topic bodies use the without-embeds whitelist: a file is published by
+     * walking to the pages showing it, and a topic isn't a page row — an
+     * embed here would 403 for every student.
      */
     public function test_embeds_are_stripped_from_a_topic_introduction()
     {

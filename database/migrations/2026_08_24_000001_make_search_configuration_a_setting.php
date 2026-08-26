@@ -4,27 +4,19 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Let the owner say which language they write in, instead of assuming Dutch.
+ * Lets the owner declare which language they write content in, instead of
+ * assuming Dutch — an English-interface teacher may still write English
+ * pages, which Dutch stemming would search badly.
  *
- * Offering an English interface implies a teacher who may write in English,
- * whose pages would then be stemmed by Dutch rules — "forces" would not find
- * "force", and the stop-word list would be wrong throughout.
+ * Additive: the trigger now asks `content_search_config()` for a
+ * configuration instead of naming one, falling back to `dutch` when unset —
+ * an un-migrated database behaves exactly as before.
  *
- * This is additive by construction. The trigger function stops *naming* a
- * configuration and starts *asking* for one, and the thing it asks falls back
- * to `dutch`; a database that never gets a `content_language` row behaves
- * exactly as it does today.
+ * Looked up via `pg_ts_config` rather than a `regconfig` cast, so a bad
+ * settings value falls back instead of throwing on every page save.
  *
- * The lookup goes through `pg_ts_config` rather than casting the stored value
- * to `regconfig` directly. A cast turns one wrong settings row into an
- * exception on every page save — and the value arrives from a form, through
- * jsonb, from a table anyone with database access can edit. Falling back is
- * the only acceptable failure here.
- *
- * STABLE, not VOLATILE: it reads a table but nothing changes underneath a
- * single statement, so the planner may call it once per statement instead of
- * once per row. It is one extra SELECT on a write performed by one person a
- * few times a day.
+ * STABLE, not VOLATILE: safe since nothing changes mid-statement, and lets
+ * the planner call it once per statement rather than per row.
  */
 return new class extends Migration
 {

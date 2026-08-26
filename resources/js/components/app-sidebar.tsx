@@ -6,6 +6,7 @@ import {
     Globe,
     Images,
     KeyRound,
+    Palette,
     Settings,
     LayoutGrid,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import { index as mediaIndex } from '@/routes/admin/media';
 import { index as passwordsIndex } from '@/routes/admin/passwords';
 import { index as backupsIndex } from '@/routes/admin/backups';
 import { edit as siteSettingsEdit } from '@/routes/admin/site-settings';
+import { edit as themeEdit } from '@/routes/admin/theme';
 import { index as topicsIndex } from '@/routes/admin/topics';
 import type { NavItem } from '@/types';
 
@@ -69,12 +71,15 @@ const mainNavItems: NavItem[] = [
         href: siteSettingsEdit(),
         icon: Settings,
     },
+    {
+        title: t('ui.nav.theme'),
+        href: themeEdit(),
+        icon: Palette,
+    },
 ];
 
-// The starter kit shipped links to Laravel's own repository and docs here.
-// Nothing on this site's admin panel should point a non-technical owner at
-// framework documentation; the one link that is genuinely useful from every
-// admin screen is the public site itself.
+// Replaces the starter kit's links to Laravel's repo/docs — irrelevant to a
+// non-technical owner; the public site is the one link worth showing here.
 const footerNavItems: NavItem[] = [
     {
         title: t('ui.nav.view_site'),

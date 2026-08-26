@@ -3,17 +3,12 @@ import { expect, test } from '@playwright/test';
 import { useAdminSession } from './support/admin';
 
 /**
- * The regression this whole runner exists for.
- *
- * A list holding exactly one item, nested inside a list holding several, used
- * to render a drag handle on the lone row and register it as a drop target —
- * so it swallowed the drop meant for the list around it, `handleDragEnd` found
- * the id in neither list, and the reorder silently did nothing. 270 passing
- * PHP tests could not see it, because nothing about it reaches the server.
- *
- * It cannot be seen in jsdom either: dnd-kit decides what you dropped on from
- * rectangles, and jsdom has no layout, so every rectangle is zero. This is why
- * the runner drives a real browser.
+ * The regression this runner exists for: a one-item list nested inside a
+ * larger one used to render a drag handle and register as a drop target,
+ * swallowing drops meant for the list around it — `handleDragEnd` found the
+ * id in neither list and silently did nothing. Invisible to the PHP suite
+ * (nothing reaches the server) and to jsdom (no layout engine, so dnd-kit's
+ * rectangle-based hit testing sees only zeroes).
  */
 test.describe('drag-and-drop ordering', () => {
     test.beforeEach(async ({ page }) => {
@@ -22,9 +17,8 @@ test.describe('drag-and-drop ordering', () => {
     });
 
     test('a list of one renders no drag handle', async ({ page }) => {
-        // The rows in a list of several all have a handle. This goes first
-        // because it is the only half that can wait for anything: an absence
-        // asserted before React has rendered is an absence of the whole page.
+        // Goes first because it's the only half that can wait for anything —
+        // an absence asserted before React renders proves nothing.
         for (const title of ['Page A', 'Page B', 'Page C']) {
             await expect(
                 page.getByRole('button', { name: `Verplaatsen: ${title}` }),
@@ -52,30 +46,25 @@ test.describe('drag-and-drop ordering', () => {
                     ),
                 );
 
-        // evaluateAll does not wait for elements: before React renders it
-        // resolves to an empty array rather than retrying, so this polls.
+        // evaluateAll doesn't wait for elements — resolves to [] before React
+        // renders rather than retrying — so this polls.
         await expect.poll(order).toEqual(['Page A', 'Page B', 'Page C']);
 
         // Space picks up, arrow moves, space drops — the keyboard sensor is
-        // not optional in this project, so it is what the test uses.
+        // not optional in this project.
         //
-        // Each key waits for the announcement the last one caused, and that is
-        // load-bearing rather than tidy: dnd-kit measures the droppable
-        // rectangles after a drag starts, so an arrow pressed in the same tick
-        // finds nothing to move to, the second space drops the item where it
-        // began, and `handleDragEnd` returns early on `active.id === over.id`.
-        // The reorder then silently does nothing — which is the exact symptom
-        // of the bug this file exists for, arrived at from the other end. No
-        // human types three keys inside a frame; the test should not either.
+        // Each key waits for the announcement the last one caused: dnd-kit
+        // measures droppable rectangles only after the drag starts, so an
+        // arrow pressed in the same tick finds nothing to move to and the
+        // reorder silently no-ops (`handleDragEnd` returns early on
+        // `active.id === over.id`) — the exact bug this file exists for,
+        // reached from the other end. No human presses three keys in one
+        // frame; the test shouldn't either.
         //
-        // It also asserts the Dutch announcements, which are the only thing a
-        // screen-reader user gets out of this control.
-        //
-        // The region holds one message at a time, so "opgepakt" is not what to
-        // wait for: dnd-kit overwrites it with the first "staat nu op" as soon
-        // as it knows what the item is over. That is the better signal anyway,
-        // because knowing what it is over means the rectangles have been
-        // measured — which is exactly the precondition the arrow key needs.
+        // Waits for "staat nu op" rather than "opgepakt": the live region
+        // holds one message at a time and dnd-kit overwrites it as soon as it
+        // knows what the item is over — which is also proof the rectangles
+        // have been measured, the precondition the next arrow key needs.
         const announcement = page
             .getByRole('status')
             .filter({ hasText: 'Page A' });
@@ -112,8 +101,7 @@ test.describe('drag-and-drop ordering', () => {
     test('reordering leaves no redirect behind, because order is not a URL', async ({
         page,
     }) => {
-        // A move that changed a path would have written a slug redirect, and
-        // the page would answer 301 from its old address. Reordering must not.
+        // A path-changing move would write a slug redirect; reordering must not.
         const response = await page.request.get('/e2e/ordering/page-a', {
             maxRedirects: 0,
         });

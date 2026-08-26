@@ -120,8 +120,27 @@ jobs:
       # Deliberately its own command rather than part of DatabaseSeeder, which
       # the entrypoint runs on every boot including on the teacher's own
       # install. It refuses to run in production for the same reason.
+      # -u www-data, and it is load-bearing. This command writes real bytes to
+      # the real private disk (fixtureImage/attachDownload go through
+      # MediaLibrary::ingest), and the development target runs as root, so
+      # without this it creates storage/app/private/images/<year>/<month>
+      # owned by root. The disk config fixes directory mode at 0755, so
+      # PHP-FPM — running as www-data — can then never write there, and every
+      # upload afterwards dies on `rename(): Permission denied`.
+      #
+      # A developer's machine survives it by luck of ordering: the directory
+      # is usually created first by a real upload, and a restart re-runs the
+      # entrypoint's chown anyway. CI boots once and never restarts, so root
+      # always gets there first and the browser upload test always failed.
+      # The technical reference records the rule this follows.
       - name: Seed the browser test fixtures
-        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T app php artisan e2e:seed
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T -u www-data app php artisan e2e:seed
+
+      # Belt and braces before the browser drives real uploads: the CI checks
+      # above also run as root and compile views into storage/framework, which
+      # is the same class of leftover one bad day from the same failure.
+      - name: Hand storage back to the user PHP-FPM runs as
+        run: docker compose -f compose.yaml -f compose.dev.yaml exec -T -u root app chown -R www-data:www-data storage bootstrap/cache
 
       - name: Run the browser tests
         run: docker compose -f compose.yaml -f compose.dev.yaml --profile e2e run --rm e2e

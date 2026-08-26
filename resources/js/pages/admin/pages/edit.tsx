@@ -11,9 +11,12 @@ import { PageForm } from '@/components/admin/page-form';
 import type { IconData } from '@/components/icon';
 import type { TopicOption } from '@/components/admin/page-form';
 import { PageEditor } from '@/components/editor/page-editor';
+import type { PageDraft } from '@/components/editor/page-editor';
+import type { PageRevisionSummary } from '@/components/editor/version-history';
 import type { EditorMediaLibrary } from '@/components/editor/media-library';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { index as topicsIndex } from '@/routes/admin/topics';
+import type { AcceptedFormats } from '@/types';
 import type { TipTapDoc } from '@/types/tiptap';
 import { t } from '@/lib/i18n';
 
@@ -34,6 +37,20 @@ type Page = {
 type Props = {
     iconData: IconData | null;
     page: Page;
+    /**
+     * The unpublished concept, if this page has one. Separate from
+     * `page.content` on purpose: the editor opens on the concept so the owner
+     * carries on from where they stopped, and DraftNotice is what keeps that
+     * honest — both halves have to be here for the screen to say which is
+     * which.
+     */
+    draft: PageDraft | null;
+    /**
+     * The last ten published bodies, newest first — timestamps only. The
+     * bodies themselves are fetched when one is opened, so a long lesson is
+     * not sent eleven times to draw a list of dates.
+     */
+    revisions: PageRevisionSummary[];
     topics: TopicOption[];
     mediaLibrary: EditorMediaLibrary;
     passwords: AccessPasswordOption[];
@@ -41,21 +58,25 @@ type Props = {
     heroImage: ImageOption | null;
     educationLevels: EducationLevelOption[];
     downloads: PageDownload[];
-    attachableFilesAvailable: boolean;
+    attachableMediaAvailable: boolean;
     uploadMaxBytes: number;
+    acceptedFormats: AcceptedFormats;
 };
 
 export default function PagesEdit({
     iconData,
     page,
+    draft,
+    revisions,
     topics,
     mediaLibrary,
     passwords,
     heroImage,
     educationLevels,
     downloads,
-    attachableFilesAvailable,
+    attachableMediaAvailable,
     uploadMaxBytes,
+    acceptedFormats,
 }: Props) {
     useStatusToasts();
 
@@ -93,8 +114,11 @@ export default function PagesEdit({
                     <PageEditor
                         pageId={page.id}
                         content={page.content}
+                        draft={draft}
+                        revisions={revisions}
                         mediaLibrary={mediaLibrary}
                         maxBytes={uploadMaxBytes}
+                        acceptedFormats={acceptedFormats}
                     />
                 </section>
 
@@ -115,8 +139,9 @@ export default function PagesEdit({
                         pageId={page.id}
                         downloads={downloads}
                         levels={educationLevels}
-                        attachableFilesAvailable={attachableFilesAvailable}
+                        attachableMediaAvailable={attachableMediaAvailable}
                         maxBytes={uploadMaxBytes}
+                        acceptedFormats={acceptedFormats}
                     />
                 </section>
             </div>

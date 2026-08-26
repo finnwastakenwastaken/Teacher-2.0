@@ -5,25 +5,12 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Three foreign keys that are queried on every media request and had no index
- * that could serve them.
- *
- * PostgreSQL indexes a primary key and a unique constraint, never a foreign
- * key column on its own. Two of these are *inside* a composite unique index
- * but as the trailing column, which cannot be used to look them up:
- *
- *   page_downloads             unique(page_id, media_file_id)
- *   education_level_page_download  unique(page_download_id, education_level_id)
- *
- * and pages.hero_image_id had nothing at all — `explain` confirmed a
- * sequential scan.
- *
- * Why it matters more than the table sizes suggest: App\Support\MediaAccess
- * asks all three before releasing a single byte of any image, document or
- * video, because deciding whether a file is public means finding every page
- * that shows it. That is the busiest route on the site — a class of thirty
- * opening the same page hits it simultaneously — and it was three sequential
- * scans deep before nginx was even handed the file.
+ * Three foreign keys queried on every media request, previously unindexed.
+ * PostgreSQL doesn't index a foreign key column on its own, and two of these
+ * were only the trailing column of a composite unique index (unusable for
+ * lookup); pages.hero_image_id had nothing (confirmed via `explain`, a
+ * sequential scan). App\Support\MediaAccess queries all three before
+ * releasing any file byte — the busiest path on the site.
  */
 return new class extends Migration
 {

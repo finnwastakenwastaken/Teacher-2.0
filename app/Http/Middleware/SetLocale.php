@@ -11,16 +11,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Decide the interface language for this request, before anything renders.
- *
- * The same arrangement as HandleAppearance, and for the same reason: the
- * answer has to be in the very first byte of the document. <html lang> and
- * the document title are written by Blade, so a language resolved in the
- * browser would mean a visible flash of the wrong one on every first load,
- * and a wrong `lang` attribute in between — which is what a screen reader
- * chooses its pronunciation from.
- *
- * Registered before HandleInertiaRequests in bootstrap/app.php, so anything
- * shared with Inertia is already translated.
+ * Same arrangement as HandleAppearance and for the same reason: <html lang>
+ * and the document title come from Blade, so resolving this in the browser
+ * would flash the wrong language on first load. Registered before
+ * HandleInertiaRequests in bootstrap/app.php, so shared Inertia data is
+ * already translated.
  */
 class SetLocale
 {

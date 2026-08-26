@@ -5,18 +5,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Bookkeeping for in-progress chunked uploads.
- *
- * Chunked upload is mandatory rather than a nicety: Cloudflare's Free and Pro
- * plans reject any request body over 100 MB, so a browser simply cannot POST
- * a lecture video in one piece through the tunnel. The browser slices the
- * file with Blob.slice() and sends ~20 MB at a time; this table tracks what a
- * given upload claims to be so the server can verify the reassembled result
- * instead of trusting it.
- *
- * The chunks themselves are files on the private disk under chunks/{ulid}/,
- * not rows here — the row records only what was promised, and completion
- * checks the promise against what actually arrived.
+ * Bookkeeping for in-progress chunked uploads. Chunking is mandatory, not a
+ * nicety: Cloudflare Free/Pro reject bodies over 100 MB, so the browser
+ * slices with Blob.slice() into ~20 MB pieces. This table records what an
+ * upload claims to be so completion can verify the reassembled result rather
+ * than trust it; the chunks themselves live as files under chunks/{ulid}/.
  */
 return new class extends Migration
 {

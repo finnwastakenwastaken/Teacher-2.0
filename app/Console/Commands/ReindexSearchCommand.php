@@ -7,21 +7,13 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Re-derive every page's search vector.
- *
- * The trigger only fires when a page is written, so changing the content
- * language leaves every existing row stemmed by the old rules. Nothing looks
- * broken — search simply keeps missing words it should find, which is the
- * worst shape a bug can take.
- *
- * SiteSettingsController runs this automatically when the setting changes.
- * It exists as a command as well because that is the only way to fix an
- * index after restoring a backup taken under a different setting, or after
- * editing the row by hand.
- *
- * The idiom is the migration's own: `set title = title` touches a column the
- * trigger watches, so the trigger recomputes the vector without any of the
- * SQL being repeated here.
+ * Re-derive every page's search vector. The trigger only fires on write, so
+ * changing the content language otherwise leaves existing rows stemmed by
+ * the old rules — search quietly misses words rather than looking broken.
+ * SiteSettingsController runs this automatically on setting change; it also
+ * exists standalone for fixing an index after a backup restore or a
+ * hand-edited row. `set title = title` touches a trigger-watched column so
+ * Postgres recomputes the vector without repeating the trigger's SQL here.
  */
 class ReindexSearchCommand extends Command
 {

@@ -5,23 +5,13 @@ namespace App\Support;
 use Illuminate\Database\QueryException;
 
 /**
- * Turning a database refusal into something the owner can act on — and only
- * the refusals we actually mean.
- *
- * Catching QueryException wholesale, as the admin controllers used to, meant a
- * connection failure, a disk-full write, a constraint nobody anticipated and a
- * genuine slug clash all arrived on the owner's screen as the same sentence
- * attached to the slug field, and none of them reached the log. The owner sees
- * a slug error on a slug that is fine, and there is nothing to diagnose it
- * with afterwards.
- *
- * So: recognise the two the triggers raise deliberately, and let everything
- * else be the 500 it is.
- *
- * Recognition is by SQLSTATE, never by message text. The messages are Dutch
- * and live in a migration; matching on them meant a reworded trigger silently
- * stopped matching. See
- * 2026_08_21_000002_give_tree_triggers_stable_error_codes.
+ * Turns a database refusal into something the owner can act on — but only
+ * the two violations the tree triggers raise deliberately; everything else
+ * stays the 500 it is, rather than every QueryException (connection
+ * failure, disk-full, unrelated constraint) showing up as a slug error.
+ * Recognition is by SQLSTATE, never message text — the messages are Dutch
+ * and live in a migration, so matching on them breaks silently on a reword.
+ * See 2026_08_21_000002_give_tree_triggers_stable_error_codes.
  */
 class TreeConstraintViolation
 {

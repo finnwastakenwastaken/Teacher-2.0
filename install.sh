@@ -112,12 +112,10 @@ ask_secret() {
 }
 
 # ---------------------------------------------------------------------------
-# .env editing
-#
-# awk with a literal prefix match rather than sed, so nothing in a generated
-# secret or a tunnel token can be read as a regular expression or collide with
-# the substitution delimiter. Values reach awk through the environment, so they
-# are never re-interpreted for escape sequences either.
+# .env editing — awk with a literal prefix match, not sed, so a generated
+# secret or tunnel token can never be read as a regex or collide with the
+# substitution delimiter. Values reach awk via the environment, so they are
+# never re-interpreted for escape sequences either.
 # ---------------------------------------------------------------------------
 set_env() {
     local key=$1 value=$2
@@ -169,9 +167,7 @@ preflight() {
     ram_mb=$(awk '/^MemTotal:/ { printf "%d", $2 / 1024 }' /proc/meminfo)
     info "Memory: ${ram_mb} MB"
     if (( ram_mb < REQUIRED_RAM_MB )); then
-        # A warning rather than an abort: swap can carry a short build, and
-        # refusing to install on a machine that would work is worse than
-        # letting the operator decide.
+        # Warn, don't abort: swap can carry a short build.
         warn "The frontend is built on this machine and needs about 4 GB. Expect the build to fail or to need swap."
         confirm 'Continue anyway?' || fail 'Stopped.'
     fi
@@ -184,10 +180,8 @@ preflight() {
         confirm 'Continue anyway?' || fail 'Stopped.'
     fi
 
-    # Deliberately no network check here. A fresh Debian has no curl, so
-    # anything that reaches out has to wait until apt has run — see
-    # install_base_packages, where `apt-get update` is itself the connectivity
-    # test, and install_docker, which checks the one host it needs.
+    # No network check here: a fresh Debian has no curl. install_base_packages's
+    # `apt-get update` and install_docker's curl each serve as their own.
 }
 
 # ---------------------------------------------------------------------------
@@ -231,9 +225,8 @@ install_docker() {
             || fail 'Could not reach download.docker.com. Check outbound HTTPS and DNS.'
         chmod a+r /etc/apt/keyrings/docker.asc
 
-        # Debian 13 uses the deb822 format. The older single-line
-        # `deb [signed-by=…]` form still parses, but new installs should use
-        # this one.
+        # Debian 13 uses the deb822 format; the older single-line form still
+        # parses, but new installs should use this one.
         cat >/etc/apt/sources.list.d/docker.sources <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/debian
@@ -301,13 +294,10 @@ configure_environment() {
         if [[ -z "$(get_env APP_KEY)" ]]; then
             fail 'APP_KEY is empty in the existing .env. Fix that by hand, or move the file aside and re-run.'
         fi
-        # Added to installations that predate it. Without a value of its own
-        # the passkey handle secret falls back to APP_KEY, so rotating the
-        # application key would silently unenrol every passkey — and key
-        # rotation is a supported operation here (APP_PREVIOUS_KEYS exists for
-        # exactly that). Writing it now, from the current APP_KEY, keeps the
-        # passkeys that are already enrolled working while making the two
-        # independent from here on.
+        # Backfill for installs that predate this key. Without it, the passkey
+        # handle secret falls back to APP_KEY, so rotating APP_KEY (a supported
+        # operation) would silently unenrol every passkey. Pinning it now to the
+        # current APP_KEY keeps existing enrolments working and decouples the two.
         if [[ -z "$(get_env PASSKEYS_USER_HANDLE_SECRET)" ]]; then
             set_env PASSKEYS_USER_HANDLE_SECRET "$(get_env APP_KEY)"
             info 'Pinned PASSKEYS_USER_HANDLE_SECRET so a future APP_KEY rotation cannot unenrol passkeys'
@@ -320,20 +310,17 @@ configure_environment() {
     cp .env.example "$ENV_FILE"
     chmod 600 "$ENV_FILE"
 
-    # -- Secrets. Generated here, never prompted for and never echoed. --------
-    #
-    # openssl's base64 output can contain + and /, which .env handles fine
-    # unquoted. The database password is hex on purpose: its value is
-    # interpolated by Compose into POSTGRES_PASSWORD, and hex cannot collide
-    # with anything Compose treats as syntax.
+    # -- Secrets. Generated here, never prompted for and never echoed, and
+    # never passed as a command-line argument — arguments are visible in `ps`
+    # and shell history. .env handles openssl's base64 output unquoted; the
+    # database password is hex on purpose, since Compose interpolates it into
+    # POSTGRES_PASSWORD and hex cannot collide with anything Compose reads as
+    # syntax. --------------------------------------------------------------
     set_env APP_KEY "base64:$(openssl rand -base64 32)"
     set_env DB_PASSWORD "$(openssl rand -hex 24)"
-    # Its own secret rather than Fortify's fallback to APP_KEY. The two have
-    # different lifetimes: APP_KEY can be rotated (that is what
-    # APP_PREVIOUS_KEYS is for) and the cost of rotating it is one round of
-    # re-logging-in, whereas changing the passkey handle secret unenrols every
-    # passkey with no way to get them back. Tying them together would make the
-    # cheap operation quietly do the expensive one.
+    # Its own secret rather than Fortify's APP_KEY fallback: rotating APP_KEY
+    # only costs a re-login, but rotating this would unenrol every passkey
+    # with no way back, so the two must not share a value.
     set_env PASSKEYS_USER_HANDLE_SECRET "$(openssl rand -hex 32)"
     info 'Generated APP_KEY, a database password and a passkey handle secret'
 
@@ -364,14 +351,11 @@ configure_environment() {
         info 'Tunnel token stored in .env'
     fi
 
-    # -- Claim window --------------------------------------------------------
-    #
-    # ADMIN_EMAIL and ADMIN_PASSWORD are deliberately left blank. Setting only
-    # the address makes `admin:seed` refuse to start the container — both are
-    # required together — and the alternative, prompting for a password and
-    # writing it to disk in plain text, is worse than the browser claim screen.
-    # So the account is claimed in the browser, and this token closes the
-    # window in the meantime.
+    # -- Claim window ---------------------------------------------------------
+    # ADMIN_EMAIL and ADMIN_PASSWORD are deliberately left blank: setting only
+    # the address makes `admin:seed` refuse to start the container (both are
+    # required together), and prompting for a password to write in plain text
+    # is worse than the browser claim screen. This token closes that window.
     case "$TEACHER_SETUP_TOKEN" in
         none|'')
             warn 'No ADMIN_SETUP_TOKEN. Anyone who reaches the site before you can claim the only account.'
@@ -449,10 +433,10 @@ configure_firewall() {
         return
     fi
 
-    # SSH first, always, and never enable the firewall if that did not work —
-    # the worst outcome of this whole installer is locking the operator out of
-    # a machine they reach only over SSH. The `OpenSSH` application profile
-    # ships with openssh-server, so fall back to the port when it is absent.
+    # SSH first, always, and never enable the firewall if that failed — the
+    # worst outcome here is locking the operator out of a machine reached only
+    # over SSH. The `OpenSSH` profile needs openssh-server; fall back to the
+    # port when it's absent.
     if ! ufw allow OpenSSH >/dev/null 2>&1 && ! ufw allow 22/tcp >/dev/null 2>&1; then
         warn 'Could not add an SSH rule to ufw, so the firewall is being left alone.'
         warn 'Enabling it now could lock you out. Configure ufw by hand.'
@@ -466,8 +450,7 @@ configure_firewall() {
         return
     fi
 
-    # The tunnel dials out, so nothing needs to reach this machine from the
-    # network. Say so explicitly rather than relying on it.
+    # The tunnel dials out, so nothing needs to reach this machine.
     ufw deny 80/tcp >/dev/null
     ufw deny 443/tcp >/dev/null
 
@@ -483,15 +466,11 @@ configure_firewall() {
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Moving an existing site onto this machine.
-#
-# TEACHER_RESTORE turns the installer into "put my site on this box": it
-# brings a fresh instance up as normal and then replaces its empty database
-# and media with an archive's. The admin account comes back with the data, so
-# there is no claim screen to race and no setup token to hand out.
-#
-# The safety archive restore.sh normally takes is skipped: this site is
-# seconds old and archiving an empty database to protect it is theatre.
+# TEACHER_RESTORE turns this into "put my site on this box": bring a fresh
+# instance up as normal, then replace its empty database and media with an
+# archive's. The admin account arrives with the data, so there's no claim
+# screen to race. restore.sh's usual safety archive is skipped — this site is
+# seconds old, so protecting an empty database is theatre.
 # ---------------------------------------------------------------------------
 restore_backup() {
     [[ -n "$TEACHER_RESTORE" ]] || return 0
@@ -514,10 +493,8 @@ summary() {
     local url
     url="$(get_env APP_URL)"
 
-    # A restored site already has its account, its content and its branding.
-    # Telling the operator to claim an account that exists would send them to
-    # a screen that refuses them, and printing a setup token they cannot use
-    # is worse than printing nothing.
+    # A restored site already has its account, so pointing at the claim screen
+    # would only send the operator to one that refuses them.
     if [[ "$RESTORED" == '1' ]]; then
         printf '\n%s%s%s\n' "$C_GREEN$C_BOLD" '  De site draait, met de back-up erin.' "$C_OFF"
         printf '\n'
@@ -541,9 +518,8 @@ summary() {
     printf '  %sEis het beheerdersaccount nu op:%s\n' "$C_BOLD" "$C_OFF"
     printf '    %s/admin/claim\n' "$url"
 
-    # Read the state back from .env rather than from this run's variables: on a
-    # re-run nothing was generated, and saying "no token is set" when one is
-    # would be exactly backwards.
+    # Read back from .env, not this run's variables: on a re-run nothing was
+    # generated, and claiming "no token is set" when one is would be backwards.
     if [[ -n "$GENERATED_SETUP_TOKEN" ]]; then
         printf '\n'
         printf '    Het opeisscherm vraagt ook om deze code:\n'
@@ -585,9 +561,8 @@ main() {
     start_stack
     restore_backup
 
-    # Not fatal. By this point the site is up and the setup token has been
-    # generated, and aborting here would hide the summary — which is the only
-    # place that token is ever printed.
+    # Not fatal: the site is already up, and aborting here would hide the
+    # summary — the only place the setup token is ever printed.
     configure_firewall || warn 'The firewall step did not finish. Check "ufw status" yourself.'
 
     summary

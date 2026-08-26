@@ -32,11 +32,8 @@ export type TwoFactorSecretKey = {
 };
 
 /**
- * What App\Support\PasswordPolicy::describe() sends. Rendered as a checklist
- * beside every new-password field so the requirements are visible before
- * submitting rather than revealed one failed attempt at a time.
- *
- * The server remains the authority; this only decides what to draw.
+ * What App\Support\PasswordPolicy::describe() sends — the server is the
+ * authority; this only decides what the checklist draws.
  */
 export type PasswordPolicy = {
     min: number;

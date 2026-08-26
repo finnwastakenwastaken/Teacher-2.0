@@ -31,6 +31,10 @@ return [
         'duplicated' => 'Page copied. The copy is hidden until you publish it.',
         'content_saved' => 'Page content saved.',
         'content_unreadable' => 'The content of this page could not be read.',
+        'draft_discarded' => 'The draft has been discarded. The published page is unchanged.',
+        // Restoring is itself a publish: the body that was on the site goes
+        // into the history as its newest version, so the step can be undone.
+        'revision_restored' => 'The older version is on the site again. The one it replaced is kept in the history.',
         'save_failed' => 'That change could not be saved.',
         'topic_required' => 'Choose a topic for this page.',
     ],
@@ -40,6 +44,9 @@ return [
         'updated' => 'Download updated.',
         'deleted' => 'Download deleted.',
         'file_required' => 'Choose a file.',
+        // An attachment names one library or the other, never both — the same
+        // rule the CHECK constraint on page_downloads enforces.
+        'one_source_only' => 'Choose one file: either a document or video, or an image.',
         'file_missing' => 'That file does not exist.',
         'already_attached' => 'This file is already among this page\'s downloads.',
         // The heading over the list of pages blocking a file's deletion.
@@ -83,6 +90,16 @@ return [
         'image_missing' => 'That image does not exist.',
         'saved_and_reindexed' => 'Settings saved. The search index has been rebuilt for the new language.',
         'content_language_unknown' => 'Choose a language from the list.',
+    ],
+
+    'theme' => [
+        'saved' => 'The colours have been saved.',
+        'reset' => 'The colours are back to the ones the site ships with.',
+        // The contrast gate runs in the browser; this is the other check, and
+        // it is the one that matters for safety: the value ends up inside a
+        // <style> block, so anything that is not plainly a colour is refused
+        // rather than repaired.
+        'not_a_colour' => 'That is not a colour. Use a hex code such as #00a8ff.',
     ],
 
     'backups' => [

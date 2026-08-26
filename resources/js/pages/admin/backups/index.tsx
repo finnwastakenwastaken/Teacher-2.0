@@ -3,18 +3,15 @@ import { Download, HardDriveDownload, Trash2 } from 'lucide-react';
 import * as React from 'react';
 import BackupController from '@/actions/App/Http/Controllers/Admin/BackupController';
 import { Button } from '@/components/ui/button';
+import { confirm } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { formatBytes } from '@/lib/format';
 import { intlLocale, t } from '@/lib/i18n';
 
-/*
- * Back-ups: one archive holding the database and every uploaded file.
- *
- * The download is a plain link, not an Inertia visit — the response is a file,
- * streamed by nginx from an internal location, and routing it through Inertia
- * would try to parse gigabytes of gzip as a page.
- */
+// The download is a plain link, not an Inertia visit — the response is a
+// file streamed by nginx, and Inertia would try to parse gigabytes of gzip
+// as a page.
 
 type Backup = {
     name: string;
@@ -55,14 +52,17 @@ export default function BackupsIndex({ backups, keep }: Props) {
         );
     }
 
-    function remove(backup: Backup) {
-        if (
-            !confirm(
-                t('ui.backups.confirm_delete', {
-                    moment: formatMoment(backup.created_at),
-                }),
-            )
-        ) {
+    async function remove(backup: Backup) {
+        const confirmed = await confirm({
+            title: t('ui.backups.confirm_delete_title'),
+            description: t('ui.backups.confirm_delete', {
+                moment: formatMoment(backup.created_at),
+            }),
+            confirmLabel: t('ui.actions.delete'),
+            destructive: true,
+        });
+
+        if (!confirmed) {
             return;
         }
 

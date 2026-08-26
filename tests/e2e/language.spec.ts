@@ -10,16 +10,13 @@ test('switching language changes the interface and leaves the content alone', as
 }) => {
     await page.goto('/e2e/open');
 
-    // Decided server-side and rendered by Blade, so it is right before
-    // hydration — there is no first-paint flash to catch.
+    // Rendered by Blade server-side, so there's no first-paint flash to catch.
     await expect(page.locator('html')).toHaveAttribute('lang', 'nl');
 
     const title = await page.getByRole('heading', { level: 1 }).innerText();
 
     await page.getByLabel('Taal').selectOption('en');
 
-    // Switching sets a cookie and reloads the document, because the dictionary
-    // arrives with it rather than as a shared prop.
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
     // The chrome is English now...
@@ -34,10 +31,9 @@ test('switching language changes the interface and leaves the content alone', as
 test('an unsupported locale is refused rather than stored', async ({
     request,
 }) => {
-    // The cookie has to be collected first and echoed back as the header, or
-    // the CSRF middleware answers 419 and the allow-list is never reached —
-    // which would make this test pass for the wrong reason if it asserted
-    // "not 200". It is percent-encoded in the cookie and not in the header.
+    // The XSRF cookie must be echoed back as a header or CSRF middleware
+    // answers 419 before the locale allow-list is even reached — decoded here
+    // since it's percent-encoded in the cookie but not the header.
     await request.get('/e2e/open');
 
     const { cookies } = await request.storageState();

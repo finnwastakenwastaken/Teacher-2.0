@@ -5,6 +5,7 @@ import {
     Circle,
     Download,
     EyeOff,
+    FileClock,
     FileText,
     FolderTree,
     GraduationCap,
@@ -58,7 +59,15 @@ type RecentPage = {
     path: string;
     isHidden: boolean;
     isEmpty: boolean;
+    hasDraft: boolean;
     updatedAt: string | null;
+};
+
+/** A page whose editor is holding writing the site is not showing. */
+type DraftPage = {
+    id: number;
+    title: string;
+    savedAt: string | null;
 };
 
 type PopularDownload = {
@@ -71,6 +80,7 @@ type PopularDownload = {
 type Props = {
     stats: Stats;
     nextSteps: Step[];
+    draftPages: DraftPage[];
     recentPages: RecentPage[];
     popularDownloads: PopularDownload[];
 };
@@ -191,6 +201,75 @@ function NextSteps({ steps }: { steps: Step[] }) {
     );
 }
 
+/*
+ * "These pages are holding writing nobody can see yet."
+ *
+ * Beside the checklist rather than inside it, and for a reason worth keeping:
+ * a step is done once and the whole checklist disappears when every step is,
+ * whereas a concept comes and goes for the life of the site. An item that can
+ * come back would have kept resurrecting a finished list — see the comment on
+ * DashboardController::show.
+ *
+ * Coloured with `warning` as a fill and never as text (the technical reference),
+ * and worded as work in progress rather than as something wrong. A concept is
+ * the owner mid-sentence, not a failure.
+ */
+function DraftPages({ pages }: { pages: DraftPage[] }) {
+    if (pages.length === 0) {
+        return null;
+    }
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+                <span
+                    aria-hidden="true"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-warning text-warning-foreground"
+                >
+                    <FileClock className="size-4" />
+                </span>
+                <div className="min-w-0">
+                    <h2 className="text-base font-medium">
+                        {t('ui.dashboard.drafts.heading')}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                        {t('ui.dashboard.drafts.description', {
+                            count: pages.length,
+                        })}
+                    </p>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <ul className="divide-y divide-border">
+                    {pages.map((page) => (
+                        <li key={page.id}>
+                            <Link
+                                href={PageController.edit(page.id).url}
+                                className="group flex flex-wrap items-center gap-x-3 gap-y-1 py-3 outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+                            >
+                                <span className="min-w-0 flex-1 text-sm font-medium">
+                                    {page.title}
+                                </span>
+                                {page.savedAt && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {t('ui.dashboard.drafts.saved_at', {
+                                            time: page.savedAt,
+                                        })}
+                                    </span>
+                                )}
+                                <ArrowRight
+                                    className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                                    aria-hidden="true"
+                                />
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            </CardContent>
+        </Card>
+    );
+}
+
 function RecentPages({ pages }: { pages: RecentPage[] }) {
     return (
         <Card className="h-full">
@@ -228,6 +307,12 @@ function RecentPages({ pages }: { pages: RecentPage[] }) {
                                         {page.isEmpty && (
                                             <Badge variant="outline">
                                                 {t('ui.dashboard.empty')}
+                                            </Badge>
+                                        )}
+                                        {page.hasDraft && (
+                                            <Badge variant="warning">
+                                                <FileClock aria-hidden="true" />
+                                                {t('ui.dashboard.has_draft')}
                                             </Badge>
                                         )}
                                     </span>
@@ -295,6 +380,7 @@ function PopularDownloads({ downloads }: { downloads: PopularDownload[] }) {
 export default function Dashboard({
     stats,
     nextSteps,
+    draftPages,
     recentPages,
     popularDownloads,
 }: Props) {
@@ -315,6 +401,8 @@ export default function Dashboard({
                 </div>
 
                 <NextSteps steps={nextSteps} />
+
+                <DraftPages pages={draftPages} />
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <StatTile

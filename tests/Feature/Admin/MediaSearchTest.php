@@ -51,14 +51,9 @@ class MediaSearchTest extends TestCase
     }
 
     /**
-     * The request every picker makes first, before anything has been typed.
-     *
-     * `?q=` arrives as null, because ConvertEmptyStringsToNull runs before
-     * validation — so a rule of `['sometimes', 'string']` answered the
-     * opening of every dialog with a 422, and the grid rendered nothing at
-     * all rather than the library or its empty line. Every browser spec typed
-     * a term immediately, and the debounce cancelled the empty search before
-     * it was sent, so nothing noticed.
+     * `?q=` arrives as null (ConvertEmptyStringsToNull runs before validation),
+     * so `['sometimes', 'string']` 422'd on every dialog's first open until the
+     * rule was made nullable.
      */
     public function test_an_empty_search_returns_the_library_rather_than_a_validation_error()
     {
@@ -75,20 +70,16 @@ class MediaSearchTest extends TestCase
             ->assertOk()
             ->assertJsonPath('images.0.id', $image->id);
 
-        // Same for the file picker, and for the exclude list it sends
-        // alongside — an empty one arrives as null too.
+        // Same for the file picker's exclude list — an empty one arrives as null too.
         $this->getJson(route('admin.media.search.files', ['q' => '', 'exclude' => '']))
             ->assertOk()
             ->assertJsonPath('files.0.ulid', $file->ulid);
     }
 
     /**
-     * The banner and branding pickers search the same table through a second
-     * endpoint, because they write a foreign key and the editor's pickers
-     * write a ULID into a document. The two shapes are the point of the
-     * split: an id reaching the editor is how the distinction stops being
-     * true, so this asserts each endpoint hands back its own shape and not
-     * the other's.
+     * Two endpoints exist because the editor's pickers write a ULID into a
+     * document while banner/branding pickers write a foreign key id; this
+     * asserts neither shape leaks into the other endpoint.
      */
     public function test_the_id_addressed_endpoint_returns_options_and_the_ulid_one_does_not()
     {
@@ -153,9 +144,7 @@ class MediaSearchTest extends TestCase
 
     public function test_files_can_be_excluded_by_id()
     {
-        // What the downloads section uses to hide files already attached to
-        // the page it is on, without shipping the whole library to work it
-        // out client-side.
+        // Lets the downloads section hide already-attached files server-side.
         $attached = $this->file('werkblad-1.pdf');
         $available = $this->file('werkblad-2.pdf');
 
@@ -166,6 +155,24 @@ class MediaSearchTest extends TestCase
             ]))
             ->assertOk()
             ->assertJsonPath('files.0.id', $available->id)
+            ->assertJsonPath('total', 1);
+    }
+
+    public function test_images_can_be_excluded_by_id()
+    {
+        // The downloads section can now offer a picture as well — a poster, a
+        // scanned worksheet — so its picker needs the same exclusion the file
+        // list has always had, against the other library.
+        $attached = $this->image('poster-1.webp', 'Poster één');
+        $available = $this->image('poster-2.webp', 'Poster twee');
+
+        $this->actingAs(User::factory()->create())
+            ->getJson(route('admin.media.search.image-options', [
+                'q' => 'poster',
+                'exclude' => (string) $attached->id,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('images.0.id', $available->id)
             ->assertJsonPath('total', 1);
     }
 

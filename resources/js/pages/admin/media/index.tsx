@@ -1,6 +1,9 @@
 import { Head } from '@inertiajs/react';
+import * as React from 'react';
 import { FileLibrary } from '@/components/admin/file-library';
 import { ImageLibrary } from '@/components/admin/image-library';
+import { matchesUsage } from '@/components/admin/media-usage-badges';
+import type { UsageFilter } from '@/components/admin/media-usage-badges';
 import { MediaUploader } from '@/components/admin/media-uploader';
 import {
     Card,
@@ -9,9 +12,10 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useStatusToasts } from '@/hooks/use-status-toasts';
 import { index as mediaIndex } from '@/routes/admin/media';
-import type { MediaFile, MediaImage } from '@/types';
+import type { AcceptedFormats, MediaFile, MediaImage } from '@/types';
 import { t } from '@/lib/i18n';
 
 /*
@@ -19,16 +23,46 @@ import { t } from '@/lib/i18n';
  * filter: an image cannot exist without alt text and is chosen visually,
  * while a document or video is chosen by name. Different metadata, different
  * affordances.
+ *
+ * What cuts across both is what an item is *for* — shown on a page, handed
+ * out as a download, or placed nowhere yet. That is derived from the same rows
+ * App\Support\MediaAccess reads, so it cannot disagree with what is actually
+ * published, and it is a filter here rather than a flag on the record because
+ * one picture can legitimately be both.
+ *
+ * Filtered in the browser: this screen already receives both libraries in
+ * full, so a round trip would buy nothing and cost the scroll position.
  */
+
+// A fixed list, because a key built from a variable cannot be checked
+// (the technical reference, on the translation layer).
+const FILTERS: { value: UsageFilter; key: string }[] = [
+    { value: 'all', key: 'ui.library.filter_all' },
+    { value: 'shown', key: 'ui.library.usage_shown' },
+    { value: 'download', key: 'ui.library.usage_download' },
+    { value: 'unused', key: 'ui.library.usage_unused' },
+];
 
 type Props = {
     images: MediaImage[];
     files: MediaFile[];
     maxBytes: number;
+    acceptedFormats: AcceptedFormats;
 };
 
-export default function MediaIndex({ images, files, maxBytes }: Props) {
+export default function MediaIndex({
+    images,
+    files,
+    maxBytes,
+    acceptedFormats,
+}: Props) {
     useStatusToasts();
+
+    const [filter, setFilter] = React.useState<UsageFilter>('all');
+    const filterId = React.useId();
+
+    const shownImages = images.filter((image) => matchesUsage(image, filter));
+    const shownFiles = files.filter((file) => matchesUsage(file, filter));
 
     return (
         <>
@@ -44,21 +78,64 @@ export default function MediaIndex({ images, files, maxBytes }: Props) {
                     </p>
                 </div>
 
-                <MediaUploader maxBytes={maxBytes} />
+                <MediaUploader
+                    maxBytes={maxBytes}
+                    acceptedFormats={acceptedFormats}
+                />
+
+                <div className="grid gap-2">
+                    {/* A span, not a <label>: what it names is a group of
+                        buttons rather than one control, so a <label> would
+                        have nothing to point at. Same shape as the group
+                        heading in components/admin/image-field.tsx. */}
+                    <span
+                        id={filterId}
+                        className="text-sm leading-none font-medium"
+                    >
+                        {t('ui.library.filter_label')}
+                    </span>
+                    <ToggleGroup
+                        type="single"
+                        variant="outline"
+                        value={filter}
+                        // A deselect sends an empty string; something is always
+                        // on show, so that is simply ignored.
+                        onValueChange={(next) => {
+                            const chosen = FILTERS.find(
+                                (option) => option.value === next,
+                            );
+
+                            if (chosen) {
+                                setFilter(chosen.value);
+                            }
+                        }}
+                        aria-labelledby={filterId}
+                        className="w-fit flex-wrap"
+                    >
+                        {FILTERS.map((option) => (
+                            <ToggleGroupItem
+                                key={option.value}
+                                value={option.value}
+                            >
+                                {t(option.key)}
+                            </ToggleGroupItem>
+                        ))}
+                    </ToggleGroup>
+                </div>
 
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('ui.media.images')}</CardTitle>
                         <CardDescription>
-                            {images.length === 0
+                            {shownImages.length === 0
                                 ? t('ui.media.empty')
                                 : t('ui.media.image_count', {
-                                      count: images.length,
+                                      count: shownImages.length,
                                   })}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <ImageLibrary images={images} />
+                        <ImageLibrary images={shownImages} />
                     </CardContent>
                 </Card>
 
@@ -66,15 +143,15 @@ export default function MediaIndex({ images, files, maxBytes }: Props) {
                     <CardHeader>
                         <CardTitle>{t('ui.media.files')}</CardTitle>
                         <CardDescription>
-                            {files.length === 0
+                            {shownFiles.length === 0
                                 ? t('ui.media.empty')
                                 : t('ui.media.file_count', {
-                                      count: files.length,
+                                      count: shownFiles.length,
                                   })}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <FileLibrary files={files} />
+                        <FileLibrary files={shownFiles} />
                     </CardContent>
                 </Card>
             </div>

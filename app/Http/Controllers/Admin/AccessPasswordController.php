@@ -47,14 +47,11 @@ class AccessPasswordController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:60', Rule::unique('access_passwords', 'name')],
-            // Short on purpose — this is read out to a class and typed on a
-            // phone, so the admin password policy does not belong here. But
-            // not as short as it was. Four characters is a keyspace of about
-            // 1.7 million in theory and about a dozen in practice, because
-            // what people actually pick is `2024`, `havo`, a class code. The
-            // limiter below is what has to survive that guess, and at four
-            // characters it was being asked to hold off an attack measured
-            // in hours. Eight is still sayable across a classroom.
+            // Short on purpose — read out to a class, typed on a phone — but
+            // not as short as four characters used to be: what people
+            // actually pick (`2024`, `havo`) makes that a keyspace of a dozen
+            // in practice, an attack measured in hours against the limiter
+            // below. Eight is still sayable across a classroom.
             'password' => ['required', 'string', 'min:'.self::MIN_LENGTH, 'max:255'],
         ], $this->messages());
 
@@ -96,11 +93,9 @@ class AccessPasswordController extends Controller
     {
         try {
             $password->delete();
-            // Thrown from a `deleting` model event, which PHPStan cannot
-            // see from here — so it reports this catch as dead. It is not:
-            // remove it and "this still has things depending on it" becomes
-            // a 500. The guard lives on the model exactly so that no delete
-            // path can skip it.
+            // Thrown from a `deleting` model event, invisible to PHPStan from
+            // here, so it flags this catch as dead. It is not: removing it
+            // turns "still in use" into a 500.
             // @phpstan-ignore catch.neverThrown
         } catch (DependentRecordsExistException $e) {
             return back()->with('error', $e->getMessage());

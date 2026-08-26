@@ -6,18 +6,12 @@ use App\Models\Image;
 use App\Models\Setting;
 
 /**
- * The site's branding and homepage copy.
- *
- * This class owns the defaults. `settings` rows are overrides, so a fresh
- * install renders correctly with an empty table and nothing has to be
- * seeded — which also means resetting a setting is a delete, not a guess at
- * what it used to say.
- *
- * Deliberately uncached. Every request reads a handful of rows in one query,
- * and a cache here would buy a millisecond in exchange for the owner
- * changing the site title and not seeing it change. If this ever shows up in
- * a profile, cache it in the container per request — never statically, which
- * would leak between requests in the test suite.
+ * The site's branding and homepage copy. This class owns the defaults;
+ * `settings` rows are overrides, so resetting a setting is a delete rather
+ * than a guess at what it used to say. Deliberately uncached — a stale
+ * answer here is the owner changing the site title and not seeing it
+ * change. If this ever shows up in a profile, cache per request, never
+ * statically (would leak between requests in the test suite).
  */
 class SiteSettings
 {
@@ -29,16 +23,10 @@ class SiteSettings
      * App\Support\MediaAccess like everything else — see brandingImageIds().
      */
     /*
-     * The two Dutch strings here are deliberately *not* translated, and that
-     * is not an oversight.
-     *
-     * They are homepage copy, which is content — the owner edits it on the
-     * settings screen and it is then stored, once, in whatever language they
-     * wrote it in. Running them through __() would make the heading of an
-     * unedited site change language as each visitor switched, which is
-     * exactly the behaviour the rest of this feature exists to avoid. A
-     * default the owner has not touched yet is still content; it just has not
-     * been written yet.
+     * The Dutch strings below are deliberately not translated: they are
+     * homepage content, stored once in whatever language the owner writes
+     * it in. Running them through __() would make an unedited heading
+     * change language as the visitor switches interface locale.
      */
     public const DEFAULTS = [
         'site_title' => null,          // null => config('app.name')
@@ -48,11 +36,23 @@ class SiteSettings
         'home_subheading' => 'Bekijk en download lesmateriaal per onderwerp.',
         'home_banner_image_id' => null,
         'home_content' => null,        // A TipTap document, or null.
+        // An optional addition to the privacy page — a contact address, a
+        // school's own policy. The page itself is the application's words and
+        // is translated; this is the owner's and is not. Null means the
+        // section is simply absent, so a fresh install reads correctly with
+        // nothing configured.
+        'privacy_content' => null,     // A TipTap document, or null.
         // A PostgreSQL text-search configuration name, not a locale code —
         // the language the owner writes in, which is a different question
         // from the language a visitor reads the interface in. See
         // App\Support\ContentLanguage.
         'content_language' => ContentLanguage::DEFAULT,
+        // The owner's overrides of the raw palette in resources/css/app.css,
+        // as a map of entry name to hex colour. Empty means "the shipped
+        // palette", which is why an unset entry has nothing to fall back
+        // *to* — it simply is not written, and the stylesheet decides. See
+        // App\Support\ThemePalette.
+        ThemePalette::SETTING => [],
     ];
 
     /**
@@ -91,6 +91,16 @@ class SiteSettings
             $values[$key] = self::asId($values[$key] ?? null);
         }
 
+        // Same reasoning one type further along: the palette is the only
+        // setting that is not a scalar, and every byte of it ends up inside a
+        // <style> block. Normalising here means no reader has to remember —
+        // an unknown entry or a value that is not a hex colour is gone before
+        // anything can render it, whether it came from the form, from a
+        // restored archive, or from somebody with psql.
+        $values[ThemePalette::SETTING] = ThemePalette::normalise(
+            $values[ThemePalette::SETTING] ?? []
+        );
+
         return $values;
     }
 
@@ -118,6 +128,23 @@ class SiteSettings
 
             Setting::query()->updateOrCreate(['key' => $key], ['value' => $value]);
         }
+    }
+
+    /**
+     * Drop an override entirely, so the default decides again.
+     *
+     * A row holding the default value would render identically today and
+     * silently pin the setting: a later version that changes the default
+     * would leave this site behind on a value its owner never chose. Deleting
+     * is the only way to say "I have no opinion about this".
+     */
+    public static function forget(string $key): void
+    {
+        if (! array_key_exists($key, self::DEFAULTS)) {
+            return;
+        }
+
+        Setting::query()->whereKey($key)->delete();
     }
 
     /**

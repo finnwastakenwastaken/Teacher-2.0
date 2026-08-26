@@ -48,10 +48,8 @@ class PageEditorPropsTest extends TestCase
         $download = $page->downloads()->create(['media_file_id' => $file->id, 'label' => 'Werkblad']);
         $download->educationLevels()->sync([$level->id]);
 
-        // Embedded separately from the download, via the body — the two are
-        // deliberately independent (page_media_references vs page_downloads,
-        // see Page::writeContent()), so a second file proves mediaLibrary
-        // reflects only what the body shows, not the download.
+        // Embedded via the body, separate from the download (page_media_references
+        // vs page_downloads) — proves mediaLibrary reflects only the body, not downloads.
         $embeddedPath = 'media/2026/08/'.Str::ulid().'.pdf';
         Storage::disk('local')->put($embeddedPath, 'bytes');
         $embedded = MediaFile::query()->create([
@@ -68,11 +66,8 @@ class PageEditorPropsTest extends TestCase
             ->assertInertia(fn (AssertableInertia $inertia) => $inertia
                 ->component('admin/pages/edit')
                 ->has('mediaLibrary.images', 0)
-                // Only the embedded file, resolved from page_media_references —
-                // not the whole media_files table, and not the file attached
-                // as a download below. The picker dialogs ask
-                // App\Http\Controllers\Admin\MediaSearchController for
-                // anything else, a page of matches at a time.
+                // Only the embedded file (from page_media_references), not the whole
+                // table or the download below — pickers ask MediaSearchController for the rest.
                 ->has('mediaLibrary.files', 1)
                 ->where('mediaLibrary.files.0.id', $embedded->id)
                 ->where('mediaLibrary.files.0.ulid', $embedded->ulid)
@@ -81,12 +76,15 @@ class PageEditorPropsTest extends TestCase
                 ->has('downloads', 1)
                 ->where('downloads.0.label', 'Werkblad')
                 ->where('downloads.0.educationLevelIds', [$level->id])
-                ->where('downloads.0.mediaFileId', $file->id)
-                // The embedded file is not attached as a download, so it is
-                // still something the "choose a file" dialog could offer —
-                // this is the boolean the downloads section checks instead of
-                // being sent the whole library to work that out itself.
-                ->where('attachableFilesAvailable', true)
+                ->where('downloads.0.source', 'file')
+                ->where('downloads.0.mediaId', $file->id)
+                ->where('downloads.0.kind', MediaFile::KIND_DOCUMENT)
+                // No thumbnail: this attachment offers a document. An offered
+                // image sends one, so the admin list can tell three posters apart.
+                ->where('downloads.0.previewUrl', null)
+                // Not attached as a download yet, so still offerable — the boolean
+                // the downloads section checks instead of receiving the whole library.
+                ->where('attachableMediaAvailable', true)
                 // The editor uploads too, so it needs the same ceiling the
                 // media screen shows.
                 ->where('uploadMaxBytes', (int) config('media.max_bytes'))
@@ -102,11 +100,8 @@ class PageEditorPropsTest extends TestCase
             'title' => 'De Planeten', 'slug' => 'de-planeten', 'topic_id' => $topic->id,
         ]);
 
-        // Representative of "a few hundred files" — the technical reference's own estimate
-        // for when the old, since-removed shape cost hundreds of kilobytes.
-        // None of these are embedded in the body or attached as a download,
-        // so a payload that only sends what the page actually shows must not
-        // grow with them.
+        // None of these are embedded or attached as downloads — the payload must not
+        // grow with library size regardless.
         foreach (range(1, 150) as $i) {
             $imagePath = "images/{$i}.webp";
             Storage::disk('local')->put($imagePath, 'bytes');
@@ -133,12 +128,8 @@ class PageEditorPropsTest extends TestCase
         $response->assertOk();
         $newBytes = strlen((string) $response->getContent());
 
-        // What the old mediaLibrary shape alone would have cost: the whole
-        // images and media_files tables, each row shaped exactly the way
-        // PageController::edit used to send it before mediaLibrary was
-        // narrowed to only what the body embeds.
-        // Reconstructed here rather than measured against a reverted
-        // controller, so the comparison stays inside one self-contained test.
+        // Reconstructs the old mediaLibrary shape (whole images/media_files tables)
+        // to compare against, rather than reverting the controller.
         $oldMediaLibraryBytes = strlen((string) json_encode([
             'images' => Image::query()->latest()->get(['ulid', 'alt_text', 'original_filename'])
                 ->map(fn (Image $image) => [
@@ -166,15 +157,12 @@ class PageEditorPropsTest extends TestCase
             number_format($newBytes),
         ));
 
-        // The new response is the *entire* edit screen — settings form,
-        // editor chrome, banner picker and all — not just mediaLibrary, and
-        // it is still smaller than the old mediaLibrary block was on its own.
+        // This is the entire edit screen, not just mediaLibrary, and still
+        // smaller than the old mediaLibrary block alone.
         $this->assertLessThan($oldMediaLibraryBytes, $newBytes);
 
-        // The banner picker was the last thing on this screen still carrying
-        // the whole library; it now carries only what the banner points at,
-        // which here is nothing. Asserted separately from the byte count
-        // because a size comparison would still pass if it came back.
+        // Banner picker now carries only what it points at (nothing here); asserted
+        // separately since a byte-count check alone could still pass if it regressed.
         $response->assertInertia(fn (AssertableInertia $inertia) => $inertia
             ->where('heroImage', null)
         );
@@ -216,9 +204,8 @@ class PageEditorPropsTest extends TestCase
 
         $this->get(route('admin.site-settings.edit'))
             ->assertInertia(fn (AssertableInertia $inertia) => $inertia
-                // Two, not twenty — and never more than three however large
-                // the library grows, because that is how many settings hold
-                // an image id.
+                // Two, not twenty — never more than three, the number of settings
+                // that hold an image id.
                 ->count('selectedImages', 2)
                 ->where('selectedImages.0.id', $images[0]->id)
             );
@@ -232,19 +219,49 @@ class PageEditorPropsTest extends TestCase
         ]);
 
         Storage::fake('local');
+
+        $this->actingAs(User::factory()->create());
+
+        // Nothing in either library yet.
+        $this->get(route('admin.pages.edit', $page))
+            ->assertInertia(fn (AssertableInertia $inertia) => $inertia
+                ->where('attachableMediaAvailable', false)
+            );
+
         $path = 'media/2026/08/'.Str::ulid().'.pdf';
         Storage::disk('local')->put($path, 'bytes');
-        // Never attached to any page, so it is the one thing the "choose a
-        // file" dialog would find.
-        MediaFile::query()->create([
+        // Never attached to any page, so it is the one thing the "choose from
+        // the library" dialog would find.
+        $file = MediaFile::query()->create([
             'path' => $path, 'kind' => MediaFile::KIND_DOCUMENT, 'mime' => 'application/pdf',
             'size_bytes' => 5, 'original_filename' => 'ongebruikt.pdf',
         ]);
 
-        $this->actingAs(User::factory()->create())
-            ->get(route('admin.pages.edit', $page))
+        $this->get(route('admin.pages.edit', $page))
             ->assertInertia(fn (AssertableInertia $inertia) => $inertia
-                ->where('attachableFilesAvailable', true)
+                ->where('attachableMediaAvailable', true)
+            );
+
+        // Attaching the only document does not exhaust the dialog any more:
+        // an image is offerable too, and a page whose every document is
+        // already attached can still be handed a poster.
+        $page->downloads()->create(['media_file_id' => $file->id]);
+
+        $this->get(route('admin.pages.edit', $page))
+            ->assertInertia(fn (AssertableInertia $inertia) => $inertia
+                ->where('attachableMediaAvailable', false)
+            );
+
+        Storage::disk('local')->put('images/poster.webp', 'bytes');
+        Image::query()->create([
+            'path' => 'images/poster.webp', 'alt_text' => 'Poster',
+            'size_bytes' => 5, 'mime' => 'image/webp',
+            'original_filename' => 'poster.webp',
+        ]);
+
+        $this->get(route('admin.pages.edit', $page))
+            ->assertInertia(fn (AssertableInertia $inertia) => $inertia
+                ->where('attachableMediaAvailable', true)
             );
     }
 

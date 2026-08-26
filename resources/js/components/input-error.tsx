@@ -2,15 +2,11 @@ import type { HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
 /*
- * `message` is the ordinary case — Inertia's shared error bag carries one
- * message per field. `messages` is for the fields where that is not enough,
- * currently only the password: several requirements can fail on one
- * submission, and showing the first alone means meeting the policy one round
- * trip at a time. See HandleInertiaRequests::allValidationErrors().
- *
- * `text-error`, not `text-destructive`: destructive is the fill and would put
- * a near-white label on the page. See the design-system section of the
- * technical reference.
+ * `messages` (plural) is for fields where more than one rule can fail at
+ * once — currently only the password (see
+ * HandleInertiaRequests::allValidationErrors()). `text-error`, not
+ * `text-destructive` — destructive is a fill and would read as near-white
+ * text.
  */
 export default function InputError({
     message,

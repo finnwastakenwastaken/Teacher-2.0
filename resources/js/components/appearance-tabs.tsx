@@ -3,6 +3,7 @@ import { Monitor, Moon, Sun } from 'lucide-react';
 import type { HTMLAttributes } from 'react';
 import type { Appearance } from '@/hooks/use-appearance';
 import { useAppearance } from '@/hooks/use-appearance';
+import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export default function AppearanceToggleTab({
@@ -11,10 +12,16 @@ export default function AppearanceToggleTab({
 }: HTMLAttributes<HTMLDivElement>) {
     const { appearance, updateAppearance } = useAppearance();
 
+    // Written out rather than mapped over the three values: t('…' + value)
+    // is a key built from a variable, and LocalisationTest cannot see one.
     const tabs: { value: Appearance; icon: LucideIcon; label: string }[] = [
-        { value: 'light', icon: Sun, label: 'Licht' },
-        { value: 'dark', icon: Moon, label: 'Donker' },
-        { value: 'system', icon: Monitor, label: 'Systeem' },
+        { value: 'light', icon: Sun, label: t('ui.settings.appearance.light') },
+        { value: 'dark', icon: Moon, label: t('ui.settings.appearance.dark') },
+        {
+            value: 'system',
+            icon: Monitor,
+            label: t('ui.settings.appearance.system'),
+        },
     ];
 
     return (

@@ -20,18 +20,14 @@ import type { ReactNode } from 'react';
 import { t } from '@/lib/i18n';
 
 /*
- * Drag to reorder, for the admin lists that carry a manual sort_order.
+ * Drag to reorder admin lists with a manual sort_order. Reordering only,
+ * never reparenting — that needs the depth cap, slug uniqueness and redirect
+ * handling the edit form already does; App\Support\SortOrder refuses a
+ * mixed-parent request rather than trusting the client.
  *
- * Reordering only, never reparenting — dropping an item into a different
- * parent would have to handle the depth cap, sibling slug uniqueness and the
- * 301 redirects a changed path leaves behind, all of which the edit form
- * already does. See App\Support\SortOrder, which refuses a mixed-parent
- * request rather than trusting the client.
- *
- * Keyboard operation is not optional here. Every admin screen is operable
- * without a mouse, and a drag-only reorder would quietly remove that: the
- * handle is a real button, and dnd-kit's keyboard sensor moves the item with
- * the arrow keys once it is picked up with space.
+ * The handle is a real button and the keyboard sensor moves items with arrow
+ * keys after space picks one up — every admin screen must work without a
+ * mouse.
  */
 
 const screenReaderInstructions = {
@@ -39,15 +35,10 @@ const screenReaderInstructions = {
 };
 
 /*
- * Whether the rows below are actually draggable.
- *
- * A list of one has nothing to reorder, so it renders no drag context — and a
- * row inside it must not render a handle either. That is not only clutter: an
- * unsorted row still registers itself as a drop target, and a drop meant for
- * the list *nested inside* it lands on the parent row instead and silently
- * does nothing. The context is always provided, never left to the default,
- * because these lists nest: a single-item list inside a sortable one would
- * otherwise inherit `true` from its parent.
+ * Whether rows below are draggable. A list of one renders no handle: these
+ * lists nest, and a lone row that still registered as a drop target would
+ * swallow a drop meant for the list nested inside it. Always provided
+ * explicitly — never left to inherit `true` from a parent list.
  */
 const SortableEnabledContext = React.createContext(false);
 
@@ -103,8 +94,7 @@ export function SortableList<T>({
         onReorder(next);
     }
 
-    // A single-item list has nothing to reorder, and mounting a drag context
-    // around it only adds keyboard targets that do nothing.
+    // Nothing to reorder with one item — skip the drag context entirely.
     if (items.length < 2) {
         return (
             <SortableEnabledContext value={false}>
@@ -113,8 +103,7 @@ export function SortableList<T>({
         );
     }
 
-    // dnd-kit's own announcements are English and name items by id ("Draggable
-    // item 5 was dropped over droppable area 3"), which is no use to anyone.
+    // Replaces dnd-kit's English, id-based default announcements.
     const titleOf = (id: string | number) => {
         const item = items.find((candidate) => getId(candidate) === Number(id));
 

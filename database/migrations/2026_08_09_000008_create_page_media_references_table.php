@@ -6,19 +6,11 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Which media each page references, extracted from its TipTap JSON body and
- * rebuilt every time the page is saved.
- *
- * The content column already contains this information, but only as a nested
- * document that would need a recursive jsonb walk to search. Two questions
- * get asked constantly and both need the *reverse* direction:
- *
- *   - may an anonymous visitor fetch this file? (it is published exactly
- *     when some page references it — see App\Support\MediaAccess)
- *   - which pages break if the owner deletes this file? (deletes block and
- *     report rather than cascading)
- *
- * Derived data, never authored: App\Support\PageContent::references() is the
- * only writer, so it cannot drift from the document it came from.
+ * rebuilt on every save. The content column has this, but only as a nested
+ * document needing a recursive jsonb walk; this answers the reverse direction
+ * cheaply — is a file public (some page references it, App\Support\MediaAccess),
+ * and what breaks if it's deleted (deletes block, not cascade). Derived data:
+ * App\Support\PageContent::references() is the only writer.
  */
 return new class extends Migration
 {

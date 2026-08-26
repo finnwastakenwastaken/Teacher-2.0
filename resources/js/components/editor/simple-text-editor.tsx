@@ -24,15 +24,11 @@ import type { TipTapDoc } from '@/types/tiptap';
 import { t } from '@/lib/i18n';
 
 /*
- * A cut-down page editor: text, links and lists, and nothing that embeds a
- * file.
- *
- * The homepage introduction uses this. Embeds are what publish a file to
- * anonymous visitors, and that decision is made by walking from a file to
- * the pages showing it — the homepage is not a page row, so an embed there
- * would render for the owner and 403 for everyone else. The server strips
- * embeds regardless (App\Support\PageContent::sanitiseWithoutEmbeds); this
- * just means the buttons are not offered in the first place.
+ * A cut-down page editor with nothing that embeds a file — used for the
+ * homepage introduction, which isn't a page row, so an embed there would
+ * render for the owner and 403 for everyone else. The server strips embeds
+ * regardless (PageContent::sanitiseWithoutEmbeds); this just hides the
+ * buttons.
  */
 
 const PROSE_CLASSES = [

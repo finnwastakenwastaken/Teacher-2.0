@@ -17,14 +17,11 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Branding, the editable homepage, and page banner images.
- *
- * Two of these are security assertions rather than feature assertions: a
- * branding image is the one category of media reachable without a page
- * (App\Support\MediaAccess), and the homepage body is the one rich-text
- * document that cannot carry embeds — there is no page row behind it to
- * publish the embedded file, so an embed would render for the owner and
- * 403 for every visitor.
+ * Branding, the editable homepage, and page banner images. Two are security
+ * assertions: a branding image is the one media reachable without a page
+ * (MediaAccess), and the homepage body cannot carry embeds — no page row
+ * exists to publish them, so an embed would render for the owner and 403 for
+ * every visitor.
  */
 class SiteSettingsTest extends TestCase
 {
@@ -182,10 +179,9 @@ class SiteSettingsTest extends TestCase
         $logo = $this->makeImage();
         $admin = User::factory()->create();
 
-        // A form field arrives as the string "7". Every reader compares ids
-        // strictly — in_array(..., true) here, `===` in the picker — so a
-        // string would leave the saved image looking unselected and, worse,
-        // unpublished.
+        // A form field arrives as string "7"; every reader compares strictly
+        // (in_array(..., true) here, `===` in the picker), so an uncast id would
+        // leave the image looking unselected and unpublished.
         $this->actingAs($admin)
             ->put('/admin/instellingen', $this->payload(['site_logo_image_id' => (string) $logo->id]));
 

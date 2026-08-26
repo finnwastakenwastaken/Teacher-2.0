@@ -122,13 +122,10 @@ class PageDownloadTest extends TestCase
     }
 
     /**
-     * The tally is meant to read as "how often was this taken". A download
-     * manager splitting a file into eight ranged requests, or a browser
-     * prefetching a link nobody clicked, is not eight students and not one.
-     *
-     * What is deliberately absent is per-visitor deduplication: knowing that
-     * two requests are the same student means identifying students, which
-     * this site has no way to do and no intention of acquiring.
+     * A download manager's ranged requests or a browser's prefetch must not
+     * inflate the tally. Per-visitor deduplication is deliberately absent:
+     * telling two requests apart as the same student means identifying
+     * students, which this site has no way and no intention to do.
      */
     public function test_a_resumed_or_prefetched_request_does_not_count()
     {
@@ -144,9 +141,7 @@ class PageDownloadTest extends TestCase
 
         $this->assertSame(0, $download->fresh()->downloads_count);
 
-        // withHeaders() adds to the defaults for the whole test rather than
-        // for one request, so without this the next call would still be
-        // carrying the prefetch header set above.
+        // withHeaders() sticks for the rest of the test, not just one request.
         $this->flushHeaders();
 
         // A range starting at zero is the fetch itself, not a continuation.
@@ -271,10 +266,8 @@ class PageDownloadTest extends TestCase
 
     public function test_downloads_attached_without_an_order_queue_up_at_the_end()
     {
-        // Uploading several worksheets from the page editor attaches them one
-        // after another, and each request is sent before the previous
-        // response has updated the editor's copy of the list — so the client
-        // cannot count and the server has to.
+        // A batch upload sends each attach request before the previous
+        // response updates the client's list, so the server has to count.
         Storage::fake('local');
         $page = $this->makePage();
         $admin = User::factory()->create();

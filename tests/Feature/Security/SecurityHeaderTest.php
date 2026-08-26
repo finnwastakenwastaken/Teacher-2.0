@@ -5,31 +5,19 @@ namespace Tests\Feature\Security;
 use Tests\TestCase;
 
 /**
- * nginx's add_header does not merge, and losing one is silent.
- *
- * A location block that declares any add_header of its own discards every
- * header inherited from the server block. Three locations here declare one —
- * /build/ sets Cache-Control, /__media/ and /__backup/ set nosniff — so all
- * three were serving without X-Frame-Options, Referrer-Policy and the rest.
- * Nothing about such a response looks wrong; you only find it by asking for a
- * header and not getting one.
- *
- * The set is therefore repeated verbatim in each block rather than included
- * from a second file, because the development stack bind-mounts this one file
- * and an unmounted include would stop nginx from starting. Repetition is only
- * safe if something counts the copies, which is what this does.
- *
- * It reads the file rather than making a request for the same reason
- * ForwardedHeaderTest does: the suite runs PHP directly, with no nginx in
- * front of it.
+ * nginx's add_header does not merge: a location declaring any add_header of
+ * its own silently discards every header inherited from the server block.
+ * /build/, /__media/ and /__backup/ each declare one, so the header set is
+ * repeated verbatim in each rather than pulled from an include (which would
+ * stop nginx starting, since dev bind-mounts this one file) — this test
+ * counts the copies. Reads the file rather than requesting it, as with
+ * ForwardedHeaderTest: no nginx in front of this suite.
  */
 class SecurityHeaderTest extends TestCase
 {
     /**
-     * Every location that sets a header of its own, and every header that
-     * must survive there. /__media/ and /__backup/ carry a shorter CSP —
-     * neither serves the application — so the policy itself is checked
-     * separately below.
+     * Every header that must survive in each location that sets one of its
+     * own. /__media/ and /__backup/ carry a shorter CSP, checked separately.
      */
     private const REPEATED = [
         'X-Content-Type-Options',
@@ -44,7 +32,6 @@ class SecurityHeaderTest extends TestCase
     {
         $conf = $this->conf();
 
-        // The server block plus the three locations that override.
         foreach (self::REPEATED as $header) {
             $this->assertSame(
                 4,
@@ -55,19 +42,54 @@ class SecurityHeaderTest extends TestCase
     }
 
     /**
-     * The one third party the site embeds. Dropping it from frame-src breaks
-     * every YouTube block on the site, which is the kind of thing to find in
-     * a test rather than from a teacher whose lesson has a blank rectangle
-     * in it.
+     * The two hosts the site frames, and no third. Dropping one breaks every
+     * block of that kind, which is the kind of thing to find in a test rather
+     * than from a teacher whose lesson has a blank rectangle in it. The
+     * exact-string assertion also fails if a host is *added* — so widening
+     * frame-src stays a decision someone made, not something that drifted in.
+     *
+     * instagram.com in particular must stay out: nothing on the site frames
+     * it (its embed carries no video, so the block links out instead), and
+     * putting it back would silently re-enable a renderer change that hands
+     * Meta every student who opens the page.
      */
-    public function test_the_policy_allows_the_youtube_embed_and_nothing_else_third_party()
+    public function test_the_policy_allows_the_embed_hosts_and_nothing_else_third_party()
     {
         $conf = $this->conf();
 
         $this->assertStringContainsString(
-            'frame-src https://www.youtube-nocookie.com;',
+            'frame-src https://www.youtube-nocookie.com https://www.tiktok.com;',
             $conf
         );
+
+        // Asked of the policies rather than the file, because the comment
+        // above them explains at length why instagram.com is absent — and
+        // that explanation is the thing most worth keeping.
+        foreach ($this->policies() as $policy) {
+            $this->assertStringNotContainsString(
+                'instagram.com',
+                $policy,
+                'Nothing on the site frames Instagram; its embed carries no video.'
+            );
+        }
+
+        // The two media locations carry a minimal policy with no frame-src and
+        // no script-src at all, so this asks the question that holds for all
+        // four: a third-party host may appear in frame-src and nowhere else.
+        //
+        // That is the distinction worth pinning rather than the host list. A
+        // framed document is isolated from this origin; a script is not, which
+        // is exactly why both platforms' own blockquote-plus-script embed was
+        // refused in favour of their plain iframe endpoint.
+        foreach ($this->policies() as $policy) {
+            $withoutFrames = preg_replace('/frame-src [^;]*/', '', $policy);
+
+            $this->assertStringNotContainsString(
+                '//',
+                (string) $withoutFrames,
+                'Only frame-src may name a third-party origin.'
+            );
+        }
 
         $this->assertStringContainsString("object-src 'none'", $conf);
         $this->assertStringContainsString("base-uri 'self'", $conf);
@@ -76,16 +98,10 @@ class SecurityHeaderTest extends TestCase
 
     /**
      * A CSP origin is resolved by the visitor's browser, so `localhost:5173`
-     * in the shipped policy names the *student's* machine, not the server —
-     * every deployed site was permitting scripts and styles from whatever was
-     * listening on their loopback. The dev server's origin therefore reaches
-     * the policy through a variable that is empty everywhere but the
-     * development stack.
-     *
-     * This reads the policies rather than the file because the file explains
-     * the reasoning in a comment, and matching on the whole thing would fail
-     * the test for saying why it exists — the same care test_hsts_is_not_set
-     * takes below.
+     * in a shipped policy would name the *student's* machine, not the
+     * server. The dev origin reaches the policy only via a variable that's
+     * empty outside the development stack. Reads the parsed policies, not
+     * the raw file, since the file's own comment mentions "localhost".
      */
     public function test_no_policy_names_a_development_origin()
     {
@@ -103,14 +119,11 @@ class SecurityHeaderTest extends TestCase
     }
 
     /**
-     * The other half of that fix, and the half that fails loudly rather than
-     * quietly: with the config installed straight into conf.d, envsubst never
-     * runs and the header goes out containing the literal `${CSP_DEV_SRC}`.
-     *
-     * NGINX_ENVSUBST_FILTER is equally load-bearing. envsubst substitutes
-     * `$VAR` as well as `${VAR}`, so without it any environment variable
-     * sharing a name with an nginx variable — `$uri`, `$request_uri`,
-     * `$document_root` — would be substituted out of the config.
+     * With the config installed straight into conf.d, envsubst never runs
+     * and the header ships the literal `${CSP_DEV_SRC}`.
+     * NGINX_ENVSUBST_FILTER is equally load-bearing: envsubst substitutes
+     * `$VAR` as well as `${VAR}`, so without it any env var sharing a name
+     * with an nginx variable (`$uri`, `$request_uri`) gets substituted away.
      */
     public function test_the_config_is_installed_as_a_template_in_both_stacks()
     {
@@ -160,18 +173,13 @@ class SecurityHeaderTest extends TestCase
     }
 
     /**
-     * Deliberately absent. nginx listens on plain 80 behind the tunnel and
-     * never sees the TLS connection, and this same file serves
-     * http://localhost:8080 in development — where an HSTS header would apply
-     * to every port on localhost and lock the operator out of their own dev
-     * site until they cleared it by hand. It belongs at the edge that
-     * terminates TLS, and the maintenance guides say so.
+     * Deliberately absent: nginx never sees the TLS connection (Cloudflare
+     * terminates it) and this same file serves http://localhost:8080 in
+     * development, where HSTS would apply to every port on localhost and
+     * lock the operator out of their own dev site.
      */
     public function test_hsts_is_not_set_here()
     {
-        // The header, not the word: the reasoning above is written into the
-        // file as a comment, and matching on that would make this test fail
-        // for explaining itself.
         $this->assertStringNotContainsString(
             'add_header Strict-Transport-Security',
             $this->conf(),

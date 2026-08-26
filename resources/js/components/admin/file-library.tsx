@@ -1,7 +1,9 @@
 import { router } from '@inertiajs/react';
 import * as React from 'react';
+import { MediaUsageBadges } from '@/components/admin/media-usage-badges';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { confirm } from '@/components/ui/confirm-dialog';
 import {
     Dialog,
     DialogContent,
@@ -31,14 +33,17 @@ function FileRow({
     file: MediaFile;
     onPreview: (file: MediaFile) => void;
 }) {
-    const remove = () => {
-        if (
-            !confirm(
-                t('ui.library.confirm_delete', {
-                    name: file.original_filename,
-                }),
-            )
-        ) {
+    const remove = async () => {
+        const confirmed = await confirm({
+            title: t('ui.library.confirm_delete_title'),
+            description: t('ui.library.confirm_delete', {
+                name: file.original_filename,
+            }),
+            confirmLabel: t('ui.actions.delete'),
+            destructive: true,
+        });
+
+        if (!confirmed) {
             return;
         }
 
@@ -66,6 +71,7 @@ function FileRow({
             </div>
 
             <Badge variant="secondary">{t(KIND_KEYS[file.kind])}</Badge>
+            <MediaUsageBadges usage={file} />
 
             <div className="flex flex-wrap gap-2">
                 {file.kind === 'video' && (

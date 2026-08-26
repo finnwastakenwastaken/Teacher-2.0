@@ -8,17 +8,12 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
 /**
- * Put an archive back — into this instance, or into a brand new one.
- *
- * This is how a site moves to another machine. `install.sh` brings a fresh
- * box up to an empty site and then calls this with the archive, so the
- * sequence for "my server died" is: install, restore, done. The admin account
- * comes back with the database, so there is no claim screen to race and no
- * setup token to find.
- *
- * It replaces everything, and says so before it does. There is no merge mode:
- * reconciling two sites' content needs decisions a command line cannot ask
- * for.
+ * Put an archive back — into this instance, or a brand new one. This is how
+ * a site moves machines: `install.sh` brings up an empty site then calls
+ * this, so "my server died" is install, restore, done — the admin account
+ * comes back with the database, no claim screen to race. Replaces
+ * everything; there is no merge mode, since reconciling two sites' content
+ * needs decisions a command line cannot ask for.
  */
 class RestoreBackup extends Command
 {

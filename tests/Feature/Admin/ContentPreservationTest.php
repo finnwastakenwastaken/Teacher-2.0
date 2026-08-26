@@ -9,19 +9,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * A request that does not mention the body must not erase the body.
- *
- * Every one of these writes used `$request->input('content')`, which is
- * correct — validated() returns only keys that have rules and would strip the
- * document to nothing. What was missing is the other half: the rule was
- * `nullable`, so an *absent* key validated cleanly, arrived as null, and
- * replaced the stored document with nothing. Absence and emptiness are
- * different intents and `nullable` alone conflates them.
- *
- * Nothing in the front end currently omits the field. That is exactly why
- * these tests exist: the trap is only sprung by something that does not exist
- * yet — a second form, a script, a retry that drops a field — and the failure
- * is silent data loss rather than an error.
+ * A request that omits the body must not erase it — fixed differently on
+ * each route. Pages: `PageController::updateContent`'s rule is `['present',
+ * 'nullable', 'array']`, so a `nullable`-alone rule that let an absent key
+ * validate as null would silently wipe the stored document. Topics:
+ * `UpdateTopicRequest` stays plain `['nullable', 'array']`, and
+ * `TopicController` instead checks `$request->has('content')` before calling
+ * `writeContent()` at all.
  */
 class ContentPreservationTest extends TestCase
 {
@@ -111,10 +105,8 @@ class ContentPreservationTest extends TestCase
     }
 
     /**
-     * Defence in depth for the whitelist. Nothing currently validates a
-     * `content` key on the page settings form, so nothing exploits this — but
-     * the guard was one added rule away from being gone, on the model where
-     * the whitelist matters most because pages are what carry embeds.
+     * Defence in depth: nothing currently sends a `content` key on this form,
+     * but the model-level whitelist must hold regardless — pages carry embeds.
      */
     public function test_a_page_body_cannot_be_mass_assigned_past_the_whitelist()
     {

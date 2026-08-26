@@ -28,9 +28,7 @@ class IconCatalogueTest extends TestCase
 
     public function test_an_unprefixed_value_is_read_as_lucide()
     {
-        // Every icon chosen before the catalogue existed is a bare lucide
-        // name. Those rows are never migrated, so this is what keeps them
-        // rendering.
+        // Icons chosen before the catalogue existed are bare lucide names, never migrated.
         $this->assertSame('lucide:atom', IconCatalogue::normalise('atom'));
         $this->assertSame('tabler:circuit-resistor', IconCatalogue::normalise('tabler:circuit-resistor'));
         $this->assertNull(IconCatalogue::normalise(''));

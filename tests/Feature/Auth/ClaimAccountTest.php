@@ -17,13 +17,8 @@ class ClaimAccountTest extends TestCase
     {
         parent::setUp();
 
-        // The 'claim' rate limiter is keyed by IP only (there's no identity
-        // yet to key on), and every test in this class hits the same route
-        // from the same test-client IP. Without a fresh cache per test, tests
-        // earlier in the run consume attempts that later tests then trip
-        // over — a false 429 that has nothing to do with what that test is
-        // actually checking. CACHE_STORE is the 'array' driver in tests, so
-        // this is an in-memory reset, not a real cache flush.
+        // The 'claim' rate limiter is keyed by IP only, and every test here shares one
+        // test-client IP; reset it per test or earlier tests trip later ones' 429s.
         Cache::flush();
     }
 
@@ -69,6 +64,36 @@ class ClaimAccountTest extends TestCase
         $user = User::query()->sole();
         $this->assertSame('De Docent', $user->name);
         $this->assertSame('docent@school.nl', $user->email);
+    }
+
+    /**
+     * Claiming with a capital in the address used to lock the owner out for
+     * good: `lowercase_usernames` canonicalises what is typed at login, so a
+     * stored `Docent@school.nl` matched nothing, and `admin:reset-password`
+     * could not help because the password was never what failed. Asserting the
+     * login rather than only the stored value — the stored value being
+     * lower-case is the mechanism, but being able to get back in is the point.
+     */
+    public function test_an_address_typed_with_capitals_is_stored_lowercase_and_can_log_in()
+    {
+        $this->post(route('admin.claim.store'), [
+            'name' => 'De Docent',
+            'email' => 'Docent@School.nl',
+            'password' => 'a-strong-password',
+            'password_confirmation' => 'a-strong-password',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertSame('docent@school.nl', User::query()->sole()->email);
+
+        $this->post(route('logout'));
+        $this->assertGuest();
+
+        $this->post(route('login'), [
+            'email' => 'Docent@School.nl',
+            'password' => 'a-strong-password',
+        ]);
+
+        $this->assertAuthenticated();
     }
 
     public function test_claiming_requires_name_email_and_password()

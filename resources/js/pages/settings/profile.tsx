@@ -10,13 +10,9 @@ import { edit } from '@/routes/profile';
 import type { Auth } from '@/types';
 import { t } from '@/lib/i18n';
 
-/*
- * No "delete account" section here, and no e-mail verification notice.
- *
- * The account cannot be deleted — it is the only one, and losing it would lock
- * the owner out of the site permanently. E-mail verification is disabled
- * because the deployment has no outbound mail. See the technical reference.
- */
+// No "delete account" section: it's the only account, and deleting it would
+// lock the owner out permanently. No e-mail verification notice either —
+// the deployment has no outbound mail.
 
 type PageProps = {
     auth: Auth;

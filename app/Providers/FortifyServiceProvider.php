@@ -13,17 +13,11 @@ use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         $this->configureActions();
@@ -31,28 +25,19 @@ class FortifyServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
     }
 
-    /**
-     * Configure Fortify actions.
-     */
     private function configureActions(): void
     {
-        // Nothing to register. User creation and email-based password reset are
-        // disabled in config/fortify.php — see the comment there before adding
-        // anything back to this method.
+        // Nothing to register. User creation and email-based password reset
+        // are disabled in config/fortify.php — see the comment there before
+        // adding anything back to this method.
     }
 
-    /**
-     * Configure Fortify views.
-     */
     private function configureViews(): void
     {
         // Sends the first visitor to the claim screen instead of a login form
-        // for an account that doesn't exist yet. This is what makes "the first
-        // person to open the admin area is presented with a claim screen" true
-        // without a bespoke /admin entry route: any authenticated route (e.g.
-        // /dashboard, and later the real admin panel) redirects a guest here
-        // via Laravel's own `auth` middleware, and this closure takes it from
-        // there. See routes/auth.php for the other half of the gate.
+        // for an account that doesn't exist yet — no bespoke /admin entry
+        // route needed, since any authenticated route already redirects a
+        // guest to `login` via Laravel's own `auth` middleware.
         Fortify::loginView(function (Request $request) {
             if (! AdminAccount::exists()) {
                 return redirect()->route('admin.claim.create');
@@ -68,9 +53,6 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::confirmPasswordView(fn () => Inertia::render('auth/confirm-password'));
     }
 
-    /**
-     * Configure rate limiting.
-     */
     private function configureRateLimiting(): void
     {
         RateLimiter::for('two-factor', function (Request $request) {

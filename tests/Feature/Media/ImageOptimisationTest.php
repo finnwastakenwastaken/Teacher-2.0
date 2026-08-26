@@ -69,10 +69,9 @@ class ImageOptimisationTest extends TestCase
 
     public function test_the_image_stack_can_read_heic_and_write_webp()
     {
-        // A tripwire, not a unit test. Both come from separate Alpine
-        // packages in the Dockerfile (imagemagick-heic, imagemagick-webp);
-        // if either is dropped, every iPhone photo silently becomes an
-        // upload the owner cannot use, and nothing else here would say so.
+        // A tripwire: both formats come from separate Alpine packages
+        // (imagemagick-heic, imagemagick-webp); dropping either silently
+        // turns every iPhone photo into an upload the owner cannot use.
         $formats = Imagick::queryFormats();
 
         $this->assertContains('HEIC', $formats);
@@ -81,12 +80,10 @@ class ImageOptimisationTest extends TestCase
 
     public function test_imagemagick_refuses_the_coders_that_execute_instructions()
     {
-        // ImageMagick picks a format by reading the file's contents, and
-        // resolveMime() can fall back to the filename, so a file arriving as
-        // ".png" still reaches readImage() and may be recognised as something
-        // else. These coders are the ones that turn decoding into following
-        // instructions; docker/php/imagemagick-policy.xml disables them, and
-        // nothing but this test would notice that COPY line disappearing.
+        // resolveMime() can fall back to filename, so a ".png" can still
+        // reach readImage() recognised as something else. These coders turn
+        // decoding into executing instructions; imagemagick-policy.xml
+        // disables them, and only this test would notice that regressing.
         foreach (['MSL', 'MVG', 'HTTPS', 'EPHEMERAL'] as $coder) {
             $blocked = false;
 

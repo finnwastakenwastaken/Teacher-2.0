@@ -3,22 +3,14 @@
 namespace App\Support;
 
 /**
- * The whitelist for page bodies.
- *
- * Page content is stored as TipTap JSON and never as HTML (the technical
- * reference). That choice only pays off if the JSON itself is constrained: the
- * document arrives from the browser, so without a server-side whitelist an
- * attacker — or a bug — could persist a node type the renderer does not
- * expect and get it back out again on a public page.
- *
- * So the rule here is allow-list, not deny-list. Anything whose type is not
- * named below is dropped, and every surviving node keeps only the attributes
- * named for it. A node type added to the editor but forgotten here silently
- * stops saving, which is the safe direction to fail.
- *
- * Combined with a renderer that maps node types to React components and never
- * touches dangerouslySetInnerHTML, this removes stored XSS as a category
- * rather than trying to sanitise it away.
+ * Server-side allow-list for TipTap JSON page bodies: any node type not
+ * named below is dropped, and surviving nodes keep only their listed
+ * attributes. The document arrives from the browser as untrusted input, so
+ * without this whitelist an attacker — or a client bug — could persist a
+ * node type the renderer doesn't expect. A node type added to the editor but
+ * forgotten here silently stops saving — the safe failure direction.
+ * Combined with a renderer that never uses dangerouslySetInnerHTML, this is
+ * what removes stored XSS as a category, not the allow-list alone.
  */
 class PageContent
 {
@@ -45,6 +37,10 @@ class PageContent
         // The embed blocks.
         'fileEmbed' => ['ulid'],
         'youtubeEmbed' => ['videoId'],
+        // A TikTok or an Instagram Reel. Only the platform and the post id
+        // are stored; the embed URL is rebuilt from them, so a pasted link's
+        // tracking parameters have nothing to ride along in.
+        'socialEmbed' => ['platform', 'postId'],
         'imageGallery' => ['ulids'],
         // One image the running text flows around. `side` and `size` are
         // enumerations the renderer turns into fixed classes, never numbers
@@ -53,20 +49,35 @@ class PageContent
     ];
 
     /**
-     * The node types that put a media file on a page.
-     *
-     * Named once because two things read the list and they must not drift:
-     * this is what sanitiseWithoutEmbeds() strips, and it is the same set
-     * whose ULIDs collectReferences() turns into the rows that publish a file
-     * to anonymous visitors. A block added to one and not the other either
-     * leaks a picker into the topic editor or renders an image the owner can
-     * see and every student gets a 403 for.
+     * The embed blocks, named once: every node the simple editor does not
+     * offer and sanitiseWithoutEmbeds() therefore strips. Most publish a
+     * media file — reachability is decided by walking from the file to the
+     * *pages* showing it, so one on a topic introduction or the homepage
+     * renders for the owner and 403s for every student. socialEmbed has no
+     * local file and cannot fail that way; it is here because this list
+     * guards paragraph editors, and a block arriving in one was not authored
+     * there. collectReferences() names its media node types separately,
+     * since it needs to know which attribute on each carries the ULID —
+     * adding a media block means editing both, or the two silently drift.
      */
     private const EMBED_NODES = [
         'fileEmbed',
         'youtubeEmbed',
+        'socialEmbed',
         'imageGallery',
         'imageAside',
+    ];
+
+    /**
+     * The platforms a socialEmbed may name, and the shape of a post id on
+     * each. Mirrors resources/js/lib/social-embed.ts, which extracts the id
+     * from whatever the owner pasted; this is what decides whether to believe
+     * it. The value is interpolated into a URL, so both patterns are anchored
+     * and neither admits a slash, a dot or a colon.
+     */
+    private const SOCIAL_ID_PATTERNS = [
+        'tiktok' => '/^\d{10,25}$/',
+        'instagram' => '/^[A-Za-z0-9_-]{5,20}$/',
     ];
 
     private const MARKS = [
@@ -97,20 +108,11 @@ class PageContent
     private const ASIDE_SIZES = ['small', 'medium', 'large'];
 
     /**
-     * Attributes whose absence is a real value, not a malformed one.
-     *
-     * TipTap writes an explicit null for a paragraph nobody aligned and for a
-     * table column nobody resized. Everywhere else in sanitiseAttrs() a null
-     * means "this attribute is broken, drop the node"; for these two it means
-     * "there is no value", so the key is dropped and the node survives.
-     *
-     * imageAside's `side` and `size` are deliberately *not* here. TipTap only
-     * writes a null for an attribute whose declared default is null, and both
-     * of those declare a real one ('right', 'medium'), so there is no "nobody
-     * chose" state for them to represent. Their arms below fall back to that
-     * same default instead of rejecting, which is the colspan treatment rather
-     * than the colwidth one: an image on the wrong side is cosmetic, an image
-     * dropped out of a lesson is a hole in it.
+     * Attributes for which an explicit null is a real value ("nobody set
+     * this"), not a malformed one. Elsewhere in sanitiseAttrs() null means
+     * "drop the node"; for these it means drop the key and keep the node.
+     * `imageAside`'s side/size are deliberately excluded — they declare a
+     * real default, so a bad value falls back to it instead of rejecting.
      */
     private const NULLABLE_ATTRS = ['textAlign', 'colwidth'];
 
@@ -143,15 +145,10 @@ class PageContent
     }
 
     /**
-     * The same whitelist, minus every embed block (see EMBED_NODES).
-     *
-     * Used for the homepage introduction. Embeds are what publish a file to
-     * anonymous visitors, and that decision is made by walking from a file
-     * to the *pages* showing it (App\Support\MediaAccess). The homepage is
-     * not a page row, so an image embedded there would render for the owner
-     * and 403 for everyone else — a trap rather than a feature. Text, links
-     * and lists cover what an introduction needs; a banner image is a
-     * separate setting with its own explicit rule in MediaAccess.
+     * The same whitelist, minus every embed block (see EMBED_NODES). Used
+     * for the homepage introduction: MediaAccess publishes a file by walking
+     * to the *pages* showing it, and the homepage is not a page row, so an
+     * embed there would render for the owner and 403 for everyone else.
      *
      * @param  array<string, mixed>|null  $document
      * @return array<string, mixed>|null
@@ -208,12 +205,9 @@ class PageContent
     }
 
     /**
-     * Every media item the document references, by ULID.
-     *
-     * This is what lets a file be published: a media file becomes publicly
-     * reachable exactly when some page references it (see
-     * App\Support\MediaAccess), and it is what makes "this file is still in
-     * use" answerable when the owner tries to delete it.
+     * Every media item the document references, by ULID. Drives both
+     * MediaAccess's "is this file published" check and "still in use" on
+     * delete.
      *
      * @param  array<string, mixed>|null  $document
      * @return array{images: list<string>, files: list<string>}
@@ -329,24 +323,24 @@ class PageContent
                 // later. Reject the whole node rather than keep it.
                 'ulid' => self::isUlid($value) ? $value : null,
                 'ulids' => self::sanitiseUlidList($value),
+                // Both halves of a socialEmbed are kept as-is here and
+                // checked together after the loop: whether a post id is
+                // valid depends on which platform it belongs to, and a rule
+                // that sees one attribute at a time cannot ask that.
+                'platform', 'postId' => is_string($value) ? $value : null,
                 // The default arm below is deliberately unreachable, which
                 // makes this the last arm that can match.
                 // @phpstan-ignore match.alwaysTrue
                 'videoId' => self::isYouTubeId($value) ? $value : null,
-                // Unreachable today: every name that can reach this method is
-                // in one of the allow-lists above and has an arm. Kept anyway,
-                // because the arms and the allow-lists are edited separately
-                // and this is what makes the omission fail closed — an
-                // attribute added to a list without a rule here drops its node
-                // rather than passing through unchecked.
+                // Unreachable today, but kept: an attribute added to an
+                // allow-list without a matching arm here fails closed (drops
+                // the node) instead of passing through unchecked.
                 default => null,
             };
 
             if ($clean[$name] === null) {
-                // For an attribute that may legitimately carry no value, a
-                // null result means "nothing usable here": drop the key and
-                // keep the node. For every other attribute it means the node
-                // itself cannot be trusted.
+                // Nullable attrs: drop the key, keep the node. Otherwise the
+                // node itself cannot be trusted.
                 if (in_array($name, self::NULLABLE_ATTRS, true)) {
                     unset($clean[$name]);
 
@@ -355,6 +349,17 @@ class PageContent
 
                 return null;
             }
+        }
+
+        // A socialEmbed's two attributes only mean anything together, which
+        // the per-attribute loop above cannot see. Checked here so neither
+        // key can arrive without the other, and so an Instagram shortcode
+        // cannot be stored under `platform: tiktok` and then interpolated
+        // into a tiktok.com URL. Malformed rejects the whole node, exactly as
+        // a bad ULID on a fileEmbed does — a broken embed is a hole in the
+        // lesson either way, and there is no sensible value to fall back to.
+        if ($type === 'socialEmbed' && ! self::isSocialPost($clean['platform'] ?? null, $clean['postId'] ?? null)) {
+            return null;
         }
 
         return $clean;
@@ -413,12 +418,9 @@ class PageContent
 
         $trimmed = trim($href);
 
-        // Relative links stay inside the site and cannot carry a scheme.
-        //
-        // The second slash is checked as either slash: browsers normalise a
-        // backslash in this position to a forward one, so `/\evil.example`
-        // is the protocol-relative URL `//evil.example` by the time it is
-        // navigated. Only the plain form was rejected before.
+        // Relative links stay in-site. Second slash checked as either slash:
+        // browsers normalise `/\evil.example` to `//evil.example` before
+        // navigating, so a lone backslash check would miss it.
         if (str_starts_with($trimmed, '/') && ! preg_match('#^/[/\\\\]#', $trimmed)) {
             return $trimmed;
         }
@@ -500,6 +502,24 @@ class PageContent
     private static function isYouTubeId(mixed $value): bool
     {
         return is_string($value) && preg_match('/^[A-Za-z0-9_-]{11}$/', $value) === 1;
+    }
+
+    /**
+     * Whether a platform/post-id pair is one this site will embed.
+     *
+     * Both halves together, deliberately: the platform decides which pattern
+     * applies, so checking them apart would let a value valid for one be
+     * stored against the other.
+     */
+    private static function isSocialPost(mixed $platform, mixed $postId): bool
+    {
+        if (! is_string($platform) || ! is_string($postId)) {
+            return false;
+        }
+
+        $pattern = self::SOCIAL_ID_PATTERNS[$platform] ?? null;
+
+        return $pattern !== null && preg_match($pattern, $postId) === 1;
     }
 
     /**

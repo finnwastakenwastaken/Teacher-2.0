@@ -1,14 +1,9 @@
 #!/bin/bash
 #
-# Creates the database the test suite runs against.
-#
-# Runs once, when the PostgreSQL data volume is first initialised. Tests use
-# real PostgreSQL rather than SQLite because the schema depends on tsvector,
-# GIN indexes and CHECK constraints — see the comment in phpunit.xml.
-#
-# In production this leaves behind one empty, unused database. That is a
-# deliberate trade for making `php artisan test` work in every environment
-# with no setup step.
+# Creates the database the test suite runs against (real PostgreSQL, not
+# SQLite — the schema needs tsvector, GIN and CHECK constraints). Runs once,
+# on first volume init; leaves one empty unused database in production, which
+# is the trade for `php artisan test` working everywhere with no setup step.
 
 set -euo pipefail
 

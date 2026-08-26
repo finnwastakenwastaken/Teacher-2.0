@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AccessPassword;
 use App\Models\EducationLevel;
-use App\Models\Image;
 use App\Models\Page;
 use App\Models\PageDownload;
 use App\Models\SlugRedirect;
@@ -28,10 +27,8 @@ class ContentController extends Controller
             return $this->redirectFromHistory($path);
         }
 
-        // The prompt replaces the content rather than sitting in front of it:
-        // nothing about a locked page reaches the browser, so "view source"
-        // is not a way past it. Breadcrumbs and the title are shown because
-        // they already appear in the public navigation.
+        // The prompt replaces the content rather than sitting in front of
+        // it — nothing about a locked page reaches the browser.
         if (! AccessControl::allows($node, $request)) {
             return $this->renderLocked($node);
         }
@@ -111,38 +108,39 @@ class ContentController extends Controller
     /**
      * The downloads section, grouped by education level.
      *
-     * Grouping happens here rather than in the browser because a download
-     * tagged for two tracks belongs in both groups — the same attachment is
-     * listed twice, deliberately, so a student scanning for "HAVO" finds
-     * everything meant for them in one place without having to read tags.
-     *
-     * Untagged downloads lead in a group of their own. Levels are optional
-     * on purpose: a handout meant for everybody should not require ticking
-     * every box, and ticking every box would then render it in every group.
-     *
-     * Empty groups are dropped. A level the owner added for another subject
-     * should not leave a bare heading on every page that does not use it.
+     * Grouped here rather than in the browser: a download tagged for two
+     * tracks is deliberately listed in both groups, so a student scanning for
+     * "HAVO" finds everything meant for them in one place. Untagged downloads
+     * lead in a group of their own — levels are optional, so a handout for
+     * everybody need not tick every box. Empty groups are dropped.
      *
      * @return array<int, array{key: string, label: string, downloads: array<int, array<string, mixed>>}>
      */
     private function downloadGroups(Page $page): array
     {
-        $downloads = $page->downloads()->with(['mediaFile', 'educationLevels'])->get();
+        $downloads = $page->downloads()->with(['mediaFile', 'image', 'educationLevels'])->get();
 
         if ($downloads->isEmpty()) {
             return [];
         }
 
-        $card = fn (PageDownload $download) => [
-            'ulid' => $download->ulid,
-            'label' => $download->displayLabel(),
-            'href' => route('downloads.show', $download),
-            'kind' => $download->mediaFile->kind,
-            'mime' => $download->mediaFile->mime,
-            'filename' => $download->mediaFile->original_filename,
-            'sizeBytes' => $download->mediaFile->size_bytes,
-            'levels' => $download->educationLevels->pluck('name')->all(),
-        ];
+        // Both arms of the attachment describe a card the same way — an
+        // offered poster is a row in this list like any worksheet, and the
+        // only thing that differs is the icon. See PageDownload::kind().
+        $card = function (PageDownload $download) {
+            $media = $download->offeredMedia();
+
+            return [
+                'ulid' => $download->ulid,
+                'label' => $download->displayLabel(),
+                'href' => route('downloads.show', $download),
+                'kind' => $download->kind(),
+                'mime' => $media->mime,
+                'filename' => $media->original_filename,
+                'sizeBytes' => $media->size_bytes,
+                'levels' => $download->educationLevels->pluck('name')->all(),
+            ];
+        };
 
         $groups = [];
 
@@ -176,13 +174,10 @@ class ContentController extends Controller
     }
 
     /**
-     * The media this page embeds, keyed by ULID.
-     *
-     * The document only stores identifiers, so the renderer needs somewhere
-     * to look up a URL, an alt text or a filename. Built from the reference
-     * rows rather than by re-walking the document, so a page can never hand
-     * the browser a URL for something it does not actually reference — the
-     * same rows that publish a file are the ones that describe it.
+     * The media this page embeds, keyed by ULID — the document only stores
+     * identifiers, so the renderer needs a URL/alt/filename lookup. Built
+     * from the reference rows rather than re-walking the document, so a page
+     * can never hand the browser a URL for something it doesn't reference.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -197,22 +192,12 @@ class ContentController extends Controller
                 continue;
             }
 
-            $media[$item->ulid] = $item instanceof Image
-                ? [
-                    'type' => 'image',
-                    'url' => route('images.show', $item),
-                    'alt' => $item->alt_text,
-                    'width' => $item->width,
-                    'height' => $item->height,
-                ]
-                : [
-                    'type' => 'file',
-                    'url' => route('media.show', $item),
-                    'kind' => $item->kind,
-                    'mime' => $item->mime,
-                    'filename' => $item->original_filename,
-                    'sizeBytes' => $item->size_bytes,
-                ];
+            // The shape lives on the models, not here: the page editor's
+            // version preview builds the same map from a stored document
+            // rather than from these rows, and a preview that described a
+            // file differently from the page would be a preview of something
+            // else. See App\Models\Image::toPageMediaItem().
+            $media[$item->ulid] = $item->toPageMediaItem();
         }
 
         return $media;
@@ -251,16 +236,10 @@ class ContentController extends Controller
             abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
-        /*
-         * 301, because the old address really is gone and a search engine
-         * should carry its ranking over to the new one. But a bare 301 is
-         * cached by browsers until the profile is cleared, so a slug typo
-         * fixed an hour later stays broken for everyone who visited in
-         * between — and the owner has no way to reach into their browsers.
-         *
-         * An explicit max-age bounds that: the redirect is still permanent
-         * for a crawler, and a visitor re-asks the server after a day.
-         */
+        // 301 so a search engine carries over its ranking. A bare 301 is
+        // cached by browsers indefinitely though, so an explicit max-age
+        // makes a visitor re-ask after a day while staying permanent for a
+        // crawler.
         return redirect('/'.$target->fullPath(), HttpResponse::HTTP_MOVED_PERMANENTLY)
             ->header('Cache-Control', 'public, max-age=86400');
     }

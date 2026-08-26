@@ -17,6 +17,12 @@ const badgeVariants = cva(
           "border-transparent bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        // Attention without alarm — an unpublished concept is work in
+        // progress, not a failure. `warning` is a fill and has no text
+        // counterpart: text-warning measures 2.45:1 on the light card and
+        // fails AA outright. See the technical reference.
+        warning:
+          "border-transparent bg-warning text-warning-foreground",
       },
     },
     defaultVariants: {

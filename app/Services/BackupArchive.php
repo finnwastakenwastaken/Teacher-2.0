@@ -11,30 +11,12 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
 /**
- * One archive holds everything needed to stand this site up somewhere else.
- *
- * Two halves, and both are required for a restore to mean anything: the
- * database (structure, pages, settings, the single admin account) and the
- * private media disk (every uploaded image, document and video). A dump of
- * one without the other produces a site full of broken links, which is worse
- * than an obvious failure because it looks like it worked.
- *
- * The archive is a plain `.tar.gz` with a flat, boring layout:
- *
- *     manifest.json      what this is, and what made it
- *     database.sql       pg_dump --clean --if-exists, plain SQL
- *     images/ media/     the private disk, verbatim
- *
- * Plain SQL rather than pg_dump's custom format on purpose: it restores with
- * `psql` alone, it can be read and repaired by a human when something has
- * gone wrong, and it does not tie the archive to one pg_restore version. The
- * whole thing is gzipped, so the text costs little.
- *
- * What is deliberately NOT in here is `.env`. It holds the database password
- * and APP_KEY, and an archive is a file the owner is encouraged to copy to a
- * laptop and a USB stick. Losing APP_KEY costs nothing but already-issued
- * unlock cookies; leaking it alongside a full database dump costs everything.
- * The install guide says to keep `.env` separately.
+ * One `.tar.gz` archive: `manifest.json` + `database.sql` (plain SQL, via
+ * `pg_dump --clean --if-exists`, so a restore needs only `psql` and a human
+ * can read it) + `images/` and `media/` verbatim. Both database and media are
+ * required — a dump of one without the other produces a site full of broken
+ * links. `.env` is deliberately excluded: it holds APP_KEY and the database
+ * password, and an archive is meant to be copied to a laptop or USB stick.
  */
 class BackupArchive
 {
@@ -122,15 +104,10 @@ class BackupArchive
         $disk = Storage::disk(config('backup.disk'));
 
         return collect($disk->files(''))
-            // Only files this class wrote. A stray upload sitting in the
-            // directory is not an archive and must not be offered as one.
+            // Only files this class wrote.
             ->filter(fn (string $file) => $this->timestampIn($file) !== null)
-            // Sorted and dated by the *name*, not by mtime. The name carries
-            // the moment the archive was made; mtime carries the last time
-            // anything touched the file, which `docker cp`, a filesystem copy
-            // and a restore all rewrite. Two archives made in the same second
-            // would also tie on mtime and come back in whatever order the
-            // directory happened to yield.
+            // Sorted by the name's own timestamp, not mtime — mtime is
+            // rewritten by `docker cp`, a filesystem copy, or a restore.
             ->sortDesc()
             ->map(fn (string $file) => [
                 'name' => $file,

@@ -9,24 +9,13 @@ use SplFileInfo;
 use Tests\TestCase;
 
 /**
- * The two locale directories must stay the same shape.
- *
- * A key present in one locale and missing from the other does not fall back
- * to the other language — APP_FALLBACK_LOCALE is `nl`, and even if it were
- * not, a partial file is how a screen ends up showing the raw key path
- * ("validation.required") to a visitor. That reads as a crash, not as a
- * translation gap, so it is worth failing the build over.
- *
- * This is the only guard there is. Translations are data, and nothing else
- * in the pipeline type-checks them.
+ * The two locale directories must stay the same shape: a missing key does not fall
+ * back to the other language, it renders the raw key path on screen. This is the
+ * only guard translations get — nothing else in the pipeline type-checks them.
  */
 class LocalisationTest extends TestCase
 {
-    /**
-     * Every locale the application ships. Adding a directory without adding
-     * it here means it is never checked; adding it here without the files
-     * fails immediately, which is the right way round.
-     */
+    /** Every locale the application ships — a directory not listed here is never checked. */
     private const LOCALES = ['nl', 'en'];
 
     public function test_every_locale_ships_the_same_files()
@@ -89,28 +78,16 @@ class LocalisationTest extends TestCase
     }
 
     /**
-     * No message may be left as the English original in the Dutch files, and
-     * the other way round — the failure this whole directory exists to fix
-     * was a Dutch screen reporting "The password field must be at least 12
-     * characters." An identical string in both locales is either an
-     * untranslated line or a placeholder, and both want looking at.
-     *
-     * Proper nouns and format strings would be false positives, so the list
-     * of things allowed to be identical is explicit rather than heuristic.
+     * A message identical in both locales is presumed untranslated. Proper nouns
+     * and format strings are false positives, so the exemption list is explicit.
      */
     public function test_no_message_is_identical_in_both_locales()
     {
         $allowed = [
-            // The framework's own example rows, kept so the file still
-            // documents how a per-field override is written.
+            // The framework's own example row, kept to document per-field overrides.
             'validation.custom.attribute-name.rule-name',
 
-            // Genuinely the same word in both languages. Listed rather than
-            // detected, so a line that merely *looks* translated because
-            // someone pasted the English over the Dutch still fails.
-            //
-            // Dutch has borrowed most of the computing vocabulary wholesale,
-            // so these are the words themselves, not untranslated lines.
+            // Genuinely identical words in both languages (Dutch borrows this vocabulary).
             'ui.public.downloads.heading',
             'ui.settings.passkeys.title',
             'ui.nav.dashboard',
@@ -130,17 +107,17 @@ class LocalisationTest extends TestCase
             'ui.site.banner',
             'ui.editor.link',
 
-            // Chemistry and physics notation, which is the same everywhere.
+            // Chemistry/physics notation, same everywhere.
             'ui.editor.subscript',
             'ui.editor.superscript',
 
-            // Format strings: a URL and a bare count.
+            // Format strings: URLs and a bare count. The TikTok placeholder
+            // does differ, because the handle in it is a word.
             'ui.editor.youtube_dialog.placeholder',
+            'ui.editor.social_dialog.instagram_placeholder',
             'ui.levels.download_count',
 
-            // The documentation is one English wiki rather than a Dutch guide
-            // and an English one, so the address it cites is the same address
-            // whichever language the interface is in.
+            // The wiki is one English doc set, so its URL is the same in both locales.
             'ui.backups.restore_doc',
         ];
 
@@ -168,25 +145,17 @@ class LocalisationTest extends TestCase
     }
 
     /**
-     * Every key the application asks for must exist in every locale.
-     *
-     * `__()` returns the key unchanged when it is missing, so a typo or a
-     * half-finished rename does not throw — it puts "admin.topics.creted" on
-     * screen where a sentence belongs. Nothing else in the pipeline can catch
-     * that: translations are data, and the key is a string.
+     * `__()` returns the key unchanged when missing rather than throwing, so a typo
+     * puts the raw key on screen instead of a sentence — nothing else catches that.
      */
     public function test_every_key_the_application_uses_exists_in_every_locale()
     {
-        // Only literal keys. A key built from a variable cannot be checked
-        // here, which is why the places that do it (DashboardController's
-        // steps, IconCatalogue's library labels, the locale switcher's two
-        // options) interpolate a value from a fixed list.
+        // Only literal keys; a key built from a variable can't be checked here (see
+        // the fixed-list callers: DashboardController, IconCatalogue, locale switcher).
         $scans = [
             [app_path(), ['php'], "/(?:__|trans)\(\s*'([a-z][a-z0-9_]*\.[a-z0-9_.]+)'/i"],
 
-            // The front end is scanned from PHP because this project has no
-            // JS test runner — the same arrangement the shared YouTube
-            // referrer-policy constant relies on.
+            // No JS test runner in this project, so the front end is scanned from PHP.
             [resource_path('js'), ['ts', 'tsx'], "/\bt\(\s*'([a-z][a-z0-9_]*\.[a-z0-9_.]+)'/"],
         ];
 
@@ -219,11 +188,7 @@ class LocalisationTest extends TestCase
         $this->assertSame([], $missing, implode("\n", $missing));
     }
 
-    /**
-     * Comments are stripped before scanning, because a doc block that shows
-     * how to call t() is not a call — `lib/i18n.ts` documents itself with
-     * three examples, and without this they were reported as missing keys.
-     */
+    /** Comments are stripped first — a doc block showing how to call t() is not a call. */
     private function withoutComments(string $source): string
     {
         return (string) preg_replace(
@@ -250,9 +215,7 @@ class LocalisationTest extends TestCase
                 continue;
             }
 
-            // Wayfinder writes resources/js/{actions,routes,wayfinder} and
-            // they are gitignored, so they may or may not exist. Nothing
-            // generated ever calls t().
+            // Wayfinder's gitignored generated files never call t().
             if (str_contains($file->getPathname(), DIRECTORY_SEPARATOR.'wayfinder')) {
                 continue;
             }

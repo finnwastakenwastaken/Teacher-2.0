@@ -2,23 +2,12 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 
 /**
- * The image the running text flows around.
- *
- * Three things about it were measured by hand when it shipped and had no
- * regression guard, and all three are invisible to the PHP suite because they
- * are layout rather than markup: that the text actually wraps, that the float
- * is contained rather than running out over whatever follows the body, and
- * that a heading after a tall picture clears instead of sitting in the gutter
- * beside it.
- *
- * They are also invisible to a DOM simulator — jsdom has no layout engine, so
- * every rectangle below would be zero and each assertion would be measuring
- * the test's own fixture. That is the same reason this project has no jsdom
- * half at all.
- *
- * The fixture image is 400×300 rather than a placeholder pixel, deliberately:
- * a 1×1 image proves a float exists and never that anything wraps around it,
- * which is the part worth protecting.
+ * The image the running text flows around. Three layout facts here are
+ * invisible to the PHP suite (markup only) and to jsdom (no layout engine, so
+ * every rectangle would read zero): that text actually wraps, that the float
+ * is contained rather than running out over what follows, and that a heading
+ * after a tall picture clears it. The fixture image is 400×300, not a 1×1
+ * pixel, because only a real size proves anything wraps around it.
  */
 
 const ALT = 'Een blauw vlak van 400 bij 300';
@@ -36,10 +25,9 @@ async function boxOf(locator: Locator): Promise<Box> {
 }
 
 /**
- * The width of the paragraph's *first line*, which is the only thing that
- * actually narrows when a float intrudes. The paragraph's own box does not:
- * a float changes where line boxes are drawn, not the width of the block
- * around them, so measuring the element would assert nothing.
+ * The paragraph's own box never narrows for a float — only its first line
+ * does, since a float changes where line boxes are drawn, not the block's
+ * width.
  */
 async function firstLineWidth(paragraph: Locator): Promise<number> {
     return paragraph.evaluate((element) => {
@@ -51,9 +39,8 @@ async function firstLineWidth(paragraph: Locator): Promise<number> {
 }
 
 async function settled(page: Page): Promise<void> {
-    // The image is lazy-loaded and its intrinsic size decides the float's
-    // height, so a measurement taken before it decodes is a measurement of
-    // an empty box.
+    // Lazy-loaded, and its intrinsic size decides the float's height — measure
+    // before it decodes and you measure an empty box.
     await page
         .getByAltText(ALT)
         .evaluate((img: HTMLImageElement) =>
@@ -85,17 +72,14 @@ test.describe('an image beside the text', () => {
         // And on the right, which is what the node's `side` attribute says.
         expect(image.x).toBeGreaterThan(text.x);
 
-        // The wrap itself. The paragraph's box still spans the column, so
-        // this compares the first line against that box rather than against
-        // a number — a line narrowed by roughly the float's width.
+        // Compares the first line against the paragraph's own (unnarrowed)
+        // box, since the box still spans the column.
         const line = await firstLineWidth(paragraph);
 
         expect(line).toBeGreaterThan(0);
         expect(line).toBeLessThan(text.width - image.width / 2);
 
-        // A heading after a tall picture must clear. Without it the heading
-        // sits in the gutter beside the image, which reads as broken rather
-        // than as a layout.
+        // Must clear the picture, or it sits in the gutter beside it.
         const afterwards = await boxOf(heading);
 
         expect(afterwards.y).toBeGreaterThanOrEqual(image.y + image.height - 1);
@@ -108,14 +92,12 @@ test.describe('an image beside the text', () => {
         await page.goto('/e2e/aside');
         await settled(page);
 
-        // Measured against the float's own containing block rather than
-        // against whatever happens to follow on this page: a float escapes
-        // its parent unless something establishes a formatting context, and
-        // the symptom is the picture painting over the downloads section of
-        // a page that has one. `flow-root` is applied only when a body
-        // contains an aside — applying it always would stop the first and
-        // last child's margins collapsing out and shift every page on the
-        // site by about 16px.
+        // Measured against the float's own containing block, not whatever
+        // follows on the page: a float escapes its parent unless something
+        // establishes a formatting context, and the symptom is the picture
+        // painting over the downloads section. `flow-root` is applied only
+        // when a body contains an aside — applying it unconditionally would
+        // stop margin collapsing and shift every page by ~16px.
         const overflow = await page
             .getByAltText(ALT)
             .evaluate((img: HTMLImageElement) => {
@@ -154,17 +136,13 @@ test.describe('an image beside the text', () => {
         const image = await boxOf(figure);
         const text = await boxOf(paragraph);
 
-        // Above, and entirely: at 375px the column is about 343px, so a third
-        // of it is too small to read a diagram in and leaves the text a
-        // measure of some twenty-five characters. Both halves come out worse
-        // than either alone, so below `sm` there is no "beside".
+        // Below `sm` there is no "beside": at 375px a third of the column is
+        // too small for the diagram and leaves ~25 characters for the text.
         expect(image.y + image.height).toBeLessThanOrEqual(text.y + 1);
 
-        // Above rather than below, because a float only ever changes where a
-        // box paints and never where it sits in the document — a screen
-        // reader always announces the image first. Matching the phone's
-        // visual order to the document order is what makes the two agree at
-        // every width, so this asserts the document order too.
+        // A float changes only where a box paints, never where it sits in the
+        // document, so a screen reader always announces the image first —
+        // hence stacking above matches document order at every width.
         const precedes = await page
             .getByAltText(ALT)
             .evaluate((img, selector) => {

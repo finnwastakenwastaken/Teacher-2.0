@@ -11,22 +11,12 @@ use Symfony\Component\HttpFoundation\Cookie as SymfonyCookie;
 
 /**
  * Which password guards a piece of content, and whether this visitor has
- * already satisfied it.
- *
- * Two rules, and they are separate on purpose:
- *
- *   - *resolution* — a page is guarded by its own password if it has one,
- *     otherwise by the nearest ancestor topic that has one. Nearest wins, so
- *     a single page inside a protected branch can carry a different password
- *     without the branch's leaking into it.
- *   - *unlocking* — proving one password unlocks everything that password
- *     guards, everywhere on the site, because the record is what is shared
- *     with a class, not the page.
- *
- * The cookie is bound to a fingerprint of the current hash, not just to the
- * record id. Changing a password therefore invalidates every cookie issued
- * under the old one on the next request — which is the whole point of being
- * able to change it after it has been passed around.
+ * satisfied it. Two separate rules: *resolution* — nearest ancestor with a
+ * password wins, so a page inside a protected branch can carry its own
+ * without the branch leaking in — and *unlocking* — proving one password
+ * unlocks everything it guards site-wide, since the record is what's shared
+ * with a class. The cookie is bound to a fingerprint of the current hash, so
+ * changing a password invalidates every cookie issued under the old one.
  */
 class AccessControl
 {

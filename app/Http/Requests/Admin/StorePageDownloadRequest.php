@@ -33,16 +33,34 @@ class StorePageDownloadRequest extends FormRequest
     }
 
     /**
+     * Exactly one of the two libraries, mirroring the CHECK constraint.
+     *
+     * `required_without` and `prohibits` together are the pair: neither given
+     * is an attachment offering nothing, both given is one whose two halves
+     * can disagree about what a student gets. The database refuses both cases
+     * regardless — this is what turns the refusal into a form error naming
+     * the field instead of a 500.
+     *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
             'media_file_id' => [
-                'required', 'integer', Rule::exists('media_files', 'id'),
+                'nullable', 'required_without:image_id', 'prohibits:image_id',
+                'integer', Rule::exists('media_files', 'id'),
                 // One page offers a given file once; the fix for a duplicate
                 // is to edit the existing card, not to add a second one.
                 Rule::unique('page_downloads', 'media_file_id')
+                    ->where('page_id', $this->page()->id),
+            ],
+            // A poster, a scanned worksheet, a diagram meant to be handed out.
+            // The library a file lands in is decided by sniffing its bytes,
+            // so this is the only way any of those can be offered at all.
+            'image_id' => [
+                'nullable', 'required_without:media_file_id', 'prohibits:media_file_id',
+                'integer', Rule::exists('images', 'id'),
+                Rule::unique('page_downloads', 'image_id')
                     ->where('page_id', $this->page()->id),
             ],
             'label' => ['nullable', 'string', 'max:255'],
@@ -73,9 +91,14 @@ class StorePageDownloadRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'media_file_id.required' => __('admin.downloads.file_required'),
+            'media_file_id.required_without' => __('admin.downloads.file_required'),
+            'media_file_id.prohibits' => __('admin.downloads.one_source_only'),
             'media_file_id.exists' => __('admin.downloads.file_missing'),
             'media_file_id.unique' => __('admin.downloads.already_attached'),
+            'image_id.required_without' => __('admin.downloads.file_required'),
+            'image_id.prohibits' => __('admin.downloads.one_source_only'),
+            'image_id.exists' => __('admin.downloads.file_missing'),
+            'image_id.unique' => __('admin.downloads.already_attached'),
         ];
     }
 }

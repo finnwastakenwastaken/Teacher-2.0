@@ -70,27 +70,17 @@ class SitemapController extends Controller
     }
 
     /**
-     * Whether this node belongs in a public sitemap.
-     *
-     * Note what this deliberately does *not* consult: the request. Everywhere
-     * else, readability is a question about this visitor —
-     * `AccessControl::allows()` lets the admin through and honours unlock
-     * cookies. A sitemap is not about a visitor: it is a public document that
-     * anything may fetch, cache and pass on. Asking `allows()` here would put
-     * every protected path in the file whenever the owner happened to load it
-     * while logged in, and hand a crawler the exact map the password exists to
-     * withhold. So the question asked is the visitor-independent one: is this
-     * guarded at all?
-     *
-     * Hidden works the same way, and has to include ancestors: a hidden topic
-     * is kept out of navigation, so publishing the pages underneath it would
-     * route around the only thing hiding is for.
+     * Whether this node belongs in a public sitemap. Deliberately does not
+     * consult the request: a sitemap is a public document anything may fetch
+     * and cache, so it asks the visitor-independent question ("guarded at
+     * all?") rather than `AccessControl::allows()`, which would put every
+     * protected path in the file whenever the owner loaded it while logged
+     * in. Hidden must cover ancestors for the same reason.
      */
     private function isListable(Topic|Page $node): bool
     {
-        // Lives in ContentVisibility because search asks a version of the
-        // same question, and when the two were written separately they
-        // diverged: this one walked the ancestor chain and search did not.
+        // Lives in ContentVisibility because search asks the same question —
+        // written separately once, the two rules diverged.
         return ContentVisibility::isPubliclyListable($node);
     }
 

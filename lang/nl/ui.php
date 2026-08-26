@@ -32,6 +32,7 @@ return [
         'choose' => 'Kiezen',
         'remove' => 'Weghalen',
         'confirm' => 'Bevestigen',
+        'confirm_unavailable' => 'De bevestiging kon niet worden getoond. Er is niets gewijzigd.',
         'copy' => 'Kopiëren',
         'download' => 'Downloaden',
         'upload' => 'Uploaden',
@@ -105,6 +106,7 @@ return [
         'passwords' => 'Wachtwoorden',
         'backups' => 'Back-ups',
         'settings' => 'Instellingen',
+        'theme' => 'Kleuren',
         'view_site' => 'Bekijk de website',
         'profile' => 'Profiel',
         'security' => 'Beveiliging',
@@ -137,6 +139,17 @@ return [
         'no_pages' => 'Er zijn nog geen pagina\'s.',
         'hidden' => 'Verborgen',
         'empty' => 'Nog geen inhoud',
+        'has_draft' => 'Concept',
+
+        // Its own block on the dashboard rather than a seventh item in the
+        // "next steps" checklist: a step is done once and the list then
+        // disappears, while a concept comes and goes for the life of the site.
+        'drafts' => [
+            'heading' => 'Niet-gepubliceerde concepten',
+            'description' => 'Op 1 pagina staat tekst die bezoekers nog niet zien. Open de pagina om hem te publiceren of het concept weg te gooien.|Op :count pagina\'s staat tekst die bezoekers nog niet zien. Open een pagina om hem te publiceren of het concept weg te gooien.',
+            'saved_at' => 'concept van :time',
+        ],
+
         'popular' => 'Meest opgehaald',
         'counts_only' => 'Alleen aantallen. Er wordt niets over bezoekers vastgelegd.',
         'nothing_fetched' => 'Nog niets opgehaald.',
@@ -158,10 +171,14 @@ return [
     'content' => [
         'title' => 'Inhoud',
         'hidden' => 'Verborgen',
+        // Beside the "hidden" badge rather than instead of it: a page can be
+        // published and still be holding an unpublished concept.
+        'has_draft' => 'Concept klaar',
         'empty' => 'Er zijn nog geen onderwerpen aangemaakt.',
         'top_level' => 'Hoofdonderwerpen',
         'duplicate' => 'Dupliceren',
         'edit_title' => '":title" bewerken',
+        'confirm_delete_title' => 'Definitief verwijderen?',
         'confirm_delete' => 'Weet je zeker dat je ":title" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.',
 
         'topic' => [
@@ -178,7 +195,7 @@ return [
             'add' => '+ Pagina',
             'under_topic' => 'Pagina’s onder :title',
             'body_heading' => 'Inhoud',
-            'body_description' => 'De tekst, afbeeldingen, bestanden en video\'s op deze pagina. Vergeet niet op "Inhoud opslaan" te klikken.',
+            'body_description' => 'De tekst, afbeeldingen, bestanden en video\'s op deze pagina. Vergeet niet op "Opslaan en publiceren" te klikken.',
             'downloads_heading' => 'Downloads',
             'downloads_description' => 'Bestanden onderaan de pagina, gegroepeerd per niveau. Elke wijziging wordt meteen opgeslagen.',
         ],
@@ -218,6 +235,7 @@ return [
         'order' => 'Volgorde',
         'levels' => 'Niveaus',
         'levels_hint' => 'Laat alles leeg voor een download die voor iedereen bedoeld is.',
+        'confirm_remove_title' => 'Download weghalen?',
         'confirm_remove' => '":name" van deze pagina halen? Het bestand zelf blijft in de mediabibliotheek.',
         'empty' => 'Nog geen downloads op deze pagina.',
         'add_heading' => 'Download toevoegen',
@@ -226,15 +244,18 @@ return [
         'upload_description' => 'Komt meteen als download op deze pagina te staan, met de niveaus hierboven. Maximaal :size per bestand.',
         'library_empty' => 'Er staan nog geen bestanden in de mediabibliotheek.',
         'library_exhausted' => 'Alle bestanden uit de mediabibliotheek staan al op deze pagina.',
-        'choose_file' => 'Bestand kiezen',
-        'dialog_description' => 'Kies een document of video uit de mediabibliotheek. De naam en de niveaus kun je daarna nog aanpassen.',
+        'choose_file' => 'Kies uit de bibliotheek',
+        'dialog_description' => 'Kies een bestand of afbeelding uit de mediabibliotheek. De naam en de niveaus kun je daarna nog aanpassen.',
+        // Which library the dialog is showing. Either can be handed out: a
+        // poster or a scanned worksheet is an image.
+        'source_label' => 'Waaruit kiezen',
+        'source_files' => 'Documenten en video’s',
+        'source_images' => 'Afbeeldingen',
         // The levels are ticked behind the dialog, so it names the groups this
         // download will end up in — "Voor iedereen" when nothing is ticked.
         'dialog_levels' => 'Deze download komt te staan onder: :names',
         'chosen_file' => 'Gekozen: :name',
         'label_placeholder' => 'Optioneel',
-        // An image cannot be a download; the server decides by sniffing.
-        'image_not_a_download' => '":name" is een afbeelding en staat nu in de mediabibliotheek. Downloads zijn documenten of video’s.',
         'attach_failed' => 'Het bestand is geüpload, maar kon niet aan deze pagina worden gekoppeld.',
         'attach_cancelled' => 'Het koppelen aan deze pagina is afgebroken. Het bestand staat wel in de mediabibliotheek.',
     ],
@@ -265,9 +286,22 @@ return [
         'alt_dialog_description' => 'Elke afbeelding heeft een korte beschrijving nodig voor schermlezers en voor als de afbeelding niet laadt. Zonder alt-tekst weigert de server de upload.',
         'alt_others' => 'De overige gekozen bestanden hebben geen alt-tekst nodig en worden gewoon meegeüpload.',
         'start' => 'Uploaden starten',
+
+        // The extensions themselves come from App\Support\MediaFormats, which
+        // reads the same table the server judges an upload against — so these
+        // lines carry only the wording, never the list. A teacher who has to
+        // upload a video to find out whether the format works is waiting on
+        // gigabytes for the answer.
+        'formats' => [
+            'heading' => 'Deze bestandstypen worden geaccepteerd:',
+            'video' => 'Video’s: :list',
+            'document' => 'Documenten: :list',
+            'image' => 'Afbeeldingen: :list',
+        ],
     ],
 
     'library' => [
+        'confirm_delete_title' => 'Uit de mediabibliotheek verwijderen?',
         'confirm_delete' => 'Weet je zeker dat je ":name" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.',
         'edit_alt' => 'Alt-tekst bewerken',
         'alt_required' => 'Alt-tekst is verplicht bij elke afbeelding.',
@@ -286,6 +320,13 @@ return [
         'open' => 'Openen',
         'no_files' => 'Er zijn nog geen documenten of video’s geüpload.',
         'video_preview_description' => 'De video wordt gestreamd met ondersteuning voor doorspoelen.',
+        // What an item is used for, derived from the rows that publish it and
+        // never a flag the owner sets. Both can be true at once.
+        'usage_shown' => 'Op een pagina',
+        'usage_download' => 'Als download',
+        'usage_unused' => 'Nergens gebruikt',
+        'filter_label' => 'Tonen',
+        'filter_all' => 'Alles',
         // Shown by the picker dialogs when a search returns more matches than
         // fit in one page of results — same idea as icons.capped below.
         'capped' => ':count bestanden, verfijn je zoekopdracht',
@@ -307,7 +348,50 @@ return [
         'placeholder' => 'Schrijf hier de inhoud van deze pagina…',
         'unsaved' => 'Er zijn niet-opgeslagen wijzigingen.',
         'saved' => 'Alle wijzigingen zijn opgeslagen.',
-        'save' => 'Inhoud opslaan',
+        'save' => 'Opslaan en publiceren',
+
+        // The concept: een tekst die wel is bewaard maar nog niet op de site
+        // staat. Bewust niet "verborgen" genoemd — een verborgen pagina is
+        // een afgeronde pagina die nog niet in het menu staat, en die is voor
+        // iedereen met de link gewoon te lezen.
+        'draft' => [
+            'save' => 'Concept opslaan',
+            'saving' => 'Concept opslaan…',
+            'saved_at' => 'Concept bewaard om :time.',
+            'failed' => 'Het concept kon niet worden bewaard. Klik op "Opslaan en publiceren" om je werk zeker te stellen.',
+            'unpublished' => 'Dit concept staat nog niet op de site.',
+            'editing_heading' => 'Je bewerkt een niet-gepubliceerd concept',
+            'editing_description' => 'Bewaard om :time. Bezoekers zien nog de gepubliceerde versie, tot je op "Opslaan en publiceren" klikt.',
+            'revert' => 'Terug naar de gepubliceerde versie',
+            'revert_title' => 'Concept weggooien?',
+            'revert_description' => 'De editor gaat terug naar de versie die nu op de site staat. Alles wat je in dit concept hebt geschreven gaat verloren.',
+            'revert_confirm' => 'Concept weggooien',
+        ],
+
+        // De versiegeschiedenis: de laatste tien gepubliceerde versies van
+        // deze pagina. Een concept telt niet mee — dat wordt elke paar
+        // seconden bewaard terwijl je typt, en tien daarvan zijn tien
+        // seconden van één zin.
+        'history' => [
+            'title' => 'Versiegeschiedenis',
+            'show' => 'Versiegeschiedenis tonen',
+            'hide' => 'Versiegeschiedenis verbergen',
+            'description' => 'De laatste tien versies die op de site hebben gestaan. De versie die er nu staat, staat hier niet bij.',
+            'empty' => 'Er is nog geen oudere versie. Zodra je deze pagina opnieuw publiceert, wordt de huidige tekst hier bewaard.',
+            'version' => 'Versie van :time',
+            'view' => 'Bekijken',
+            'failed' => 'Deze versie kon niet worden geladen.',
+            'preview_empty' => 'Deze versie was leeg.',
+            'close' => 'Voorbeeld sluiten',
+            'restore' => 'Terugzetten',
+            'restore_title' => 'Deze versie terugzetten?',
+            'restore_description' => 'De versie van :time komt op de site te staan. Wat er nu staat wordt bewaard als nieuwste versie, dus je kunt dit terugdraaien.',
+            // Herstellen gaat via dezelfde publicatie als "Opslaan en
+            // publiceren", en die gooit het concept weg. Dat mag niet stil
+            // gebeuren: het concept staat nergens anders.
+            'restore_description_with_draft' => 'De versie van :time komt op de site te staan. Wat er nu staat wordt bewaard als nieuwste versie. Let op: je niet-gepubliceerde concept gaat hierbij verloren.',
+            'restore_confirm' => 'Versie terugzetten',
+        ],
         'bold' => 'Vet',
         'italic' => 'Cursief',
         // H₂O and m/s² are unwritable without these, so the examples stay in
@@ -329,6 +413,8 @@ return [
         'insert_images' => 'Afbeeldingen invoegen',
         'insert_image_aside' => 'Afbeelding naast tekst',
         'insert_youtube' => 'YouTube-video invoegen',
+        'insert_tiktok' => 'TikTok invoegen',
+        'insert_instagram' => 'Instagram-reel invoegen',
         'insert_table' => 'Tabel invoegen',
         'row_above' => 'Rij erboven',
         'row_below' => 'Rij eronder',
@@ -356,12 +442,25 @@ return [
             'insert' => 'Invoegen',
         ],
 
+        'social_dialog' => [
+            'tiktok_description' => 'Plak de link naar de TikTok. Alleen het video-nummer wordt opgeslagen.',
+            'tiktok_label' => 'TikTok-link of video-nummer',
+            'tiktok_placeholder' => 'https://www.tiktok.com/@naam/video/...',
+            'tiktok_invalid' => 'Dit is geen geldige TikTok-link. Plak de volledige link uit de adresbalk.',
+            'instagram_description' => 'Plak de link naar de reel of het bericht. Alleen de code wordt opgeslagen.',
+            'instagram_label' => 'Instagram-link of code',
+            'instagram_placeholder' => 'https://www.instagram.com/reel/...',
+            'instagram_invalid' => 'Dit is geen geldige Instagram-link. Plak de volledige link uit de adresbalk.',
+            'hint' => 'Een verkorte deel-link werkt niet. Open de video eerst en kopieer de link uit de adresbalk.',
+            'insert' => 'Invoegen',
+        ],
+
         'file_dialog' => [
             'description' => 'Kies een document of video uit de mediabibliotheek. Het bestand wordt pas openbaar zodra deze pagina is opgeslagen.',
             'upload_title' => 'Nieuw bestand uploaden',
             'upload_description' => 'Wordt meteen op deze plek in de pagina gezet.',
             'added' => '1 bestand toegevoegd aan de pagina.|:count bestanden toegevoegd aan de pagina.',
-            'remember_to_save' => 'Vergeet niet op "Inhoud opslaan" te klikken.',
+            'remember_to_save' => 'Vergeet niet op "Opslaan en publiceren" te klikken.',
             'empty' => 'Er zijn nog geen documenten of video’s. Upload er hierboven een, of bij Media.',
         ],
 
@@ -387,6 +486,9 @@ return [
             'images_missing' => 'Deze afbeeldingen bestaan niet meer. Verwijder dit blok.',
             'image_count' => '1 afbeelding|:count afbeeldingen',
             'youtube_invalid' => 'Ongeldige YouTube-video. Verwijder dit blok.',
+            'social_invalid' => 'Ongeldige TikTok of Instagram-reel. Verwijder dit blok.',
+            'social_open' => 'Bekijk het originele bericht',
+            'instagram_preview' => 'Instagram toont hier geen video. Leerlingen zien een kaart met een link naar het bericht.',
             'aside_missing' => 'Deze afbeelding bestaat niet meer. Verwijder dit blok.',
             'aside_left' => 'Links van de tekst',
             'aside_right' => 'Rechts van de tekst',
@@ -430,7 +532,8 @@ return [
         'merge_into' => 'Samenvoegen met',
         'merge_placeholder' => 'Kies een niveau',
         'merge_confirm' => 'Samenvoegen en verwijderen',
-        'confirm_delete' => 'Niveau ":name" verwijderen?',
+        'confirm_delete_title' => 'Niveau verwijderen?',
+        'confirm_delete' => 'Het niveau ":name" verwijderen? Dit kan alleen als geen enkele download er nog mee is getagd.',
         'download_count' => ':count download(s)',
         'not_in_use' => 'niet in gebruik',
     ],
@@ -446,7 +549,8 @@ return [
         'change_warning' => 'Als je het wachtwoord wijzigt, moet iedereen die het al had ingevoerd het opnieuw invoeren.',
         'in_use' => 'Haal dit wachtwoord eerst weg bij de onderwerpen en pagina’s die het gebruiken.',
         'empty' => 'Er zijn nog geen wachtwoorden.',
-        'confirm_delete' => 'Wachtwoord ":name" verwijderen?',
+        'confirm_delete_title' => 'Wachtwoord verwijderen?',
+        'confirm_delete' => 'Het wachtwoord ":name" verwijderen? Dit kan alleen als geen onderwerp of pagina het nog gebruikt.',
         'topic_count' => ':count onderwerp(en)',
         'page_count' => ':count pagina(\'s)',
         'not_in_use' => 'niet in gebruik',
@@ -470,6 +574,7 @@ return [
         // in both locales — see the allow-list in LocalisationTest.
         'restore_doc' => 'github.com/finnwastakenwastaken/Teacher-2.0/wiki/Backups-and-Restore',
         'restore_command' => './restore.sh <bestand>',
+        'confirm_delete_title' => 'Back-up verwijderen?',
         'confirm_delete' => 'Back-up van :moment verwijderen? Dit kan niet ongedaan worden gemaakt.',
         'keep' => 'Op deze server worden standaard de :count nieuwste back-ups bewaard als er automatisch wordt opgeruimd.',
     ],
@@ -502,12 +607,94 @@ return [
         'banner_hint' => 'Brede afbeelding bovenaan de homepage.',
         'text' => 'Tekst',
         'text_hint' => 'Optioneel. Bestanden en video\'s horen op een pagina, niet hier.',
+        'section_privacy' => 'Privacy',
+        'privacy_text' => 'Eigen toevoeging',
+        'privacy_text_hint' => 'Optioneel. Wat de site zelf vastlegt staat er al; dit is voor wat alleen jij weet, zoals bij wie leerlingen terechtkunnen met vragen.',
 
         'section_search' => 'Zoeken',
         'content_language' => 'Taal van je lesmateriaal',
         'content_language_hint' => 'Bepaalt hoe de zoekfunctie woorden herkent, zodat "krachten" ook "kracht" vindt. Dit gaat over de taal waarin jij schrijft, niet over de taal van de knoppen — die kiest elke bezoeker zelf. Als je dit wijzigt, wordt de zoekindex meteen opnieuw opgebouwd.',
         'content_language_dutch' => 'Nederlands',
         'content_language_english' => 'Engels',
+    ],
+
+    'theme' => [
+        'title' => 'Kleuren',
+        'description' => 'Hiermee geef je de site je eigen kleuren. Je past het basispalet aan; knoppen, links, meldingen en de zijbalk zijn daarvan afgeleid en passen zich vanzelf aan — in de lichte én de donkere modus.',
+        'section_palette' => 'Basispalet',
+        'section_preview' => 'Voorbeeld',
+        'section_contrast' => 'Leesbaarheid',
+        'pick' => 'Kies :colour',
+        'reset_one' => ':colour terugzetten',
+        'reset_all' => 'Alles terugzetten',
+        'theme_light' => 'lichte modus',
+        'theme_dark' => 'donkere modus',
+        'preview_heading' => 'Zo ziet een pagina eruit',
+        'preview_body' => 'Gewone tekst, met daaronder een regel die wat rustiger mag zijn.',
+        'preview_card' => 'Een blok met inhoud',
+        'preview_link' => 'Een link naar een andere pagina',
+        'preview_button' => 'Knop',
+        'preview_success' => 'Gelukt',
+        'preview_destructive' => 'Verwijderen',
+        'contrast_ok' => 'Alle :count combinaties van tekst en achtergrond halen :ratio:1 of meer, in beide modi.',
+        'contrast_failed' => 'Met deze kleuren is de site niet meer goed leesbaar',
+        'contrast_failed_hint' => 'Opslaan kan pas als alles weer voldoet aan de leesbaarheidsnorm WCAG AA. Zet de kleur terug, of kies een duidelijk donkerdere of lichtere variant.',
+        'contrast_fail' => ':pair haalt in de :theme :ratio:1, en dat moet minstens :minimum:1 zijn.',
+        'contrast_unreadable' => ':pair kon in de :theme niet worden gemeten.',
+        'blocked' => 'Los eerst de leesbaarheid op.',
+
+        // The raw palette, in the order resources/css/app.css declares it.
+        // These are names of colours, not of the roles built on them: the
+        // roles are derived in CSS and are deliberately not editable here.
+        'colours' => [
+            'blue' => 'Blauw',
+            'blue-deep' => 'Diepblauw',
+            'purple' => 'Paars',
+            'purple-deep' => 'Diep paars',
+            'yellow' => 'Geel',
+            'yellow-deep' => 'Diepgeel',
+            'green' => 'Groen',
+            'green-deep' => 'Diepgroen',
+            'steel' => 'Staalblauw',
+            'steel-deep' => 'Diep staalblauw',
+            'red' => 'Rood',
+            'red-deep' => 'Dieprood',
+            'grey-50' => 'Grijs 50 (paginakleur)',
+            'grey-100' => 'Grijs 100 (randen)',
+            'grey-400' => 'Grijs 400',
+            'grey-500' => 'Grijs 500',
+            'navy' => 'Marineblauw',
+            'navy-deep' => 'Diep marineblauw',
+            'slate' => 'Leisteen',
+            'slate-deep' => 'Diep leisteen (donkere pagina)',
+            'white' => 'Wit (kaarten)',
+        ],
+
+        // The combinations that are measured. Described as what the reader
+        // actually sees, not as the name of the token — nobody outside this
+        // repository knows what "sidebar-accent-foreground" is.
+        'pairs' => [
+            'page' => 'Tekst op de pagina',
+            'card' => 'Tekst op een kaart',
+            'popover' => 'Tekst in een uitklapmenu',
+            'primary' => 'Opschrift op een primaire knop',
+            'secondary' => 'Opschrift op een secundaire knop',
+            'muted' => 'Tekst op een grijs vlak',
+            'accent' => 'Tekst op een gemarkeerd menu-item',
+            'destructive' => 'Opschrift op een verwijderknop',
+            'success' => 'Opschrift op een gelukt-melding',
+            'warning' => 'Opschrift op een waarschuwing',
+            'info' => 'Opschrift op een informatiemelding',
+            'sidebar' => 'Tekst in de zijbalk',
+            'sidebar_primary' => 'Opschrift op de knop in de zijbalk',
+            'sidebar_accent' => 'Tekst op het actieve item in de zijbalk',
+            'link_on_page' => 'Een link op de pagina',
+            'link_on_card' => 'Een link op een kaart',
+            'error_on_page' => 'Een foutmelding op de pagina',
+            'error_on_card' => 'Een foutmelding op een kaart',
+            'muted_on_page' => 'Rustige tekst op de pagina',
+            'muted_on_card' => 'Rustige tekst op een kaart',
+        ],
     ],
 
     'settings' => [
@@ -521,6 +708,13 @@ return [
         'appearance' => [
             'title' => 'Weergave',
             'description' => 'Kies of de site licht of donker wordt getoond. Deze keuze geldt alleen op dit apparaat.',
+
+            // The three-way choice lives here and only here. The public
+            // header carries a two-state toggle instead, because a control
+            // that cycles three states never says what the next press does.
+            'light' => 'Licht',
+            'dark' => 'Donker',
+            'system' => 'Systeem',
         ],
 
         'security' => [
@@ -587,6 +781,9 @@ return [
         'downloads' => [
             'heading' => 'Downloads',
             'my_level' => 'Mijn niveau:',
+            // The count decides the form; `|` is Laravel's own choice syntax
+            // and lib/i18n.ts reads it the same way.
+            'count' => '1 bestand|:count bestanden',
         ],
 
         'locked' => [
@@ -594,6 +791,37 @@ return [
             'unnamed' => 'Deze pagina is beveiligd. Vul het wachtwoord in.',
             'password' => 'Wachtwoord',
             'unlock' => 'Ontgrendelen',
+        ],
+
+        // Wat de software met gegevens doet — geschreven door de applicatie,
+        // dus vertaald. Elke zin hier moet kloppen met de code: liever een
+        // ongemakkelijke waarheid dan een belofte die niet waar te maken is.
+        'privacy' => [
+            'title' => 'Privacy en jouw gegevens',
+            'intro' => 'Deze site bestaat om lesmateriaal te delen, niet om bezoekers te volgen. Hieronder staat wat er wel en niet wordt vastgelegd.',
+
+            'no_account_heading' => 'Geen account, geen inloggen',
+            'no_account' => 'Leerlingen maken geen account aan en loggen nergens in. Aanmelden kan op deze site helemaal niet. Alleen de docent die de site beheert heeft een account.',
+
+            'no_tracking_heading' => 'Geen trackers, geen bezoekersstatistieken',
+            'no_tracking' => 'Er staan geen analyseprogramma’s, advertentienetwerken of volgscripts op deze site. Er draait geen JavaScript van andere partijen.',
+
+            'cookies_heading' => 'Wat er in je eigen browser blijft',
+            'cookies' => 'Je gekozen niveau, je taal en je keuze voor een licht of donker uiterlijk worden in je eigen browser bewaard. De server legt die keuzes niet vast. Vul je het wachtwoord van een beveiligde pagina in, dan onthoudt je browser dát je het wachtwoord kent — niet wie je bent.',
+
+            'logs_heading' => 'Wat de server wel bijhoudt',
+            'logs' => 'Zoals bij vrijwel elke website houdt de webserver een logboek bij van opgevraagde adressen, met IP-adres en tijdstip. Dat hoort bij het draaien van een server. Het wordt niet gebruikt om te volgen wie wat bekijkt.',
+
+            'counter_heading' => 'De downloadteller',
+            'counter' => 'Van elk bestand wordt geteld hoe vaak het is opgehaald. Dat is één getal per bestand. Er wordt niet bijgehouden wie het ophaalde, en twee downloads zijn niet aan dezelfde persoon te koppelen.',
+
+            'video_heading' => 'Video van andere sites',
+            'video' => 'Staat er een YouTube-video op een pagina, dan legt je browser contact met YouTube zodra je die pagina opent, en ziet YouTube je IP-adres. Dat hoort bij het insluiten van video en valt niet te vermijden. Een TikTok-video wordt pas opgehaald wanneer je zelf op afspelen klikt. Berichten van Instagram worden nooit ingeladen — daarvan staat er alleen een link naar het origineel.',
+
+            'photos_heading' => 'Foto’s',
+            'photos' => 'Uit geüploade foto’s wordt de verborgen informatie verwijderd die een camera meestuurt, waaronder de plek waar de foto genomen is.',
+
+            'owner_heading' => 'Van de beheerder van deze site',
         ],
 
         'search' => [
@@ -608,14 +836,38 @@ return [
             'empty' => 'Dit onderdeel heeft nog geen inhoud.',
         ],
 
+        // The button that enlarges a picture carries the picture and nothing
+        // else, so its accessible name is the alt text plus this word — the
+        // alt says what it is, this says what pressing it does.
+        'lightbox' => [
+            'enlarge' => 'Vergroten',
+            'previous' => 'Vorige afbeelding',
+            'next' => 'Volgende afbeelding',
+            'counter' => 'Afbeelding :current van :total',
+        ],
+
         'page_empty' => 'Deze pagina heeft nog geen inhoud.',
         'nothing_published' => 'Er is nog geen lesmateriaal gepubliceerd.',
         'video_unsupported' => 'Je browser kan deze video niet afspelen.',
         'youtube_title' => 'YouTube-video',
+        'social_title' => ':platform-video',
+        'social_load' => 'Video van :platform laden',
+        'social_notice' => 'De video wordt pas geladen als je hierop klikt. :platform kan je dan herkennen.',
+        'instagram_open' => 'Bekijk dit bericht op Instagram',
+        'instagram_notice' => 'Instagram speelt deze video alleen af op hun eigen site. De link opent in een nieuw tabblad.',
 
         'header' => [
             'search' => 'Zoeken',
             'admin' => 'Beheer',
+
+            // The light/dark button carries an icon and nothing else, so its
+            // accessible name is the only thing that says what pressing it
+            // does. Hence a verb and the theme it moves to, rather than the
+            // name of the theme showing now.
+            'appearance' => [
+                'to_light' => 'Overschakelen naar de lichte weergave',
+                'to_dark' => 'Overschakelen naar de donkere weergave',
+            ],
         ],
     ],
 

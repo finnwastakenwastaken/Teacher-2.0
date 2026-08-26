@@ -12,11 +12,8 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
-// There is deliberately no profile.destroy route. This site has exactly one
-// admin account and deleting it would permanently lock the owner out of their
-// own site with no recovery path. The prohibition is enforced again on the
-// model and in the policy — this is the first of three layers, not the only
-// one. See the technical reference before touching any of them.
+// Deliberately no profile.destroy route: one admin account, no recovery path
+// if deleted. Also enforced on the model and in the policy — three layers.
 Route::middleware(['auth'])->group(function () {
     Route::get('settings/security', [SecurityController::class, 'edit'])
         ->middleware(RequirePassword::class)

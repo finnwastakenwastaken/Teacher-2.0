@@ -5,16 +5,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * The downloads section at the bottom of a page.
- *
- * Relational rather than part of the TipTap body, because this is the one
- * feature that justifies the whole project: the same worksheet in several
- * track-specific variants, grouped by level. That needs to be queryable and
- * countable, which a nested JSON document is not.
- *
- * Level tags hang off the *attachment*, not the file: the same PDF can be
- * offered as "HAVO + VWO" on one page and "VWO" on another, and neither page
- * should be able to change what the other says.
+ * The downloads section at the bottom of a page. Relational, not part of the
+ * TipTap body — the same worksheet in several track-specific variants,
+ * grouped by level, needs to be queryable and countable. Level tags hang off
+ * the *attachment*, not the file: the same PDF can be "HAVO + VWO" on one
+ * page and "VWO" on another.
  */
 return new class extends Migration
 {

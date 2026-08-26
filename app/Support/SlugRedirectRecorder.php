@@ -61,20 +61,15 @@ class SlugRedirectRecorder
     }
 
     /**
-     * Deliberately does not compare $oldPath against $model->fullPath() to
-     * skip a "no-op" — for a descendant, fullPath() would resolve the moved
-     * ancestor via a fresh query, which still returns that ancestor's OLD
-     * row (its own UPDATE hasn't been committed yet at this point in the
-     * observer chain), making old and "current" paths look identical even
-     * though the move is genuinely happening. Callers only reach here after
-     * already confirming a real slug/parent change, so recording
-     * unconditionally is correct.
+     * Does not compare $oldPath against $model->fullPath() to skip a "no-op":
+     * for a descendant, fullPath() re-queries the moved ancestor, whose own
+     * UPDATE hasn't committed yet — it would return the old row and make the
+     * genuine move look like a no-op. Callers only reach here after
+     * confirming a real change, so recording unconditionally is correct.
      *
-     * updateOrCreate and not firstOrCreate: a path that has been vacated can
-     * be claimed by something else and then vacated again, and firstOrCreate
-     * would leave the first claimant's redirect in place — sending visitors
-     * to a page that has not lived at that address for a year. The newest
-     * occupant is the one the link was for.
+     * updateOrCreate, not firstOrCreate: a vacated path can be reclaimed and
+     * vacated again, and firstOrCreate would leave the first claimant's
+     * redirect pointing at a stale destination. The newest occupant wins.
      */
     private static function record(string $oldPath, Topic|Page $model): void
     {

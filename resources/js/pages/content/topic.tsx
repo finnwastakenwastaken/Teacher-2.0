@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { ChevronRight } from 'lucide-react';
 import { RichText } from '@/components/content/rich-text';
 import { ContentSummaryCard } from '@/components/content-summary-card';
 import { Icon } from '@/components/icon';
@@ -39,16 +40,21 @@ export default function ContentTopic({
             <PublicBreadcrumbs items={breadcrumbs} />
 
             <div className="mb-8 space-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight">
+                <h1 className="text-3xl font-semibold tracking-tight text-balance">
                     {topic.title}
                 </h1>
                 {topic.description && (
-                    <p className="text-muted-foreground">{topic.description}</p>
+                    <p className="text-lg text-pretty text-muted-foreground">
+                        {topic.description}
+                    </p>
                 )}
             </div>
 
             {topic.content && (
-                <div className="mb-8">
+                // The introduction is prose and gets the same reading measure
+                // as a page body. The grids below stay at container width —
+                // they are scanned, not read.
+                <div className="mb-8 max-w-[35rem] text-[1.0625rem]">
                     {/* An empty media map: a topic introduction cannot
                         contain embeds, because the server strips them
                         (App\Support\PageContent::sanitiseWithoutEmbeds). */}
@@ -75,27 +81,44 @@ export default function ContentTopic({
             )}
 
             {pages.length > 0 && (
-                <ul className="divide-y divide-border rounded-lg border border-border">
+                <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
                     {pages.map((page) => (
                         <li key={page.id}>
+                            {/* Same vocabulary as ContentSummaryCard — tinted
+                                icon square, clamped description, a chevron
+                                that moves — so a subtopic and a page read as
+                                the same kind of destination. The focus ring is
+                                on the link and is not optional: these rows
+                                were hoverable and invisibly focusable. */}
                             <Link
                                 href={page.href}
-                                className="flex items-center gap-3 p-4 hover:bg-accent/50"
+                                className="group flex items-center gap-3 p-4 transition-colors hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
                             >
-                                <Icon
-                                    icon={page.icon ? icons[page.icon] : null}
-                                    className="size-5 shrink-0 text-muted-foreground"
-                                />
-                                <div>
+                                <span
+                                    aria-hidden="true"
+                                    className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"
+                                >
+                                    <Icon
+                                        icon={
+                                            page.icon ? icons[page.icon] : null
+                                        }
+                                        className="size-5"
+                                    />
+                                </span>
+                                <div className="min-w-0 flex-1">
                                     <div className="font-medium">
                                         {page.title}
                                     </div>
                                     {page.description && (
-                                        <div className="text-sm text-muted-foreground">
+                                        <div className="line-clamp-2 text-sm text-muted-foreground">
                                             {page.description}
                                         </div>
                                     )}
                                 </div>
+                                <ChevronRight
+                                    aria-hidden="true"
+                                    className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                                />
                             </Link>
                         </li>
                     ))}

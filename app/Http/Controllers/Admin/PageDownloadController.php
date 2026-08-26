@@ -25,7 +25,10 @@ class PageDownloadController extends Controller
 
         DB::transaction(function () use ($page, $validated): void {
             $download = $page->downloads()->create([
-                'media_file_id' => $validated['media_file_id'],
+                // Exactly one is non-null; the Form Request and a CHECK
+                // constraint each say so independently.
+                'media_file_id' => $validated['media_file_id'] ?? null,
+                'image_id' => $validated['image_id'] ?? null,
                 'label' => $validated['label'] ?? null,
                 'sort_order' => $validated['sort_order'],
             ]);

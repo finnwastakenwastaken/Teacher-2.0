@@ -9,6 +9,7 @@ use App\Models\Topic;
 use App\Models\User;
 use App\Support\SiteSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -40,9 +41,8 @@ class DashboardTest extends TestCase
             'topic_id' => $topic->id,
         ]);
 
-        // writeContent(), not a fillable attribute: `content` is not mass
-        // assignable and should not be, since this is the only writer that
-        // whitelists the document and derives content_text from it.
+        // writeContent(), not mass assignment: it's the only writer that whitelists
+        // the document and derives content_text.
         if ($content !== null) {
             $page->writeContent($content);
         }
@@ -122,11 +122,9 @@ class DashboardTest extends TestCase
                 $this->assertTrue($steps['topic']);
                 $this->assertTrue($steps['page']);
                 $this->assertTrue($steps['download']);
-                // Offering a file as a download necessarily put it in the
-                // library, so that step is done as a side effect.
+                // A download attachment implies the media step too.
                 $this->assertTrue($steps['media']);
 
-                // The page exists, but its body is still null.
                 $this->assertFalse($steps['content']);
             });
     }
@@ -200,6 +198,122 @@ class DashboardTest extends TestCase
                 ->where('recentPages.1.title', 'Zwaartekracht')
                 ->etc()
             );
+    }
+
+    /*
+     * An unpublished concept is otherwise discoverable only by opening the
+     * page it is on, which is what item 28 was about. These four pin the
+     * three decisions worth pinning: which pages are reported, that the
+     * *timestamp* is what decides, that the concept itself never rides along,
+     * and that none of it touches the setup checklist.
+     */
+
+    public function test_a_page_with_an_unpublished_concept_is_reported_and_one_without_is_not()
+    {
+        $topic = $this->topic('Natuurkunde', 'natuurkunde');
+
+        $published = $this->page($topic, 'Zwaartekracht', 'zwaartekracht', [
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Gepubliceerd']]],
+            ],
+        ]);
+
+        $concept = $this->page($topic, 'De Planeten', 'de-planeten');
+        $concept->writeDraft([
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Nog niet af']]],
+            ],
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertInertia(fn (Assert $assert) => $assert
+                ->has('draftPages', 1)
+                ->where('draftPages.0.id', $concept->id)
+                ->where('draftPages.0.title', 'De Planeten')
+                // The list carries a title and when it was saved, never the
+                // document — draft_content is hidden on the model for exactly
+                // this reason, and the dashboard has no business shipping a
+                // body the owner has not published.
+                ->where('draftPages.0.savedAt', fn ($savedAt) => is_string($savedAt))
+                ->where(
+                    'draftPages.0',
+                    fn (Collection $row) => $row->keys()->sort()->values()->all()
+                        === ['id', 'savedAt', 'title'],
+                )
+                ->etc()
+            );
+
+        $this->assertFalse($published->fresh()->hasDraft());
+    }
+
+    public function test_a_concept_that_empties_the_page_is_still_a_concept()
+    {
+        // The one case reading draft_content instead of draft_saved_at gets
+        // wrong: the owner has cleared the body and not published it yet, so
+        // the document is legitimately null and there is still something
+        // unpublished waiting. See Page::hasDraft().
+        $topic = $this->topic('Natuurkunde', 'natuurkunde');
+        $page = $this->page($topic, 'De Planeten', 'de-planeten', [
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Gepubliceerd']]],
+            ],
+        ]);
+
+        $page->writeDraft(null);
+
+        $this->assertNull($page->fresh()->draft_content);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertInertia(fn (Assert $assert) => $assert
+                ->has('draftPages', 1)
+                ->where('draftPages.0.id', $page->id)
+                ->etc()
+            );
+    }
+
+    public function test_a_concept_does_not_become_a_setup_step()
+    {
+        // The checklist is a first-run affordance that disappears once every
+        // step is done. A concept comes and goes for the life of the site, so
+        // folding it in would keep resurrecting a finished list — hence its
+        // own prop.
+        $topic = $this->topic('Natuurkunde', 'natuurkunde');
+        $page = $this->page($topic, 'De Planeten', 'de-planeten');
+        $page->writeDraft(['type' => 'doc', 'content' => []]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertInertia(function (Assert $assert) {
+                $steps = collect($assert->toArray()['props']['nextSteps']);
+
+                $this->assertSame(
+                    ['branding', 'topic', 'page', 'content', 'media', 'download'],
+                    $steps->pluck('key')->all(),
+                );
+            });
+    }
+
+    public function test_publishing_a_concept_takes_the_page_off_the_list()
+    {
+        $topic = $this->topic('Natuurkunde', 'natuurkunde');
+        $page = $this->page($topic, 'De Planeten', 'de-planeten');
+        $page->writeDraft([
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Bijna af']]],
+            ],
+        ]);
+
+        $this->assertTrue($page->fresh()->promoteDraft());
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertInertia(fn (Assert $assert) => $assert->has('draftPages', 0)->etc());
     }
 
     public function test_only_downloads_that_were_actually_taken_are_listed()

@@ -13,14 +13,10 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * `imageAside` — one image with the running text flowing beside it.
- *
- * Two things are worth failing the build over. The first is the whitelist
- * itself: a node the editor can produce and App\Support\PageContent does not
- * know about silently stops saving. The second is the reference row, which is
- * the only reason an embedded file is served to anyone who is not logged in —
- * forget it and the picture renders perfectly for the owner and 403s for
- * every student, which is invisible from the admin panel.
+ * `imageAside` — one image with the running text flowing beside it. Two
+ * things must not silently regress: the whitelist entry in PageContent, and
+ * the reference row that publishes the image — without it the picture
+ * renders for the owner and 403s for every student, invisibly.
  */
 class ImageAsideTest extends TestCase
 {

@@ -3,16 +3,12 @@ import { expect, test } from '@playwright/test';
 import { useAdminSession } from './support/admin';
 
 /**
- * Media is authorised by PHP and then streamed by nginx from an `internal`
- * location, via X-Accel-Redirect. The PHP suite cannot see the second half of
- * that: it runs with MEDIA_X_ACCEL=false, so PHP reads the file itself, as the
- * same user that wrote it. Production hands the path to nginx, which reads it
- * as a different user from a read-only mount — a difference that has already
- * caused one total outage of media serving that a full green suite did not
- * notice.
- *
- * These go through the real nginx, which is the only place that difference is
- * visible.
+ * Media is authorised by PHP, then streamed by nginx via X-Accel-Redirect.
+ * The PHP suite runs with MEDIA_X_ACCEL=false (PHP reads the file itself, as
+ * the user that wrote it), while production hands the path to nginx, which
+ * reads it as a different user from a read-only mount — a mismatch that once
+ * caused a total outage a fully green PHP suite never saw. Only these tests,
+ * against the real nginx, can catch that.
  */
 const downloadHref = async (locator: {
     getAttribute(name: string): Promise<string | null>;
@@ -42,9 +38,8 @@ test('a download on an open page streams through nginx', async ({
     expect(headers['accept-ranges']).toBe('bytes');
     expect(headers['etag']).toBeTruthy();
 
-    // add_header does not merge in nginx — a location that sets one of its own
-    // discards every inherited header, silently. These four were missing from
-    // gated media for exactly that reason once.
+    // add_header doesn't merge in nginx — a location setting one discards all
+    // inherited ones silently, which once dropped these four from gated media.
     expect(headers['x-frame-options']).toBe('SAMEORIGIN');
     expect(headers['referrer-policy']).toBe('same-origin');
     expect(headers['content-security-policy']).toBeTruthy();
@@ -73,9 +68,9 @@ test('a file reachable only from a locked page is refused anonymously', async ({
     page,
     request,
 }) => {
-    // The owner sees the locked page without holding its password, which is
-    // how the URL is discoverable at all. `request` is a separate context with
-    // its own cookie jar, so the second half of this is genuinely anonymous.
+    // The owner can see the locked page without holding its password, which
+    // is how the URL becomes known. `request` is a separate, genuinely
+    // anonymous context.
     await useAdminSession(page);
     await page.goto('/e2e/locked');
 

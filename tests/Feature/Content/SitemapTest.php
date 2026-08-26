@@ -99,10 +99,9 @@ class SitemapTest extends TestCase
     }
 
     /**
-     * The sitemap describes what is public, not what the fetcher may see.
-     * Asking AccessControl::allows() here would put every protected path in
-     * the file the moment the owner loaded it while logged in — and anything
-     * caching that copy would then serve it to the world.
+     * The sitemap describes what is public, not what the fetcher may see —
+     * AccessControl::allows() would leak every protected path the moment the
+     * owner loaded it while logged in.
      */
     public function test_the_admin_gets_the_same_sitemap_as_anyone_else()
     {

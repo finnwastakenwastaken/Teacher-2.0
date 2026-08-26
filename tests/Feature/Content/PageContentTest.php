@@ -106,10 +106,8 @@ class PageContentTest extends TestCase
     }
 
     /**
-     * `//host` was refused and `/\host` was not, although browsers normalise
-     * the two to the same off-site address. Only the site owner writes these,
-     * so this is a mistyped link rather than an attack — but a link that
-     * leaves the site while looking like a path is worth refusing either way.
+     * Browsers normalise `//host` and `/\host` to the same off-site address,
+     * so both must be refused even though only the trusted owner writes links.
      */
     public function test_a_protocol_relative_link_is_refused_however_it_is_spelled()
     {
@@ -164,6 +162,87 @@ class PageContentTest extends TestCase
         $clean = PageContent::sanitise($this->doc([
             ['type' => 'fileEmbed', 'attrs' => ['ulid' => '../../etc/passwd']],
             ['type' => 'youtubeEmbed', 'attrs' => ['videoId' => '"><script>']],
+            $this->paragraph('Blijft staan'),
+        ]));
+
+        $this->assertCount(1, $clean['content']);
+        $this->assertSame('paragraph', $clean['content'][0]['type']);
+    }
+
+    public function test_a_social_embed_survives_with_both_halves_intact()
+    {
+        $clean = PageContent::sanitise($this->doc([
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'tiktok', 'postId' => '7234567890123456789']],
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'instagram', 'postId' => 'C1a2B3c4D5e']],
+        ]));
+
+        $this->assertCount(2, $clean['content']);
+        $this->assertSame('tiktok', $clean['content'][0]['attrs']['platform']);
+        $this->assertSame('7234567890123456789', $clean['content'][0]['attrs']['postId']);
+        $this->assertSame('instagram', $clean['content'][1]['attrs']['platform']);
+    }
+
+    /**
+     * The pair is checked together, not attribute by attribute. Each of these
+     * halves is valid on its own — an Instagram shortcode really is a
+     * shortcode, `tiktok` really is a platform — and the combination is what
+     * makes the node a lie, because the id is interpolated into that
+     * platform's URL.
+     */
+    public function test_a_social_embed_whose_id_belongs_to_the_other_platform_is_dropped()
+    {
+        $clean = PageContent::sanitise($this->doc([
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'tiktok', 'postId' => 'C1a2B3c4D5e']],
+            $this->paragraph('Blijft staan'),
+        ]));
+
+        $this->assertCount(1, $clean['content']);
+        $this->assertSame('paragraph', $clean['content'][0]['type']);
+    }
+
+    public function test_a_social_embed_with_an_unknown_platform_or_a_malformed_id_is_dropped()
+    {
+        $clean = PageContent::sanitise($this->doc([
+            // A platform nobody allow-listed.
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'facebook', 'postId' => '7234567890123456789']],
+            // An id that would break out of the path it is interpolated into.
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'tiktok', 'postId' => '../../evil']],
+            // Half a node.
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'instagram']],
+            ['type' => 'socialEmbed', 'attrs' => ['postId' => 'C1a2B3c4D5e']],
+            ['type' => 'socialEmbed'],
+            $this->paragraph('Blijft staan'),
+        ]));
+
+        $this->assertCount(1, $clean['content']);
+        $this->assertSame('paragraph', $clean['content'][0]['type']);
+    }
+
+    /**
+     * A socialEmbed publishes no file — it has no ULID — so it must not add a
+     * reference row either. If it ever did, the row would point at nothing and
+     * the rebuild on the next save would be the only thing removing it.
+     */
+    public function test_a_social_embed_creates_no_media_reference()
+    {
+        $page = $this->makePage();
+
+        $page->writeContent($this->doc([
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'tiktok', 'postId' => '7234567890123456789']],
+        ]));
+
+        $this->assertSame(0, $page->mediaReferences()->count());
+    }
+
+    /**
+     * The simple editor is a paragraph editor and offers no embed buttons, so
+     * a block arriving in a topic introduction or the homepage was not
+     * authored there. Stripped for the same reason every other embed is.
+     */
+    public function test_a_social_embed_is_stripped_from_a_body_that_allows_no_embeds()
+    {
+        $clean = PageContent::sanitiseWithoutEmbeds($this->doc([
+            ['type' => 'socialEmbed', 'attrs' => ['platform' => 'tiktok', 'postId' => '7234567890123456789']],
             $this->paragraph('Blijft staan'),
         ]));
 

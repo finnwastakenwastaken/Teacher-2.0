@@ -3,24 +3,17 @@ import { expect, test } from '@playwright/test';
 import { useAdminSession } from './support/admin';
 
 /**
- * The banner and branding pickers search the server instead of being handed
- * the whole library.
+ * The banner and branding pickers search the server rather than being handed
+ * the whole library. MediaSearchTest already covers the endpoint, so this
+ * covers what only a browser shows: a dialog whose search never fires,
+ * results that arrive after it's decided it's empty, or a choice that updates
+ * the hidden input without updating the thumbnail.
  *
- * Worth a browser test rather than a controller one because the server half
- * is already covered — MediaSearchTest asserts the endpoint — and what can
- * actually break is the half no request can see: a dialog whose search never
- * fires, results that arrive after it decided it was empty, or a choice that
- * updates the hidden input without updating the thumbnail beside it. That
- * thumbnail is the only feedback the owner gets that they picked what they
- * meant to.
+ * Also pins *when* search runs: three pickers render on the settings screen,
+ * so the fetch is gated on the dialog opening, not on mount — otherwise
+ * opening the screen alone would fire three unwanted requests.
  *
- * It also pins *when* the search runs. Three of these render on the settings
- * screen, so searching on mount would be three requests for a library nobody
- * has asked to see; the effect is gated on the dialog being open, and nothing
- * else would notice if that gate were removed.
- *
- * Nothing here is saved: the form is never submitted, so the chosen logo
- * lives only in the component's state and the site is left as it was found.
+ * Nothing here is saved — the form is never submitted.
  */
 const ALT = 'Een blauw vlak van 400 bij 300';
 
@@ -52,22 +45,19 @@ test('the branding picker searches the server and shows what was chosen', async 
         .click();
     await expect(dialog).toBeVisible();
 
-    // The results come from the server, so this asserts a request happened
-    // and its answer is on screen — not that a prop was filtered in the
-    // browser.
+    // Asserts a request happened and its answer rendered, not that a prop
+    // was filtered client-side.
     await expect(dialog.getByAltText(ALT)).toBeVisible();
     expect(searches.length).toBeGreaterThan(0);
 
     await dialog.getByAltText(ALT).click();
     await expect(dialog).toBeHidden();
 
-    // Chosen, and drawn. The field keeps its own copy of what was picked,
-    // because the only thing the server sent was whatever the *stored*
-    // setting pointed at.
+    // The field keeps its own copy of the pick — the server only ever sent
+    // whatever the *stored* setting pointed at.
     await expect(logo.getByAltText(ALT)).toBeVisible();
 
-    // Typing narrows it on the server too, and a term matching nothing must
-    // empty the grid rather than leave the previous results standing.
+    // A term matching nothing must empty the grid, not leave stale results.
     await logo
         .getByRole('button', { name: /Logo: (kiezen|vervangen)/ })
         .click();

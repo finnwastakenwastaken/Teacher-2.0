@@ -8,23 +8,15 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-    YOUTUBE_REFERRER_POLICY,
-    isYouTubeId,
-    youTubeEmbedUrl,
-} from '@/lib/youtube';
+import { isYouTubeId, youTubeEmbedUrl } from '@/lib/youtube';
+import { EMBED_REFERRER_POLICY } from '@/lib/embeds';
 import { t } from '@/lib/i18n';
 
 /*
- * A YouTube video, stored as its 11-character id and nothing else.
- *
- * The embed URL is rebuilt from that id (see lib/youtube.ts), on the
- * nocookie host, so no pasted tracking parameter can survive into a rendered
- * page. App\Support\PageContent rejects any videoId that is not exactly 11
- * id characters, so this extension checks the same thing before drawing.
- *
- * parseHTML/renderHTML are only Tiptap's clipboard plumbing — page bodies are
- * stored and loaded as JSON.
+ * Stored as its 11-character id only; the embed URL is rebuilt from it (see
+ * lib/youtube.ts) on the nocookie host, so no pasted tracking parameter
+ * survives. This extension re-checks the id shape PageContent enforces
+ * before drawing. parseHTML/renderHTML are only TipTap's clipboard plumbing.
  */
 
 function YouTubeEmbedView(props: ReactNodeViewProps) {
@@ -48,7 +40,7 @@ function YouTubeEmbedView(props: ReactNodeViewProps) {
                             allowFullScreen
                             // Same reason as the public renderer: without it
                             // the preview shows error 153, not the video.
-                            referrerPolicy={YOUTUBE_REFERRER_POLICY}
+                            referrerPolicy={EMBED_REFERRER_POLICY}
                             className="size-full border-0"
                         />
                     </div>

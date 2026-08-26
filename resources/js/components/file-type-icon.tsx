@@ -3,17 +3,16 @@ import {
     FileSpreadsheet,
     FileText,
     Film,
+    Image as ImageIcon,
     Presentation,
 } from 'lucide-react';
-import type { MediaFileKind } from '@/types';
+import type { DownloadKind } from '@/types';
 
 /**
- * The MIME is the finer signal; `kind` only distinguishes video from the
+ * MIME is the finer signal; `kind` distinguishes video and image from the
  * rest. Shared by the media library, the editor and the public download card
- * so they cannot drift apart on what a spreadsheet looks like.
- *
- * A component rather than a function returning an icon: picking a component
- * during render remounts it on every pass, and the icons are static.
+ * so they cannot drift on what a spreadsheet looks like. A component, not a
+ * function returning one — the latter would remount on every render.
  */
 export function FileTypeIcon({
     mime,
@@ -21,11 +20,18 @@ export function FileTypeIcon({
     className,
 }: {
     mime: string;
-    kind: MediaFileKind;
+    kind: DownloadKind;
     className?: string;
 }) {
     if (kind === 'video') {
         return <Film className={className} aria-hidden="true" />;
+    }
+
+    // A picture offered as a download — a poster, a scanned worksheet. It is
+    // an `images` row, so it has no `kind` column of its own; the library it
+    // came from is the answer.
+    if (kind === 'image') {
+        return <ImageIcon className={className} aria-hidden="true" />;
     }
 
     if (

@@ -9,15 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('pages', function (Blueprint $table) {
-            // The banner across the top of a page, separate from anything
-            // embedded in the body. Kept as a column rather than as a body
-            // node because it is page furniture, not content: it renders
-            // above the title and survives every edit of the body.
-            //
-            // restrictOnDelete, like every other reference to uploaded media
-            // in this schema. Deleting an image that a page is using blocks
-            // and reports the pages using it (the technical reference) rather
-            // than silently leaving a page with a hole in it.
+            // Page banner — a column, not a body node, since it's page
+            // furniture that survives every body edit. restrictOnDelete like
+            // every other media reference: blocks and reports usage rather
+            // than leaving a hole.
             $table->foreignId('hero_image_id')
                 ->nullable()
                 ->after('is_hidden')

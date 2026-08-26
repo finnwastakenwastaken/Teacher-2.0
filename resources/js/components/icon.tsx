@@ -1,18 +1,11 @@
 import { createElement } from 'react';
 
 /*
- * Renders an icon from catalogue geometry supplied by the server.
- *
- * The public site used to draw icons with lucide's `DynamicIcon`, which works
- * by shipping a name-to-chunk map of every icon in the catalogue — 48.7 KB
- * gzipped for 1,760 icons, on the critical path of every student-facing topic
- * page, and growing linearly with the catalogue. With ~15,000 icons that map
- * would have been a quarter of a megabyte. The server sends the handful of
- * shapes a page actually shows instead, and this file draws them.
- *
- * Nodes are structured `[tag, attributes]` pairs, never markup. That is the
- * same reason `rich-text.tsx` builds elements rather than setting innerHTML:
- * nothing derived from stored data is ever injected as HTML.
+ * Draws an icon from catalogue geometry the server sends, replacing lucide's
+ * `DynamicIcon` (which ships a name-to-chunk map of the whole catalogue —
+ * would be ~250 KB at ~15,000 icons). Nodes are `[tag, attributes]` pairs,
+ * never markup, for the same reason rich-text.tsx builds elements instead of
+ * setting innerHTML.
  */
 
 export type IconNode = [string, Record<string, string>];

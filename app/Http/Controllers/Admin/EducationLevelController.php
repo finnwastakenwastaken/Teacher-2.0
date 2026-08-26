@@ -70,13 +70,10 @@ class EducationLevelController extends Controller
     }
 
     /**
-     * Delete a level, optionally merging its downloads into another one.
-     *
-     * A level in use cannot simply be removed — that would strip the tag off
-     * every download carrying it and leave files listed under no track, which
-     * looks like a rendering bug rather than the data loss it is. So the only
-     * way to retire a level that is in use is to say where its downloads
-     * should go instead.
+     * Delete a level, optionally merging its downloads into another one. A
+     * level in use cannot simply be removed — that would strip the tag off
+     * every download carrying it, which looks like a rendering bug rather
+     * than the data loss it is.
      */
     public function destroy(Request $request, EducationLevel $level): RedirectResponse
     {

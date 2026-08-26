@@ -36,9 +36,8 @@ trait StoredOnPrivateDisk
         });
 
         static::deleted(function (self $model): void {
-            // After commit, not during: a delete that rolls back must not
-            // leave the row intact but the bytes gone. Outside a transaction
-            // this runs immediately.
+            // After commit, not during: a rolled-back delete must not leave
+            // the row intact but the bytes gone.
             $path = $model->path;
 
             DB::afterCommit(function () use ($path): void {

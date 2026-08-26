@@ -5,14 +5,10 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 
 /**
- * Safe to run on a live install, and the installer does run it.
- *
- * Deliberately creates no user. The starter kit seeded a test@example.com
- * account here; on a real deploy that would occupy the single admin slot
- * before the owner ever reached the claim screen, locking them out of their
- * own site behind a publicly known e-mail address. The only account is
- * created by the claim screen or by `php artisan admin:seed` — see
- * The technical reference.
+ * Safe to run on a live install (the installer does). Deliberately creates no
+ * user — the starter kit's seeded test@example.com would occupy the single
+ * admin slot before the owner reached the claim screen. The only account
+ * comes from the claim screen or `php artisan admin:seed`.
  */
 class DatabaseSeeder extends Seeder
 {

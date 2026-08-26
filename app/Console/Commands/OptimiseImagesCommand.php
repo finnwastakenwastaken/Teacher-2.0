@@ -11,17 +11,11 @@ use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
- * Re-encodes images that were already in the library.
- *
- * Conversion happens on upload, so this only matters once: for whatever was
- * uploaded before that existed, or imported from disk. A teacher's library
- * fills up with photos straight off a phone, and those are the files that make
- * a page slow on a school's wifi.
- *
- * It rewrites stored files, so it reports first and only writes when told to.
- * The ULID never changes, which is what keeps every existing embed, download
- * and banner pointing at the right image — only the stored path's extension
- * and the recorded MIME type move.
+ * Re-encodes images already in the library — conversion normally happens on
+ * upload, so this only matters for what predates that or was imported from
+ * disk. Rewrites stored files, so it reports first and only writes with
+ * `--force`. The ULID never changes, so every existing embed, download and
+ * banner keeps pointing at the right image.
  */
 class OptimiseImagesCommand extends Command
 {
@@ -74,10 +68,7 @@ class OptimiseImagesCommand extends Command
                 continue;
             }
 
-            // false on a stat failure, and false used as an integer is 0 —
-            // which would print a 100% saving for a file that could not even
-            // be measured. replace() checks the same thing again before it
-            // trusts the value; this one only has to keep the report honest.
+            // filesize() false, cast to int, would print a false "100% saving".
             $newSize = filesize($optimised->path);
 
             if ($newSize === false) {
@@ -154,14 +145,9 @@ class OptimiseImagesCommand extends Command
         $oldPath = $image->path;
         $newPath = preg_replace('/\.[^.]+$/', '.'.$optimised->extension, $oldPath);
 
-        /*
-         * The new file is inspected while it is still a temporary file, and
-         * only then moved into place. Doing it the other way round would be
-         * unrecoverable in one specific case: an image that was already WebP
-         * keeps its extension, so the new path *is* the old path and the move
-         * overwrites the only copy of the original. Checking first means
-         * every way of failing below leaves the library exactly as it was.
-         */
+        // Inspected as a temp file before moving into place: for an image
+        // already WebP, new path == old path, so moving first and failing
+        // after would overwrite the only copy of the original irrecoverably.
         $dimensions = @getimagesize($optimised->path);
         $size = @filesize($optimised->path);
 
@@ -176,20 +162,10 @@ class OptimiseImagesCommand extends Command
             return false;
         }
 
-        /*
-         * An image that was already WebP keeps its extension, so the new path
-         * *is* the old one and the move below overwrites the original. That
-         * is fine as long as the row is then updated — but if the update
-         * fails, the row goes on describing bytes that no longer exist: the
-         * old width, height and size against a different file. The image
-         * still renders, so nothing looks wrong; the library just quietly
-         * reports the wrong numbers forever.
-         *
-         * So when the path is unchanged, the original is set aside first and
-         * only discarded once the row has been written. When it changes there
-         * is nothing to set aside — the old file is still where the row says
-         * it is until the update succeeds.
-         */
+        // When the path is unchanged (already WebP), the original is set
+        // aside first and only discarded once the row write succeeds — if
+        // the update failed after an in-place overwrite, the row would
+        // silently describe the wrong dimensions/size forever.
         $rescue = $newPath === $oldPath ? $disk->path($oldPath).'.pre-optimise' : null;
 
         if ($rescue !== null && ! @rename($disk->path($oldPath), $rescue)) {

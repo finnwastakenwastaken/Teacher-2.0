@@ -6,6 +6,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -50,16 +51,30 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * The single admin account can never be deleted.
+     * Stored lower-case, always. `lowercase_usernames` is on in
+     * config/fortify.php, so a login canonicalises what was typed before
+     * looking it up — and an address stored with a capital in it then matches
+     * nothing, on a site whose only account this is. Claiming as
+     * `Teacher@school.nl` locked the owner out permanently:
+     * `admin:reset-password` is §3's recovery path and cannot help, because
+     * the password was never what failed. Here rather than only in the form
+     * request so that `admin:seed`, a factory and tinker are covered too.
      *
-     * This site is administered by exactly one account. Deleting it would
-     * leave a live, publicly reachable site that nobody can log into, with no
-     * recovery path short of editing the database by hand.
-     *
-     * This is the last of three layers — there is no delete route and no
-     * controller action either — and it is the one that also catches deletes
-     * from tinker, a seeder, a future bulk operation, or a cascade. It throws
-     * rather than returning false so a mistake is loud instead of silent.
+     * @return Attribute<string, string>
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value): string => mb_strtolower($value),
+        );
+    }
+
+    /**
+     * The single admin account can never be deleted — this site has no
+     * recovery path but editing the database by hand. Last of three layers
+     * (no delete route, no controller action), and the one that also catches
+     * tinker, a seeder, or a cascade. Throws rather than returning false so
+     * the mistake is loud.
      */
     protected static function booted(): void
     {

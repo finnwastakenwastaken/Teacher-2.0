@@ -1,16 +1,12 @@
 /**
- * Generates the icon catalogue consumed by `php artisan icons:sync`.
+ * Generates the icon catalogue consumed by `php artisan icons:sync`. Every
+ * name and path comes from the packages' own exported data, never a
+ * hand-written list (v1's picker rendered blank tiles from guessed names).
  *
- * Every name and every path in the output comes from the packages' own
- * exported data — never from a hand-written list. The technical reference: v1's
- * picker rendered blank tiles because names were guessed, and the rule since
- * is that the catalogue is generated or it does not exist.
- *
- * Output is a map of "library:name" to the icon's child nodes in lucide's
- * [tag, attributes] shape, which is what the React renderer turns into real
- * elements. Storing structured nodes rather than SVG markup is deliberate:
- * the renderer never has to inject HTML, so icons cannot become the hole
- * that `PageContent` closes everywhere else.
+ * Output maps "library:name" to child nodes in lucide's [tag, attributes]
+ * shape, which the React renderer turns into real elements — structured
+ * data, never SVG markup, so icons can't reopen the HTML-injection hole
+ * PageContent closes elsewhere.
  *
  * Run: npm run icons:build
  */
@@ -24,11 +20,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = resolve(root, 'database/data/icons.json');
 
 /**
- * Attributes that may appear on a generated node. Anything else is dropped.
- *
- * The renderer trusts this file, so the whitelist lives here rather than at
- * render time — but it is a whitelist either way, and both ends only ever
- * deal in structured data.
+ * Attributes allowed on a generated node; anything else is dropped. The
+ * renderer trusts this file, so the whitelist is enforced here at generation
+ * time rather than at render time.
  */
 const ALLOWED_ATTRIBUTES = new Set([
     'd', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'x2', 'y1', 'y2',
@@ -86,13 +80,11 @@ function addIcons(catalogue, library, entries) {
 }
 
 // --- lucide ---------------------------------------------------------------
-// Each icon module exports `__iconNode`. The name list comes from the same
-// package's `iconNames`, so the two can never disagree.
-// About 200 of lucide's names are aliases: the module re-exports another
-// icon's default and deliberately does not re-export `__iconNode`. Dropping
-// them would silently delete real, choosable icons — including any a site is
-// already using — so the alias is followed through the module source, which
-// throws rather than guesses if the target ever moves.
+// Each icon module exports `__iconNode`; the name list comes from the same
+// package's `iconNames`. About 200 names are aliases (re-export another
+// icon's default, no `__iconNode`) — followed through the module source
+// rather than dropped, since dropping would silently delete real icons a
+// site may already use. Throws if the alias target ever moves.
 async function lucideEntries() {
     const { iconNames } = await import('lucide-react/dynamic');
     const moduleDir = resolve(root, 'node_modules/lucide-react/dist/esm/icons');

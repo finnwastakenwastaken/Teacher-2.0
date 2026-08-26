@@ -11,13 +11,10 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * The stored search vector follows the *owner's* writing language, never the
- * visitor's interface locale.
- *
- * These assert against the vector itself rather than against rendered search
- * results, because that column is the thing that can silently be wrong: a
- * page stemmed by the old rules still renders perfectly and just stops being
- * findable.
+ * The stored search vector follows the owner's writing language, never the
+ * visitor's interface locale. Assertions target the vector itself, not
+ * rendered results — a page stemmed by stale rules still renders fine and
+ * just stops being findable.
  */
 class ContentLanguageTest extends TestCase
 {
@@ -80,10 +77,8 @@ class ContentLanguageTest extends TestCase
 
         $english = $this->page('Forces');
 
-        // The Dutch stemmer reduces "krachten" to "kracht"; the English one
-        // reduces "forces" to "forc". Neither would happen under the other
-        // configuration, which is what makes this a real assertion rather
-        // than a restatement of the input.
+        // Dutch stems "krachten" to "kracht"; English stems "forces" to
+        // "forc" — neither happens under the other configuration.
         $this->assertStringContainsString('kracht', $this->vector($dutch));
         $this->assertStringContainsString('forc', $this->vector($english));
         $this->assertStringNotContainsString('forces', $this->vector($english));
@@ -112,9 +107,8 @@ class ContentLanguageTest extends TestCase
     }
 
     /**
-     * A cast to regconfig would raise on every page save. The lookup falls
-     * back instead — the value comes from a table, and a wrong row must not
-     * be able to stop the owner writing.
+     * A regconfig cast would raise on every page save if the stored value
+     * were ever wrong, so the lookup falls back to `dutch` instead.
      */
     public function test_an_unknown_stored_value_falls_back_instead_of_throwing()
     {
@@ -156,9 +150,8 @@ class ContentLanguageTest extends TestCase
         $page = $this->page('Krachten');
         $before = $this->vector($page);
 
-        // An English-reading visitor searching a Dutch site gets the Dutch
-        // stemmer, because the corpus is Dutch. Conflating the two questions
-        // would make results depend on who is asking.
+        // An English-reading visitor searching a Dutch site still gets the
+        // Dutch stemmer: the corpus follows the owner, not the visitor.
         $this->withCookie('locale', 'en')->get('/zoeken?q=kracht')->assertOk();
 
         $this->assertSame($before, $this->vector($page->fresh()));

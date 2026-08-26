@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { FilePickerList } from '@/components/admin/file-picker-list';
 import type { PickableFile } from '@/components/admin/file-picker-list';
+import type { ImageOption } from '@/components/admin/image-field';
+import { ImagePickerList } from '@/components/admin/image-picker-list';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -13,29 +15,37 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { t } from '@/lib/i18n';
 
 /*
- * Choosing the file for a new download.
- *
- * The same list the editor's file picker shows, with a different footer: this
- * one does not insert anything, it creates a page_downloads row. So a choice
- * is held rather than acted on immediately, and the label field travels with
- * it — the levels come from the section behind the dialog, because they apply
- * to whatever is uploaded there too.
- *
- * Mounted only while open, like the editor's dialogs, so the choice and the
- * label start empty every time without an effect to reset them.
+ * Same lists the editor's pickers show, with a different footer: this one
+ * creates a page_downloads row rather than inserting a node, so the choice
+ * and label are held until "Add" instead of acted on immediately. Two
+ * libraries behind one switch, shown separately rather than merged, because
+ * a document is recognised by its name and a picture by looking at it — one
+ * list would have to pick a losing affordance for one of them. Mounted only
+ * while open, so both start empty without a reset effect.
  */
 
-/** The numeric id is what the attach endpoint keys on; PickableFile already
- *  carries it — see resources/js/components/admin/file-picker-list.tsx. */
+/** The numeric id is what the attach endpoint keys on; both shapes carry it. */
 export type AttachableFile = PickableFile;
 
+/**
+ * What was picked, and from which library. A discriminated union rather than
+ * two nullable fields, so "both at once" is not a state that can be reached
+ * from here — the Form Request and a CHECK constraint refuse it too.
+ */
+export type AttachableChoice =
+    | { source: 'file'; file: PickableFile }
+    | { source: 'image'; image: ImageOption };
+
 type Props = {
-    /** Ids already on this page, so the search excludes them server-side
-     *  instead of the whole library being fetched to filter here. */
-    exclude: number[];
+    /** Media-file ids already on this page, so the search excludes them
+     *  server-side instead of the whole library being fetched to filter. */
+    excludeFiles: number[];
+    /** The same, for the image library. */
+    excludeImages: number[];
     /** Shown when a search with no query still comes back empty — an empty
      *  library and one whose every file is already here look the same from
      *  here, so the message has to speak to both. */
@@ -43,18 +53,26 @@ type Props = {
     /** The levels ticked in the section, so the choice is not made blind. */
     levelNames: string[];
     /** Resolves when the row exists; rejects when the visit failed. */
-    onAttach: (file: AttachableFile, label: string | null) => Promise<void>;
+    onAttach: (choice: AttachableChoice, label: string | null) => Promise<void>;
     onClose: () => void;
 };
 
+function chosenName(choice: AttachableChoice): string {
+    return choice.source === 'file'
+        ? choice.file.original_filename
+        : choice.image.filename;
+}
+
 export function DownloadPickerDialog({
-    exclude,
+    excludeFiles,
+    excludeImages,
     emptyMessage,
     levelNames,
     onAttach,
     onClose,
 }: Props) {
-    const [chosen, setChosen] = React.useState<AttachableFile | null>(null);
+    const [source, setSource] = React.useState<'file' | 'image'>('file');
+    const [chosen, setChosen] = React.useState<AttachableChoice | null>(null);
     const [label, setLabel] = React.useState('');
     const [attaching, setAttaching] = React.useState(false);
 
@@ -98,13 +116,55 @@ export function DownloadPickerDialog({
                     })}
                 </p>
 
-                <FilePickerList
-                    idPrefix="download-picker"
-                    emptyMessage={emptyMessage}
-                    selectedUlid={chosen?.ulid ?? null}
-                    exclude={exclude}
-                    onSelect={setChosen}
-                />
+                <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={source}
+                    // A deselect sends an empty string; there is always a
+                    // library on show, so that is simply ignored.
+                    onValueChange={(next) => {
+                        if (next === 'file' || next === 'image') {
+                            setSource(next);
+                            // The choice belongs to the library it came from.
+                            // Leaving it behind would let the owner attach a
+                            // document while looking at a grid of pictures.
+                            setChosen(null);
+                        }
+                    }}
+                    aria-label={t('ui.downloads.source_label')}
+                    className="w-fit"
+                >
+                    <ToggleGroupItem value="file">
+                        {t('ui.downloads.source_files')}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="image">
+                        {t('ui.downloads.source_images')}
+                    </ToggleGroupItem>
+                </ToggleGroup>
+
+                {source === 'file' ? (
+                    <FilePickerList
+                        idPrefix="download-picker"
+                        emptyMessage={emptyMessage}
+                        selectedUlid={
+                            chosen?.source === 'file' ? chosen.file.ulid : null
+                        }
+                        exclude={excludeFiles}
+                        onSelect={(file) => setChosen({ source: 'file', file })}
+                    />
+                ) : (
+                    <ImagePickerList
+                        idPrefix="download-picker-image"
+                        emptyMessage={emptyMessage}
+                        selectedId={
+                            chosen?.source === 'image' ? chosen.image.id : null
+                        }
+                        exclude={excludeImages}
+                        onSelect={(image) =>
+                            setChosen({ source: 'image', image })
+                        }
+                    />
+                )}
 
                 {chosen !== null && (
                     <div className="grid gap-2">
@@ -112,7 +172,7 @@ export function DownloadPickerDialog({
                             where the button that acts on it lives. */}
                         <p className="text-sm" role="status">
                             {t('ui.downloads.chosen_file', {
-                                name: chosen.original_filename,
+                                name: chosenName(chosen),
                             })}
                         </p>
 

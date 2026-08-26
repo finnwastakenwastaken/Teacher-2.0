@@ -11,10 +11,9 @@ export const ADMIN_PASSWORD = 'Playwright!2026#fixture';
 export const ACCESS_PASSWORD = 'e2e-unlock-2026';
 
 /**
- * A second access password, kept separate from ACCESS_PASSWORD above.
- * `passwords.spec.ts` changes this one's secret to prove the unlock cookie
- * gets invalidated — doing that to the password `gated-media.spec.ts` also
- * relies on would make the two specs order-dependent. Mirrors
+ * Kept separate from ACCESS_PASSWORD: `passwords.spec.ts` changes this one's
+ * secret, and reusing the same password `gated-media.spec.ts` relies on would
+ * make the two specs order-dependent. Mirrors
  * `SeedBrowserTestFixtures::COOKIE_PASSWORD_SECRET`.
  */
 export const COOKIE_TEST_PASSWORD = 'e2e-cookie-2026';
@@ -25,14 +24,12 @@ export const SESSION_STATE = 'tests/e2e/.auth/admin.json';
 type StorageState = Awaited<ReturnType<BrowserContext['storageState']>>;
 
 /**
- * Give this page the admin's session, without spending a login on it.
- *
- * Cookies go onto the page's own context rather than through the project's
- * `storageState`, deliberately: the `request` fixture is a separate context
- * and several specs rely on it being genuinely anonymous — the 403 for a file
- * behind a password is the whole point of one of them. A project-wide
- * storageState would have authenticated those too, and quietly turned the
- * security assertions into assertions about nothing.
+ * Gives this page the admin's session without spending another login.
+ * Cookies go onto the page's own context, not the project-wide
+ * `storageState`, because the `request` fixture is a separate context that
+ * several specs need genuinely anonymous — a project-wide storageState would
+ * authenticate those too and turn security assertions into assertions about
+ * nothing.
  */
 export async function useAdminSession(page: Page): Promise<void> {
     const state = JSON.parse(

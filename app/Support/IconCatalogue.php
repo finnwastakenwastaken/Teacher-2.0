@@ -16,12 +16,9 @@ use Illuminate\Support\Collection;
 class IconCatalogue
 {
     /**
-     * The library used when a stored value carries no prefix.
-     *
-     * Every icon chosen before the catalogue existed is a bare lucide name
-     * such as `atom`. Those rows are not migrated: an unprefixed value simply
-     * means lucide, forever. That keeps the change backwards compatible and
-     * means a half-applied deploy cannot blank out a site's icons.
+     * The library used when a stored value carries no prefix. Icons chosen
+     * before the catalogue existed are bare names ("atom"); those rows are
+     * never migrated, so unprefixed permanently means lucide.
      */
     public const DEFAULT_LIBRARY = 'lucide';
 

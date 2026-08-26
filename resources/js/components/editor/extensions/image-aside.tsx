@@ -24,22 +24,13 @@ import { t } from '@/lib/i18n';
 import type { TipTapAsideSide, TipTapAsideSize } from '@/types/tiptap';
 
 /*
- * One image with the running text flowing beside it.
- *
- * The attribute set matches App\Support\PageContent exactly: a ULID, which
- * must be a real one or the node is refused on save, plus two enumerations
- * that the server clamps to their default rather than dropping the picture.
- * Both declare a real default here, which is why neither is in that class's
- * NULLABLE_ATTRS — TipTap only writes an explicit null for an attribute whose
- * default is null.
- *
- * The geometry classes are imported from the public renderer rather than
- * restated, so what the owner arranges is what a student sees — including the
- * part that only shows on a phone, where there is no "beside" and the picture
- * stacks above the text.
- *
- * parseHTML/renderHTML are only Tiptap's clipboard plumbing — page bodies are
- * stored and loaded as JSON.
+ * Attribute set matches App\Support\PageContent: a ULID (refused if invalid)
+ * plus two enumerations the server clamps to their default rather than
+ * dropping the picture — both declare a real default here, so neither is in
+ * PageContent::NULLABLE_ATTRS. Geometry classes are imported from the public
+ * renderer, not restated, so the owner sees what a student sees.
+ * parseHTML/renderHTML are only TipTap's clipboard plumbing; bodies are
+ * stored as JSON.
  */
 
 const SIDES: { value: TipTapAsideSide; icon: LucideIcon }[] = [
@@ -47,24 +38,17 @@ const SIDES: { value: TipTapAsideSide; icon: LucideIcon }[] = [
     { value: 'right', icon: PanelRight },
 ];
 
-/**
- * S / M / L rather than words: the control row lives inside the floated box,
- * which is a quarter of the column at its narrowest. The accessible name
- * carries the real word.
- */
+/** S/M/L, not words — the control row lives inside the narrow floated box;
+ * the accessible name carries the real word. */
 const SIZES: { value: TipTapAsideSize; short: string }[] = [
     { value: 'small', short: 'S' },
     { value: 'medium', short: 'M' },
     { value: 'large', short: 'L' },
 ];
 
-/*
- * Labels are looked up while rendering, never in a constant beside the list
- * above. The dictionary is set per document, so a module-scope `t()` freezes
- * whichever language happened to load first — and the keys are written out in
- * full rather than built from `value`, because a key assembled from a
- * variable is invisible to LocalisationTest.
- */
+// Looked up at render, not module scope (t() would freeze the first-loaded
+// language), with keys written out in full — a key built from `value` is
+// invisible to LocalisationTest.
 function sideLabel(side: TipTapAsideSide): string {
     return side === 'left'
         ? t('ui.editor.blocks.aside_left')

@@ -1,4 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -6,10 +7,8 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
-// The owner's site name, written into the document by the root Blade
-// template (resources/views/app.blade.php) so it is right before hydration.
-// The build-time VITE_APP_NAME is only a fallback for the first paint of a
-// page served without it.
+// Written into the document by app.blade.php so it's right before hydration;
+// VITE_APP_NAME is only a fallback.
 const appName =
     document
         .querySelector('meta[name="app-name"]')
@@ -39,7 +38,12 @@ createInertiaApp({
     withApp(app) {
         return (
             <TooltipProvider delayDuration={0}>
-                {app}
+                {/* One confirmation dialog for the whole application, so every
+                    "are you sure" is themed, translated and keyboard-operable
+                    rather than whatever the browser draws. Mounted here rather
+                    than per screen because the same dialog serves seven of
+                    them; see components/ui/confirm-dialog.tsx. */}
+                <ConfirmProvider>{app}</ConfirmProvider>
                 <Toaster />
             </TooltipProvider>
         );

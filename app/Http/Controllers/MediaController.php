@@ -10,18 +10,12 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Serves uploaded media by identifier.
- *
- * Authorise first (App\Support\MediaAccess), then hand the transfer to
- * App\Support\MediaStream, which gives nginx an X-Accel-Redirect pointing
- * into the `internal` /__media/ location. nginx serves the file with native
- * Range support, so scrubbing a video works and the PHP worker is released
- * immediately instead of being held open for the length of the playback —
- * see the technical reference.
- *
- * App\Http\Controllers\DownloadController is the other caller of the same
- * pair. Both authorise through MediaAccess before streaming anything; that
- * is the invariant, not this controller being the only door.
+ * Serves uploaded media by identifier. Authorise first (MediaAccess), then
+ * hand off to MediaStream, which gives nginx an X-Accel-Redirect into the
+ * `internal` /__media/ location — native Range support, and the PHP worker
+ * is released instead of held open for the playback (the technical reference).
+ * DownloadController is the other caller of the same pair; both authorising
+ * through MediaAccess is the invariant, not either being the only door.
  */
 class MediaController extends Controller
 {
@@ -29,20 +23,19 @@ class MediaController extends Controller
     {
         abort_unless(MediaAccess::allows($image, $request), Response::HTTP_FORBIDDEN);
 
-        // SVG is XML and can carry script. Loaded through <img> that never
-        // executes, but a visitor navigating straight to the URL would render
-        // it as a document in this origin. Forcing a download plus a sandbox
-        // CSP removes that path; everything else can display inline.
-        $isSvg = $image->mime === 'image/svg+xml';
+        // Forcing a download plus a sandbox CSP is what stops an SVG being
+        // rendered as a document in this origin; everything else can display
+        // inline. See App\Models\Image::isSvg() — the rule lives there
+        // because App\Http\Controllers\DownloadController can serve an image
+        // too, and two copies of it would drift.
+        $isSvg = $image->isSvg();
 
         return MediaStream::send(
             path: $image->path,
             mime: $image->mime,
             filename: $image->original_filename,
             inline: ! $isSvg,
-            extraHeaders: $isSvg
-                ? ['Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; sandbox"]
-                : [],
+            extraHeaders: $isSvg ? Image::svgSandboxHeaders() : [],
         );
     }
 

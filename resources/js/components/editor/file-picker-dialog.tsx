@@ -10,10 +10,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import type { AcceptedFormats } from '@/types';
 import { t } from '@/lib/i18n';
 
 type Props = {
     maxBytes: number;
+    acceptedFormats: AcceptedFormats;
     /** How many uploads this dialog has already put on the page. */
     uploadedCount: number;
     /** Registers the file with the library and inserts it. */
@@ -23,18 +25,14 @@ type Props = {
 };
 
 /**
- * Mounted only while open (see page-editor.tsx), so its state starts fresh
- * every time without an effect to reset it.
- *
- * Unlike the image picker, an upload here goes straight into the document:
- * a file embed is one block, so there is no batch to assemble and nothing to
- * decide. The dialog stays open so several can be added in a row.
- *
- * Clicking a row inserts it, so there is no selection to carry — hence no
- * footer beyond the way out, and no `selectedUlid` on the list.
+ * Mounted only while open, so state starts fresh without a reset effect.
+ * Unlike the image picker, an upload goes straight into the document (one
+ * block, no batch to assemble); the dialog stays open for adding several in
+ * a row. Clicking a row inserts it, so there's no selection to carry.
  */
 export function FilePickerDialog({
     maxBytes,
+    acceptedFormats,
     uploadedCount,
     onUploaded,
     onSelect,
@@ -60,6 +58,7 @@ export function FilePickerDialog({
                 <MediaUploader
                     compact
                     maxBytes={maxBytes}
+                    acceptedFormats={acceptedFormats}
                     title={t('ui.editor.file_dialog.upload_title')}
                     description={t('ui.editor.file_dialog.upload_description')}
                     onUploaded={onUploaded}

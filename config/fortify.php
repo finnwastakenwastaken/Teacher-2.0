@@ -145,17 +145,12 @@ return [
     'passkeys' => [
         'relying_party_id' => parse_url(config('app.url'), PHP_URL_HOST),
         'allowed_origins' => [config('app.url')],
-        // `?:` and not env()'s second argument: .env.example ships the key
-        // present but empty, and Dotenv reads that as the empty string rather
-        // than as absent — so the default would never apply and the secret
-        // would be "". Falling back to APP_KEY is the old behaviour and is
-        // survivable; falling back to nothing is not.
-        //
-        // The fallback exists for installations that predate the variable.
-        // Prefer a value of its own: rotating APP_KEY is a supported operation
-        // (APP_PREVIOUS_KEYS) that costs one round of logging back in, while
-        // changing this unenrols every passkey permanently. install.sh
-        // generates one and back-fills existing .env files.
+        // `?:`, not env()'s second arg: .env.example ships the key present
+        // but empty, which Dotenv reads as "" rather than absent, so a
+        // default there would never apply. Falls back to APP_KEY for
+        // installations that predate this variable — prefer a value of its
+        // own, since rotating APP_KEY is supported but changing this
+        // unenrols every passkey permanently. install.sh generates one.
         'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET') ?: config('app.key'),
         'timeout' => 60000,
     ],
@@ -174,24 +169,15 @@ return [
     /*
     | DELIBERATELY DISABLED — DO NOT RE-ENABLE
     |
-    | Features::registration()
-    |   This site has exactly one admin account, ever. The account is claimed
-    |   once through the first-run screen (or pre-seeded from ADMIN_* env vars)
-    |   and there is no second path to creating one. Enabling registration
-    |   would expose a public sign-up form on a site whose students are never
-    |   meant to have accounts at all.
+    | Features::registration() — one admin account, ever, claimed via the
+    |   first-run screen or ADMIN_* env vars. No second path to create one.
     |
-    | Features::resetPasswords()
-    | Features::emailVerification()
-    |   Both depend on outbound mail, which this deployment does not have
-    |   (MAIL_MAILER=log). A forgot-password form that silently does nothing is
-    |   worse than none, and it leaks whether an address exists. Recovery is
-    |   `php artisan admin:reset-password`, run on the server, and is what the
-    |   update & security guide documents.
+    | Features::resetPasswords() / Features::emailVerification() — both need
+    |   outbound mail, which this deployment lacks (MAIL_MAILER=log).
+    |   Recovery is `php artisan admin:reset-password` on the server.
     |
-    | Two-factor and passkeys stay enabled: they are already built, cost
-    | nothing, and are worth having on the single account that controls the
-    | whole site.
+    | Two-factor and passkeys stay enabled: already built, free, worthwhile
+    | on the one account that controls the whole site.
     */
     'features' => [
         Features::twoFactorAuthentication([

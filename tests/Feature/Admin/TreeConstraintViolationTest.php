@@ -12,19 +12,11 @@ use Tests\TestCase;
 /**
  * The seam between a Postgres trigger and a Dutch sentence on a form.
  *
- * Worth its own file because of how it can fail. The friendly messages used to
- * be chosen by searching the raw error text for the substring 'niveaus diep',
- * a string that lives inside a migration — so rewording the trigger would have
- * silently stopped matching, forever, with nothing failing.
- *
- * Nothing failing was the easy part: the depth branch is barely reachable over
- * HTTP at all, because StoreTopicRequest rejects an over-deep parent at the
- * application layer first. The trigger exists for the race the form request
- * cannot close, which means its message is exercised approximately never in
- * practice and would have rotted in total silence.
- *
- * These tests therefore go at the contract directly: make the database raise
- * the real exception, and assert PHP recognises it.
+ * Messages used to be matched by searching raw error text for a substring
+ * that lives in a migration, so rewording the trigger would silently break
+ * matching. The depth branch is also barely reachable over HTTP — the form
+ * request rejects an over-deep parent first — so its message would rot
+ * unexercised; these tests raise the real database exception directly instead.
  */
 class TreeConstraintViolationTest extends TestCase
 {

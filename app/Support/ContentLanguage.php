@@ -3,23 +3,13 @@
 namespace App\Support;
 
 /**
- * Which language the teacher *writes* in.
- *
- * Deliberately not the visitor's interface locale, and the two must never be
- * conflated. `pages.search_vector` is one stored column: it is stemmed once,
- * when the page is saved, by whichever PostgreSQL text-search configuration
- * the trigger picks. Stemming it per visitor is not a thing Postgres can do,
- * and it would be the wrong answer anyway — a Dutch worksheet is still Dutch
- * when an English-reading visitor searches for it.
- *
- * So: the interface follows the visitor (App\Support\Locale), and the corpus
- * follows the owner (this).
- *
- * The value is a PostgreSQL configuration name, not a locale code. They are
- * different vocabularies — `nl` is a locale, `dutch` is a `pg_ts_config` row —
- * and the migration looks the stored value up in that catalogue rather than
- * casting it, so an unknown value falls back instead of throwing on every
- * page save.
+ * Which language the teacher *writes* in — never to be conflated with the
+ * visitor's interface locale (App\Support\Locale). `pages.search_vector` is
+ * stemmed once at save time using this setting; a Dutch worksheet stays
+ * Dutch regardless of who searches for it. The value is a PostgreSQL
+ * configuration name (`dutch`), not a locale code (`nl`) — the migration
+ * looks it up rather than casting it, so an unknown value falls back
+ * instead of throwing on every page save.
  */
 class ContentLanguage
 {
@@ -28,16 +18,9 @@ class ContentLanguage
     public const DEFAULT = 'dutch';
 
     /**
-     * The configurations offered on the settings screen.
-     *
-     * A short list rather than everything `pg_ts_config` holds: these are the
-     * two languages the interface ships, and offering `simple` — which does no
-     * stemming at all — would look like a reasonable choice and quietly make
-     * search worse in both.
-     *
-     * Each maps to the label key describing it. Widening this list means
-     * adding the label to both dictionaries; the configuration itself already
-     * exists in any standard PostgreSQL build.
+     * The configurations offered on the settings screen — a short list, not
+     * everything `pg_ts_config` holds. `simple` (no stemming) would look
+     * reasonable and quietly make search worse in both languages.
      *
      * @var array<string, string>
      */

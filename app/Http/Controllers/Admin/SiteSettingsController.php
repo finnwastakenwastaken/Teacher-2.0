@@ -34,17 +34,15 @@ class SiteSettingsController extends Controller
                 'home_subheading' => $settings['home_subheading'],
                 'home_banner_image_id' => $settings['home_banner_image_id'],
                 'home_content' => $settings['home_content'],
+                'privacy_content' => $settings['privacy_content'],
                 'content_language' => ContentLanguage::current(),
             ],
             'contentLanguages' => ContentLanguage::options(),
-            // Only the images these three settings point at — at most three,
-            // so that this screen does not grow with the library. The pickers
-            // search App\Http\Controllers\Admin\MediaSearchController for
-            // anything else, a capped page of matches at a time.
-            //
-            // whereIntegerInRaw over the ids rather than three separate
-            // lookups, and array_filter first because an unset setting is
-            // null: `whereIn('id', [null])` matches nothing but still asks.
+            // Only the images these three settings point at, so this screen
+            // does not grow with the library; the pickers search
+            // MediaSearchController for anything else. array_filter first
+            // because an unset setting is null, and `whereIn('id', [null])`
+            // would still run a pointless query.
             'selectedImages' => Image::query()
                 ->whereIntegerInRaw('id', array_values(array_filter([
                     $settings['site_logo_image_id'],
@@ -61,18 +59,25 @@ class SiteSettingsController extends Controller
     {
         $values = $request->validated();
 
-        // validated() only returns keys that have rules, and `home_content`
-        // has a rule on its shape rather than its contents — so the document
-        // is read from the request and whitelisted here. Same trap as the
-        // page editor; see the technical reference.
-        //
-        // Guarded on presence for the same reason the topic introduction is:
-        // sanitising an absent key yields null, which would replace the
-        // homepage introduction with nothing on any request that did not
-        // carry it. Sending an explicit null still clears it.
+        // validated() only returns keys with rules, and `home_content` is
+        // only validated by shape — so it's read from the request and
+        // whitelisted here. Guarded on presence, or an absent key would
+        // sanitise to null and erase the introduction on any request that
+        // omitted it; an explicit null still clears it.
         if ($request->has('home_content')) {
             $values['home_content'] = PageContent::sanitiseWithoutEmbeds(
                 $request->input('home_content')
+            );
+        }
+
+        // The privacy page's owner-written addition, on the same terms and
+        // for the same reason: embeds are stripped because a file is
+        // published by walking from it to the *pages* showing it, and this is
+        // not a page row — an embed here would render for the owner and 403
+        // for every visitor.
+        if ($request->has('privacy_content')) {
+            $values['privacy_content'] = PageContent::sanitiseWithoutEmbeds(
+                $request->input('privacy_content')
             );
         }
 
@@ -81,12 +86,10 @@ class SiteSettingsController extends Controller
 
         SiteSettings::put($values);
 
-        // The trigger only fires on a write, so every page already stored
-        // keeps its old stemming until it is saved again. Without this the
-        // setting appears to take effect and search quietly keeps missing
-        // words — run it here rather than leaving the owner a command to
-        // remember. There is no queue, and the corpus is tens to hundreds of
-        // rows: one statement, synchronously.
+        // The trigger only fires on a write, so already-stored pages keep
+        // their old stemming until reindexed — run it here rather than
+        // leaving the owner a command to remember. No queue needed; the
+        // corpus is small enough to do synchronously.
         if ($languageChanged) {
             Artisan::call('search:reindex');
 

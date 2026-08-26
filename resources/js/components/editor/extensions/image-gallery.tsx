@@ -20,15 +20,10 @@ import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
 /*
- * One or more images, referenced by ULID.
- *
- * The attribute set matches App\Support\PageContent exactly: a `ulids` list,
- * every entry of which must be a real ULID or the whole node is refused on
- * save. Alt text is not stored here — it belongs to the image and is looked
- * up, so editing it in the media library fixes every page at once.
- *
- * parseHTML/renderHTML are only Tiptap's clipboard plumbing — page bodies are
- * stored and loaded as JSON.
+ * One or more images by ULID. Attribute set matches PageContent exactly: a
+ * `ulids` list, every entry a real ULID or the node is refused. Alt text is
+ * looked up, not stored here, so editing it in the library fixes every page
+ * at once. parseHTML/renderHTML are only TipTap's clipboard plumbing.
  */
 
 function toUlidList(value: unknown): string[] {

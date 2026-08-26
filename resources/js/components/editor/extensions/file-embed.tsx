@@ -19,14 +19,10 @@ import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
 /*
- * A single document or video, referenced by ULID.
- *
- * The attribute set matches App\Support\PageContent exactly — that class is
- * the authority, and an attribute it does not know about is dropped on save.
- *
- * parseHTML/renderHTML exist only for Tiptap's internal clipboard handling.
- * Page bodies are stored and loaded as JSON, so neither is ever involved in
- * persistence or in rendering the public page.
+ * A single document or video by ULID. Attribute set matches PageContent
+ * exactly — an attribute it doesn't know is dropped on save.
+ * parseHTML/renderHTML are only TipTap's clipboard plumbing; bodies are
+ * stored and loaded as JSON.
  */
 
 function FileEmbedView(props: ReactNodeViewProps) {

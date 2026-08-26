@@ -6,19 +6,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Full-text search over pages, in PostgreSQL, with the `dutch` configuration.
- *
- * The `dutch` config gives stemming and stop words, so "krachten" finds
- * "kracht" — which an ILIKE scan would not, and which matters more in Dutch
- * than in English because of compounding.
- *
- * Maintained by a trigger rather than by the application: `content_text` is
- * itself derived (see Page::writeContent), and a second derivation done in
- * PHP would be one more thing that can silently fall out of step with the
- * row it describes. The database is the only writer here.
- *
- * Weighted, so a match in a title outranks a passing mention in a body:
- *   A title · B description · C body text
+ * Full-text search over pages, using the `dutch` configuration for stemming
+ * (e.g. "krachten" finds "kracht"). Maintained by a trigger, not the
+ * application, so it can't drift from content_text (itself derived — see
+ * Page::writeContent). Weighted A/B/C: title, description, body.
  */
 return new class extends Migration
 {
@@ -41,11 +32,8 @@ return new class extends Migration
             $$ language plpgsql;
         SQL);
 
-        // BEFORE, so the computed value is part of the row being written
-        // rather than a second UPDATE. Listing the columns keeps unrelated
-        // writes (sort_order, is_hidden) from re-tokenising the whole body —
-        // note that Postgres decides this from the statement's SET list, not
-        // from which values actually changed.
+        // BEFORE avoids a second UPDATE; naming the columns keeps unrelated
+        // writes (sort_order, is_hidden) from re-tokenising the body.
         DB::statement(<<<'SQL'
             create or replace trigger pages_search_vector_trigger
                 before insert or update of title, description, content_text on pages

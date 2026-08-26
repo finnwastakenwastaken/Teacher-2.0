@@ -68,9 +68,8 @@ class ReorderTest extends TestCase
 
     public function test_a_reorder_cannot_mix_topics_from_different_parents()
     {
-        // This is the line between "reorder" and "move". A drag must never be
-        // able to reparent: that path has to handle the depth cap, sibling
-        // slug uniqueness and 301 redirects, and it lives in the edit form.
+        // A drag must never reparent — that path needs the depth cap, sibling
+        // slug uniqueness and 301 redirects, and lives in the edit form instead.
         $parent = $this->topic('Natuurkunde');
         $child = $this->topic('Sterrenkunde', parentId: $parent->id);
         $otherRoot = $this->topic('Scheikunde');
@@ -105,9 +104,8 @@ class ReorderTest extends TestCase
 
     public function test_reordering_writes_no_slug_redirects()
     {
-        // Order is not part of a URL, so moving an item up or down must not
-        // leave a 301 behind. If it did, every drag would litter the
-        // redirect table.
+        // Order isn't part of a URL — a reorder must leave no 301 behind, or
+        // every drag would litter the redirect table.
         $first = $this->topic('Natuurkunde', order: 0);
         $second = $this->topic('Scheikunde', order: 1);
 
@@ -161,9 +159,8 @@ class ReorderTest extends TestCase
 
     public function test_saving_an_unrelated_edit_keeps_the_dragged_order()
     {
-        // The edit form no longer carries an order field, so the request must
-        // keep what dragging set. Defaulting it to 0 here would silently
-        // reshuffle the list every time the owner fixed a typo.
+        // No order field on the edit form — must keep what dragging set;
+        // defaulting to 0 would reshuffle the list on every unrelated edit.
         $topic = $this->topic('Natuurkunde', order: 3);
 
         $this->actingAs($this->admin())

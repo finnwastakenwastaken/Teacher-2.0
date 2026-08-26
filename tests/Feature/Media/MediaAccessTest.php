@@ -12,15 +12,11 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * The "no side door" guarantee (the technical reference): uploaded bytes leave
- * this application through exactly one authorised controller, and nowhere
- * else.
- *
- * MEDIA_X_ACCEL is forced off for the suite (see tests/bootstrap.php) so the
- * controller streams files itself and these tests can assert on real response
- * bodies. Authorisation happens before that branch, so what is proved here
- * holds for the nginx path too — and the header itself is asserted separately
- * below.
+ * The "no side door" guarantee (the technical reference): uploaded bytes leave through
+ * exactly one authorised controller. MEDIA_X_ACCEL is forced off so the controller
+ * streams files itself and these tests can assert on real bodies;
+ * authorisation runs before that branch, so this also holds for the nginx
+ * path (its header is asserted separately below).
  */
 class MediaAccessTest extends TestCase
 {
@@ -202,15 +198,11 @@ class MediaAccessTest extends TestCase
 
     public function test_the_private_disk_creates_files_nginx_can_read()
     {
-        // Two containers share this volume: PHP-FPM writes as www-data,
-        // nginx reads as its own user. Flysystem's private default creates
-        // directories 0700, which nginx cannot even traverse — every gated
-        // URL then 403s in production while this suite stays green, because
-        // tests run with MEDIA_X_ACCEL=false and read the file as the same
-        // user that wrote it.
-        //
-        // Storage::fake() does not inherit the real disk's config, so this
-        // asserts the configuration directly rather than a created file.
+        // PHP-FPM writes as www-data, nginx reads as its own user. Flysystem's
+        // private default creates directories 0700, which nginx can't
+        // traverse, 403ing every gated URL in production while this suite —
+        // reading the file as the user that wrote it — stays green. Asserts
+        // config directly since Storage::fake() doesn't inherit it.
         $dir = config('filesystems.disks.local.permissions.dir.private');
         $file = config('filesystems.disks.local.permissions.file.private');
 
@@ -221,12 +213,9 @@ class MediaAccessTest extends TestCase
 
     public function test_laravels_own_storage_routes_do_not_exist()
     {
-        // `serve => true` on the private disk registers GET and PUT routes at
-        // /storage/{path} that read and write it directly, gated only by a
-        // signed URL — a second way to reach media that skips MediaAccess
-        // entirely, and one that Storage::temporaryUrl() would happily mint
-        // shareable links for. config/filesystems.php turns it off; this is
-        // the guard that keeps it off.
+        // `serve => true` would register GET/PUT routes at /storage/{path}
+        // gated only by a signed URL — a side door around MediaAccess.
+        // config/filesystems.php turns it off; this guards that it stays off.
         $names = collect(Route::getRoutes())->map(fn ($route) => $route->getName())->filter();
 
         $this->assertNotContains('storage.local', $names);

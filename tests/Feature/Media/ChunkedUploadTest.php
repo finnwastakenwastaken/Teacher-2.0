@@ -85,10 +85,8 @@ class ChunkedUploadTest extends TestCase
 
     public function test_completing_describes_the_new_file_for_the_page_editor()
     {
-        // The page editor links what it uploads to the page it is editing, so
-        // it has to learn what the file turned out to be without a reload —
-        // and the type comes from sniffing the bytes, which only the server
-        // can do.
+        // The type comes from sniffing the bytes, so only the server can
+        // tell the editor what the upload turned out to be.
         $admin = User::factory()->create();
         $contents = '%PDF-1.4 werkblad';
 
@@ -157,11 +155,9 @@ class ChunkedUploadTest extends TestCase
     }
 
     /**
-     * The row's ULID and the one in its path used to differ for images and
-     * only for images — the path was built from one and createImage() minted
-     * another. Nothing broke, which is why it survived; it just meant that a
-     * file on disk could not be traced back to its row without a LIKE query,
-     * at exactly the moment someone is trying to work out what went wrong.
+     * The row's ULID and the one in its path used to differ for images only —
+     * the path used one, createImage() minted another — leaving a file that
+     * couldn't be traced back to its row without a LIKE query.
      */
     public function test_an_image_row_and_its_file_carry_the_same_ulid()
     {

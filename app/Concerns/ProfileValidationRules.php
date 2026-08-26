@@ -9,8 +9,22 @@ use Illuminate\Validation\Rule;
 trait ProfileValidationRules
 {
     /**
-     * Get the validation rules used to validate user profiles.
-     *
+     * Lower-cases the address before anything looks at it, so the owner may
+     * type `Teacher@school.nl` and have it work. The `lowercase` rule below
+     * asserts the result rather than policing the input — refusing a capital
+     * letter on the claim screen would be a strange thing to explain, and the
+     * value has to end up lower-case regardless (see User::email()).
+     */
+    protected function prepareForValidation(): void
+    {
+        $email = $this->input('email');
+
+        if (is_string($email)) {
+            $this->merge(['email' => mb_strtolower($email)]);
+        }
+    }
+
+    /**
      * @return array<string, array<int, ValidationRule|array<mixed>|string>>
      */
     protected function profileRules(?int $userId = null): array
@@ -22,8 +36,6 @@ trait ProfileValidationRules
     }
 
     /**
-     * Get the validation rules used to validate user names.
-     *
      * @return array<int, ValidationRule|array<mixed>|string>
      */
     protected function nameRules(): array
@@ -32,7 +44,11 @@ trait ProfileValidationRules
     }
 
     /**
-     * Get the validation rules used to validate user emails.
+     * `lowercase` is not cosmetic and not only a duplicate of the mutator on
+     * User: the uniqueness check below runs on what was submitted, so without
+     * it a mixed-case address is compared against lower-case stored ones,
+     * passes, and then collides once the mutator writes it. It also makes the
+     * screen agree with what is stored rather than silently changing it.
      *
      * @return array<int, ValidationRule|array<mixed>|string>
      */
@@ -42,6 +58,7 @@ trait ProfileValidationRules
             'required',
             'string',
             'email',
+            'lowercase',
             'max:255',
             $userId === null
                 ? Rule::unique(User::class)

@@ -13,48 +13,32 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * An archive has to be enough to stand this site up somewhere else. That means
- * two halves — the database and the private media disk — and a dump of one
- * without the other is worse than no backup at all, because it restores into
- * a site full of broken links that looks like it worked.
- *
- * These tests exercise the real pg_dump and the real tar. There is no value in
- * a backup test that mocks the thing doing the backing up.
+ * An archive must contain both the database and the private media disk — one
+ * without the other restores into a site full of broken links. These tests
+ * run the real pg_dump and tar rather than mocking them.
  */
 class BackupArchiveTest extends TestCase
 {
-    /*
-     * DatabaseTruncation, not RefreshDatabase, and it is not a preference.
-     *
-     * RefreshDatabase wraps each test in an open transaction. pg_dump connects
-     * on its own connection and sees only committed data, so every archive
-     * made under it would be of an empty database — a test that passes while
-     * proving nothing. The restore is worse: psql drops and recreates tables
-     * the open transaction still holds locks on.
-     */
+    // DatabaseTruncation, not RefreshDatabase: pg_dump runs on its own
+    // connection and would see nothing inside RefreshDatabase's open
+    // transaction, and a restore's psql would deadlock against its locks.
     use DatabaseTruncation;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Both disks are faked. Without the media one, a test that deletes
-        // the image directory to check the empty case would delete the
-        // developer's own media volume — the suite runs in the same
-        // container, against the same storage path.
+        // Both disks are faked, or a test deleting the image directory would
+        // delete the developer's own media volume.
         Storage::fake('local');
         Storage::fake('backups');
     }
 
     /**
-     * Clean up after ourselves, which no other test in the suite has to do.
-     *
-     * A restore commits: psql drops and recreates the tables on its own
-     * connection, outside any transaction this process controls. Nothing rolls
-     * that back. Every RefreshDatabase test that runs afterwards assumes it
-     * starts on an empty database — that assumption is the whole trait — so
-     * leaving rows behind here breaks tests three directories away, with a
-     * failure message that points at them and not at us.
+     * A restore commits on its own connection, outside any transaction this
+     * process controls, so nothing rolls it back automatically. Later
+     * RefreshDatabase tests assume an empty database; leaving rows here would
+     * fail them instead of us.
      */
     protected function tearDown(): void
     {

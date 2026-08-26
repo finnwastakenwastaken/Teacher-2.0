@@ -117,11 +117,9 @@ class TopicController extends Controller
     {
         try {
             $topic->delete();
-            // Thrown from a `deleting` model event, which PHPStan cannot
-            // see from here — so it reports this catch as dead. It is not:
-            // remove it and "this still has things depending on it" becomes
-            // a 500. The guard lives on the model exactly so that no delete
-            // path can skip it.
+            // Thrown from a `deleting` model event, invisible to PHPStan from
+            // here, so it flags this catch as dead. It is not: removing it
+            // turns "still in use" into a 500.
             // @phpstan-ignore catch.neverThrown
         } catch (DependentRecordsExistException $e) {
             return back()->with('error', $e->getMessage());
@@ -156,17 +154,22 @@ class TopicController extends Controller
         return $this->branch(
             null,
             Topic::query()->orderBy('sort_order')->get(),
-            Page::query()->orderBy('sort_order')->get(['id', 'topic_id', 'title', 'slug', 'is_hidden']),
+            // `draft_saved_at` is selected, not `draft_content`: the concept
+            // badge needs to know a concept exists, and loading a jsonb body
+            // per row to answer a boolean is the expensive way to be told.
+            // Leaving the column out entirely would be worse than expensive —
+            // an unselected attribute reads as null, so hasDraft() would
+            // answer "no concept" for every page and look correct.
+            Page::query()->orderBy('sort_order')
+                ->get(['id', 'topic_id', 'title', 'slug', 'is_hidden', 'draft_saved_at']),
         );
     }
 
     /**
-     * One level of the tree, recursing into its children.
-     *
-     * A named method rather than a recursive closure: a closure that calls
-     * itself has no return type the analyser can settle on, so it infers the
-     * shape one level deeper on every pass and never terminates on an answer.
-     * Both collections are passed down so the whole tree costs two queries.
+     * One level of the tree, recursing into its children. A named method
+     * rather than a recursive closure — PHPStan can't settle on a return type
+     * for a self-calling closure. Both collections are passed down so the
+     * whole tree costs two queries.
      *
      * @param  Collection<int, Topic>  $topics
      * @param  Collection<int, Page>  $pages
@@ -188,27 +191,32 @@ class TopicController extends Controller
                 'is_hidden' => $topic->is_hidden,
                 'depth' => $topic->depth,
                 'children' => $this->branch($topic->id, $topics, $pages),
-                'pages' => $pages->where('topic_id', $topic->id)->values(),
+                // Shaped by hand rather than serialised: `has_draft` is a
+                // question, not a column, and sending draft_saved_at raw
+                // would put a timestamp on screen where a badge belongs.
+                'pages' => $pages->where('topic_id', $topic->id)
+                    ->map(fn (Page $page): array => [
+                        'id' => $page->id,
+                        'title' => $page->title,
+                        'slug' => $page->slug,
+                        'is_hidden' => $page->is_hidden,
+                        'has_draft' => $page->hasDraft(),
+                    ])
+                    ->values(),
             ])
             ->values();
     }
 
     /**
      * Show the owner what they can fix — or let a real failure be a failure.
-     *
-     * This used to catch every QueryException and put the same sentence on
-     * the slug field, so a connection drop, a full disk and a genuine slug
-     * clash were indistinguishable to the owner and invisible in the log. Now
-     * only the two violations the triggers raise deliberately are dressed up;
-     * anything else is reported and rethrown, because a 500 with a stack
-     * trace is more use than a wrong hint on a field that is fine.
+     * Only the two violations the triggers raise deliberately get a friendly
+     * slug-field message; anything else is reported and rethrown, since a
+     * stack trace beats a wrong hint on a field that's fine.
      */
     private function refuse(QueryException $e): RedirectResponse
     {
         $message = TreeConstraintViolation::message($e);
 
-        // Logged either way. An anticipated refusal is still worth a line
-        // when someone is working out why a save keeps bouncing.
         report($e);
 
         if ($message === null) {
